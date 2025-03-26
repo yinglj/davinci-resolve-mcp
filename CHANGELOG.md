@@ -2,6 +2,25 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
+## [1.3.0] - 2025-03-26
+
+### Added
+- Support for adding clips to timeline directly by name
+- Intelligent marker placement with frame detection
+- Enhanced logging and error reporting
+- Improved code organization with modular architecture
+
+### Changed
+- Reorganized project structure for better maintainability
+- Enhanced Claude Desktop integration with better error handling
+- Optimized connection to DaVinci Resolve for faster response times
+- Updated documentation to include more examples
+
+### Fixed
+- Issues with marker placement on empty timelines
+- Media pool navigation in complex project structures
+- Timing issues when rapidly sending commands to DaVinci Resolve
+
 ## [1.1.0] - 2025-03-26
 
 ### Added
