@@ -18,8 +18,8 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
 
 | Client | macOS | Windows | Linux |
 |--------|-------|---------|-------|
-| Cursor | ✅ Priority | 🟡 Planned | ❌ |
-| Claude Desktop | ✅ Full Functionality | 🟡 Planned | ❌ |
+| Cursor | ✅ Priority | ⚠️ Experimental | ❌ |
+| Claude Desktop | ✅ Full Functionality | ⚠️ Experimental | ❌ |
 
 ## Implementation Methods
 
@@ -34,43 +34,43 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
 
 | Feature | Implementation | Cursor (Mac) | Claude (Mac) | Cursor (Win) | Claude (Win) | Notes |
 |---------|---------------|--------------|--------------|--------------|--------------|-------|
-| Get Resolve Version | ✅ | ✅ | ✅ | ❌ | ❌ | Returns product name and version string |
-| Get Current Page | ✅ | ✅ | ✅ | ❌ | ❌ | Returns active page in UI |
-| Switch Page | ✅ | ✅ | ✅ | ❌ | ❌ | Changes UI to specified page |
+| Get Resolve Version | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Returns product name and version string |
+| Get Current Page | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Returns active page in UI |
+| Switch Page | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Changes UI to specified page |
 
 ### Project Management
 
 | Feature | Implementation | Cursor (Mac) | Claude (Mac) | Cursor (Win) | Claude (Win) | Notes |
 |---------|---------------|--------------|--------------|--------------|--------------|-------|
-| List Projects | ✅ | ✅ | ✅ | ❌ | ❌ | Gets all project names in database |
-| Get Current Project Name | ✅ | ✅ | ✅ | ❌ | ❌ | Returns name of open project |
-| Open Project | ✅ | ✅ | ✅ | ❌ | ❌ | Opens project by name |
-| Create New Project | ✅ | ✅ | ✅ | ❌ | ❌ | Creates project with given name |
-| Save Project | ✅ | ✅ | ✅ | ❌ | ❌ | Fixed with multi-method approach |
+| List Projects | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Gets all project names in database |
+| Get Current Project Name | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Returns name of open project |
+| Open Project | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Opens project by name |
+| Create New Project | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Creates project with given name |
+| Save Project | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Fixed with multi-method approach |
 | Close Project | ❌ | ❌ | ❌ | ❌ | ❌ | Close current project |
-| Get/Set Project Settings | ✅ | ✅ | ✅ | ❌ | ❌ | Manages project configuration |
+| Get/Set Project Settings | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Manages project configuration |
 
 ### Timeline Operations
 
 | Feature | Implementation | Cursor (Mac) | Claude (Mac) | Cursor (Win) | Claude (Win) | Notes |
 |---------|---------------|--------------|--------------|--------------|--------------|-------|
-| List Timelines | ✅ | ✅ | ✅ | ❌ | ❌ | Lists all timelines in project |
-| Get Current Timeline | ✅ | ✅ | ✅ | ❌ | ❌ | Returns current timeline info |
-| Create Timeline | ✅ | ✅ | ✅ | ❌ | ❌ | Creates new timeline with name |
-| Set Current Timeline | ✅ | ✅ | ✅ | ❌ | ❌ | Switches to timeline by name |
-| Add Markers | ✅ | ✅ | ✅ | ❌ | ❌ | Adds markers with color and notes |
-| List Timeline Clips | ✅ | ✅ | ✅ | ❌ | ❌ | Lists clips in timeline |
+| List Timelines | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Lists all timelines in project |
+| Get Current Timeline | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Returns current timeline info |
+| Create Timeline | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Creates new timeline with name |
+| Set Current Timeline | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Switches to timeline by name |
+| Add Markers | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Adds markers with color and notes |
+| List Timeline Clips | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Lists clips in timeline |
 | Delete Timeline | ❌ | ❌ | ❌ | ❌ | ❌ | Removes a timeline |
 | Get Timeline Tracks | ❌ | ❌ | ❌ | ❌ | ❌ | Gets video/audio track structure |
-| Add Clips to Timeline | ✅ | ✅ | ✅ | ❌ | ❌ | Adds media pool clips to timeline |
+| Add Clips to Timeline | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Adds media pool clips to timeline |
 
 ### Media Pool Operations
 
 | Feature | Implementation | Cursor (Mac) | Claude (Mac) | Cursor (Win) | Claude (Win) | Notes |
 |---------|---------------|--------------|--------------|--------------|--------------|-------|
-| List Media Pool Clips | ✅ | ✅ | ✅ | ❌ | ❌ | Lists clips in root folder |
-| Import Media | ✅ | ✅ | ✅ | ❌ | ❌ | Imports files to media pool |
-| Create Bins | ✅ | ✅ | ✅ | ❌ | ❌ | Creates organizational folders |
+| List Media Pool Clips | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Lists clips in root folder |
+| Import Media | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Imports files to media pool |
+| Create Bins | ✅ | ✅ | ✅ | ⚠️ | ⚠️ | Creates organizational folders |
 | List Bins | ❌ | ❌ | ❌ | ❌ | ❌ | Lists all bins/folders |
 | Get Bin Contents | ❌ | ❌ | ❌ | ❌ | ❌ | Lists contents of specific bin |
 | Delete Media | ❌ | ❌ | ❌ | ❌ | ❌ | Removes media from pool |
@@ -97,6 +97,7 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
 | Get Render Status | ❌ | ❌ | ❌ | ❌ | ❌ | Check job status |
 
 ## Notes on Recent Improvements
+- Added experimental Windows support in v1.3.2 with platform-specific path detection
 - Completed full integration with Claude Desktop on macOS
 - Claude Desktop now has full feature parity with Cursor on macOS
 - Implementation uses properly configured environment variables for Resolve API access
@@ -108,16 +109,19 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
    - ✅ Complete Claude Desktop functionality on macOS
    - 🔄 Improve error handling for API calls
    - 🔄 Expand media pool and color page operations
+   - 🔄 Stabilize Windows support
 
 2. **Next Steps**:
    - 🔄 Develop comprehensive error reporting
+   - 🔄 Improve Windows integration and compatibility
    - 🟡 Implement more advanced timeline editing operations
    - 🟡 Add support for Fusion page functionality
 
 3. **Future Work**:
-   - 🟡 Windows support expansion
+   - 🔄 Windows support expansion
    - 🟡 Implement missing API functions
    - 🟡 Enhance cross-platform compatibility
+   - 🟡 Linux support investigation
 
 ## Implementation Notes
 
@@ -140,6 +144,10 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
     - Check server status
     - Start servers with specific DaVinci Resolve projects
     - Force server startup when DaVinci Resolve process isn't detected
+- **Platform Support**:
+  - macOS: Fully supported and tested
+  - Windows: Experimental support added in v1.3.2
+  - Linux: Not currently implemented
 
 ## Testing Procedure
 
@@ -150,3 +158,4 @@ For each feature, testing involves:
 4. Cross-checking results for accuracy
 
 Features are marked as "✅ Implemented and tested" only after all steps are completed successfully. 
+Windows features are currently marked as "⚠️ Implemented but needs testing" as they require more field testing. 

@@ -2,6 +2,27 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
+## [1.3.2] - 2025-03-28
+
+### Added
+- Experimental Windows support with platform-specific path detection
+- Dynamic environment setup based on operating system
+- Platform utility module for handling OS-specific paths and configurations
+- Enhanced error messages with platform-specific environment setup instructions
+- Windows pre-launch check script (PowerShell) with automatic environment configuration
+- Windows batch file launcher for easy execution of the pre-launch check
+
+### Changed
+- Refactored path setup code to use platform detection
+- Improved logging with platform-specific information
+- Updated documentation to reflect Windows compatibility status
+- Enhanced README with Windows-specific configuration instructions
+
+### Fixed
+- Platform-dependent path issues that prevented Windows compatibility
+- Environment variable handling for cross-platform use
+- Windows-specific configuration paths for Cursor integration
+
 ## [1.3.1] - 2025-03-27
 
 ### Added

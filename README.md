@@ -1,5 +1,12 @@
 # DaVinci Resolve MCP Server
 
+[![Version](https://img.shields.io/badge/version-1.3.2-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
+[![DaVinci Resolve](https://img.shields.io/badge/DaVinci%20Resolve-18.5+-darkred.svg)](https://www.blackmagicdesign.com/products/davinciresolve)
+[![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://www.python.org/downloads/)
+[![macOS](https://img.shields.io/badge/macOS-stable-brightgreen.svg)](https://www.apple.com/macos/)
+[![Windows](https://img.shields.io/badge/Windows-experimental-yellow.svg)](https://www.microsoft.com/windows)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
 A Model Context Protocol (MCP) server that connects AI coding assistants (Cursor, Claude Desktop) to DaVinci Resolve, enabling them to query and control DaVinci Resolve through natural language.
 
 ## Features
@@ -9,89 +16,123 @@ A Model Context Protocol (MCP) server that connects AI coding assistants (Cursor
 - **Timeline Operations**: Create timelines, switch between them, add markers
 - **Media Management**: Import media, create bins, list clips
 - **Multi-Client Support**: Works with both Cursor and Claude Desktop
+- **Cross-Platform**: Full support for macOS with experimental Windows support
 
 ## Requirements
 
-- **macOS** with DaVinci Resolve installed
+- **macOS** or **Windows** with DaVinci Resolve installed (macOS recommended for stable operation)
 - **Python 3.6+**
 - DaVinci Resolve running in the background
 
-## Quick Start
+## Platform Support
 
-The easiest way to get started is with our quick setup script:
+| Platform | Status |
+|----------|--------|
+| macOS | ✅ Fully supported and tested |
+| Windows | ⚠️ Experimental support (v1.3.2+) |
+| Linux | ❌ Not currently supported |
+
+## Quick Start Guide
+
+The fastest way to get up and running with DaVinci Resolve MCP:
+
+### For macOS Users
 
 ```bash
 # Clone the repository 
 git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
 cd davinci-resolve-mcp
 
-# Make the script executable
+# Make the script executable and run the quick start script
 chmod +x scripts/run-now.sh
-
-# Run the quick setup script (this creates a virtual environment)
 ./scripts/run-now.sh
 ```
 
-This will:
-1. Create a Python virtual environment
-2. Install the necessary dependencies
-3. Set up environment variables
-4. Start the MCP server in development mode
+### For Windows Users
 
-## Pre-Launch Check
+```
+# Simply double-click run-now.bat in the repository root
+# or run it from Command Prompt
+run-now.bat
+```
 
-To ensure smooth operation, we've included pre-launch scripts that verify all necessary components are installed and DaVinci Resolve is running before connecting to AI assistants:
+These quick start scripts will:
+1. Check if DaVinci Resolve is running
+2. Create a Python virtual environment
+3. Install the MCP SDK from the official repository
+4. Set up environment variables
+5. Configure Cursor/Claude integration
+6. Start the MCP server in development mode
 
-### New Universal Launcher
+## Launch Options
 
-We now offer a unified launcher script that lets you manage both Cursor and Claude Desktop MCP servers:
+After installation, you have several ways to start the server:
+
+### Client-Specific Launch Scripts
+
+The repository includes dedicated scripts for launching with specific clients:
 
 ```bash
-# Make the script executable
-chmod +x mcp_resolve_launcher.sh
+# For Cursor integration (macOS)
+chmod +x scripts/mcp_resolve-cursor_start
+./scripts/mcp_resolve-cursor_start
+
+# For Claude Desktop integration (macOS)
+chmod +x scripts/mcp_resolve-claude_start
+./scripts/mcp_resolve-claude_start
+```
+
+These specialized scripts:
+- Set up the proper environment for each client
+- Verify DaVinci Resolve is running
+- Configure client-specific settings
+- Start the MCP server with appropriate parameters
+
+### Pre-Launch Check
+
+Before connecting AI assistants, verify your environment is properly configured:
+
+```bash
+# On macOS
+./scripts/check-resolve-ready.sh
+
+# On Windows
+./scripts/check-resolve-ready.bat
+```
+
+These scripts will:
+- Verify DaVinci Resolve is running (and offer to start it)
+- Check environment variables are properly set
+- Ensure the Python environment is configured correctly
+- Validate Cursor/Claude configuration
+- Optionally launch Cursor
+
+### Universal Launcher
+
+For advanced users, our unified launcher provides full control over both Cursor and Claude Desktop servers:
+
+```bash
+# Make the script executable (macOS only)
+chmod +x scripts/mcp_resolve_launcher.sh
 
 # Run in interactive mode
-./mcp_resolve_launcher.sh
+./scripts/mcp_resolve_launcher.sh
 
 # Or use command line options
-./mcp_resolve_launcher.sh --start-cursor    # Start Cursor server
-./mcp_resolve_launcher.sh --start-claude    # Start Claude Desktop server
-./mcp_resolve_launcher.sh --start-both      # Start both servers
-./mcp_resolve_launcher.sh --stop-all        # Stop all running servers
-./mcp_resolve_launcher.sh --status          # Show server status
+./scripts/mcp_resolve_launcher.sh --start-cursor    # Start Cursor server (uses mcp_resolve-cursor_start)
+./scripts/mcp_resolve_launcher.sh --start-claude    # Start Claude Desktop server (uses mcp_resolve-claude_start)
+./scripts/mcp_resolve_launcher.sh --start-both      # Start both servers
+./scripts/mcp_resolve_launcher.sh --stop-all        # Stop all running servers
+./scripts/mcp_resolve_launcher.sh --status          # Show server status
 ```
 
-The launcher provides an interactive menu for:
-- Starting Cursor or Claude Desktop servers individually or together
-- Stopping servers
-- Checking server status
-- Force mode (skip Resolve running check) with `--force` flag
-- Project selection with `--project "Project Name"` flag
-
-### Legacy Pre-Launch Check
-
-The original pre-launch check script is still available:
-
-```bash
-# Make the script executable
-chmod +x scripts/check-resolve-ready.sh
-
-# Run the pre-launch check
-./scripts/check-resolve-ready.sh
-```
-
-This script will:
-1. Check if DaVinci Resolve is running (and offer to start it if not)
-2. Verify environment variables are properly set
-3. Ensure the Python virtual environment is ready
-4. Check and update Cursor MCP configuration as needed
-5. Optionally launch Cursor when ready
-
-**Using a pre-launch script is strongly recommended before working with DaVinci Resolve and AI assistants together.**
+Additional options:
+- Force mode (skip Resolve running check): `--force`
+- Project selection: `--project "Project Name"`
 
 ## Full Installation
 
-For a complete installation with AI assistant integration:
+For a complete manual installation:
 
 1. Clone this repository:
    ```bash
@@ -99,45 +140,49 @@ For a complete installation with AI assistant integration:
    cd davinci-resolve-mcp
    ```
 
-2. Run the setup script:
+2. Create a Python virtual environment:
    ```bash
-   chmod +x scripts/setup.sh
-   ./scripts/setup.sh
+   # Create virtual environment
+   python -m venv venv
+   
+   # Activate it
+   # On macOS/Linux:
+   source venv/bin/activate
+   # On Windows:
+   venv\Scripts\activate
+   
+   # Install MCP SDK from the official repository
+   pip install git+https://github.com/modelcontextprotocol/python-sdk.git
    ```
 
-3. Set up DaVinci Resolve scripting environment variables. Add the following to your shell profile (`.zshrc`, `.bash_profile`, etc.):
+3. Set up DaVinci Resolve scripting environment variables:
+
+   **For macOS**:
    ```bash
    export RESOLVE_SCRIPT_API="/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting"
    export RESOLVE_SCRIPT_LIB="/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so"
    export PYTHONPATH="$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"
    ```
 
-4. Make sure DaVinci Resolve is running before starting the server.
+   **For Windows**:
+   ```cmd
+   set RESOLVE_SCRIPT_API=C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting
+   set RESOLVE_SCRIPT_LIB=C:\Program Files\Blackmagic Design\DaVinci Resolve\fusionscript.dll
+   set PYTHONPATH=%PYTHONPATH%;%RESOLVE_SCRIPT_API%\Modules
+   ```
+   
+   Alternatively, run the pre-launch check script which will set these for you:
+   ```
+   # On macOS
+   ./scripts/check-resolve-ready.sh
+   
+   # On Windows
+   ./scripts/check-resolve-ready.bat
+   ```
 
-## Server Management
+4. Configure Cursor to use the server by creating a configuration file:
 
-The project includes a consolidated server management script:
-
-```bash
-# Start the server in the background
-./scripts/server.sh start
-
-# Check server status
-./scripts/server.sh status
-
-# Start in development mode (foreground)
-./scripts/server.sh dev
-
-# Stop the server
-./scripts/server.sh stop
-
-# Restart the server
-./scripts/server.sh restart
-```
-
-## Usage with Cursor
-
-1. The setup script will automatically configure Cursor to use the server, or you can manually create a `.cursor/mcp.json` file:
+   **For macOS** (`~/.cursor/mcp.json`):
    ```json
    {
      "mcpServers": {
@@ -150,11 +195,42 @@ The project includes a consolidated server management script:
    }
    ```
 
-2. **Important**: Run the pre-launch check script before starting Cursor to ensure all components are ready:
-   ```bash
-   ./scripts/check-resolve-ready.sh
+   **For Windows** (`%APPDATA%\Cursor\mcp.json`):
+   ```json
+   {
+     "mcpServers": {
+       "davinci-resolve": {
+         "name": "DaVinci Resolve MCP",
+         "command": "C:\\path\\to\\venv\\Scripts\\python.exe",
+         "args": ["C:\\path\\to\\davinci-resolve-mcp\\resolve_mcp_server.py"]
+       }
+     }
+   }
    ```
-   This script will verify DaVinci Resolve is running and all components are properly configured.
+
+5. Start the server using one of the client-specific scripts:
+   ```bash
+   # For Cursor
+   ./scripts/mcp_resolve-cursor_start
+   
+   # For Claude Desktop
+   ./scripts/mcp_resolve-claude_start
+   ```
+
+## Usage with AI Assistants
+
+### Using with Cursor
+
+1. Start the Cursor server using the dedicated script:
+   ```bash
+   ./scripts/mcp_resolve-cursor_start
+   ```
+   Or use the universal launcher:
+   ```bash
+   ./scripts/mcp_resolve_launcher.sh --start-cursor
+   ```
+
+2. Start Cursor and open a project.
 
 3. In Cursor's AI chat, you can now interact with DaVinci Resolve. Try commands like:
    - "What version of DaVinci Resolve is running?"
@@ -162,11 +238,20 @@ The project includes a consolidated server management script:
    - "Create a new timeline called 'My Sequence'"
    - "Add a marker at the current position"
 
-## Usage with Claude Desktop
+### Using with Claude Desktop
 
-1. Create a `claude_desktop_config.json` file in your Claude Desktop configuration directory. The setup script can do this for you, or you can create it manually using the template in the `config-templates` directory.
+1. Create a `claude_desktop_config.json` file in your Claude Desktop configuration directory using the template in the `config-templates` directory.
 
-2. In Claude Desktop, you can now interact with DaVinci Resolve using the same commands as with Cursor.
+2. Run the Claude Desktop server using the dedicated script:
+   ```bash
+   ./scripts/mcp_resolve-claude_start
+   ```
+   Or use the universal launcher:
+   ```bash
+   ./scripts/mcp_resolve_launcher.sh --start-claude
+   ```
+
+3. In Claude Desktop, you can now interact with DaVinci Resolve using the same commands as with Cursor.
 
 ## Available Features
 
@@ -192,22 +277,17 @@ The project includes a consolidated server management script:
 - List media pool clips
 - Import media file
 - Create media bin
+- Add clip to timeline
+
+## Windows Support Notes
+
+Windows support is experimental in v1.3.2 and may require additional troubleshooting:
+- Ensure DaVinci Resolve is installed in the default location
+- Environment variables are properly set as described above
+- Windows paths may require adjustment based on your installation
+- For issues, please check the logs in the `logs/` directory
 
 ## Troubleshooting
-
-### Python Environment Issues
-If you encounter Python installation errors, the setup script creates a virtual environment to avoid system conflicts. If you need to manually set it up:
-
-```bash
-# Create virtual environment
-python3 -m venv venv
-
-# Activate it
-source venv/bin/activate
-
-# Install MCP
-pip install mcp
-```
 
 ### DaVinci Resolve Connection
 Make sure DaVinci Resolve is running before starting the server. If the server can't connect to Resolve, check that:
@@ -225,18 +305,40 @@ davinci-resolve-mcp/
 ├── FEATURES.md               # Feature matrix
 ├── LICENSE                   # License information
 ├── resolve_mcp_server.py     # Main server implementation
+├── mcp_resolve_launcher.sh   # Symbolic link to the universal launcher
+├── run-now.sh                # Symbolic link to the quick start script
+├── run-now.bat               # Symbolic link to the Windows quick start script
+├── src/                      # Source code modules
+│   └── utils/                # Utility modules
+│       ├── platform.py       # Platform-specific functionality
+│       └── resolve_connection.py # Resolve connection utilities
 ├── config-templates/         # Configuration templates
-│   ├── cursor-mcp.template.json
-│   └── claude-desktop.template.json
+│   ├── README.md             # Template documentation
+│   ├── cursor-mcp-config.template.json # Cursor configuration template
+│   └── claude-desktop-config.template.json # Claude Desktop configuration template
 ├── scripts/                  # Helper scripts
+│   ├── README.md             # Script documentation
 │   ├── run-now.sh            # Quick start script
+│   ├── run-now.bat           # Quick start script (Windows)
+│   ├── check-resolve-ready.bat # Pre-launch check (Windows)
 │   ├── setup.sh              # Full installation
 │   ├── server.sh             # Consolidated server management
+│   ├── mcp_resolve_launcher.sh # Universal launcher script
+│   ├── mcp_resolve-cursor_start # Cursor-specific launcher
+│   ├── mcp_resolve-claude_start # Claude-specific launcher
 │   └── check-resolve-ready.sh # Pre-launch check
 ├── examples/                 # Example usage scripts
+│   ├── README.md             # Examples documentation
+│   ├── getting_started.py    # Simple starter example
 │   ├── markers/              # Marker-related examples
+│   │   ├── README.md         # Marker examples documentation
+│   │   └── ...               # Marker example scripts
 │   ├── timeline/             # Timeline examples
+│   │   ├── README.md         # Timeline examples documentation
+│   │   └── ...               # Timeline example scripts
 │   └── media/                # Media management examples
+│       ├── README.md         # Media examples documentation
+│       └── ...               # Media example scripts
 └── venv/                     # Python virtual environment (created by setup script)
 ```
 

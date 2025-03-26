@@ -22,7 +22,7 @@ var/
 *.egg
 
 # Logs and temporary files
-logs/
+logs/*.log
 *.log
 *.swp
 .DS_Store
@@ -86,6 +86,13 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Keep the logs directory but not its contents
+logs/*
+!logs/.gitkeep
+
+# Any backup directories
+*_backup/
 
 # Cursor
 .cursor/ 

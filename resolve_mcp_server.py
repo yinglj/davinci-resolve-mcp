@@ -2,6 +2,8 @@
 """
 DaVinci Resolve MCP Server
 A server that connects to DaVinci Resolve via the Model Context Protocol (MCP)
+
+Version: 1.3.2 - Experimental Windows Support
 """
 
 import os
@@ -9,10 +11,20 @@ import sys
 import logging
 from typing import List, Dict, Any, Optional
 
-# Set environment variables for DaVinci Resolve scripting
-RESOLVE_API_PATH = "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting"
-RESOLVE_LIB_PATH = "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so"
-RESOLVE_MODULES_PATH = os.path.join(RESOLVE_API_PATH, "Modules")
+# Add src directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, 'src')
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
+# Import platform utilities
+from src.utils.platform import setup_environment, get_platform, get_resolve_paths
+
+# Setup platform-specific paths and environment variables
+paths = get_resolve_paths()
+RESOLVE_API_PATH = paths["api_path"]
+RESOLVE_LIB_PATH = paths["lib_path"]
+RESOLVE_MODULES_PATH = paths["modules_path"]
 
 os.environ["RESOLVE_SCRIPT_API"] = RESOLVE_API_PATH
 os.environ["RESOLVE_SCRIPT_LIB"] = RESOLVE_LIB_PATH
@@ -31,6 +43,13 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("davinci-resolve-mcp")
+
+# Log server version and platform
+VERSION = "1.3.2"
+logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
+logger.info(f"Detected platform: {get_platform()}")
+logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")
+logger.info(f"Using Resolve library path: {RESOLVE_LIB_PATH}")
 
 # Create MCP server instance
 mcp = FastMCP("DaVinciResolveMCP")
