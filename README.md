@@ -40,7 +40,37 @@ This will:
 
 ## Pre-Launch Check
 
-To ensure smooth operation, we've included a pre-launch check script that verifies all necessary components are installed and DaVinci Resolve is running before connecting Cursor:
+To ensure smooth operation, we've included pre-launch scripts that verify all necessary components are installed and DaVinci Resolve is running before connecting to AI assistants:
+
+### New Universal Launcher
+
+We now offer a unified launcher script that lets you manage both Cursor and Claude Desktop MCP servers:
+
+```bash
+# Make the script executable
+chmod +x mcp_resolve_launcher.sh
+
+# Run in interactive mode
+./mcp_resolve_launcher.sh
+
+# Or use command line options
+./mcp_resolve_launcher.sh --start-cursor    # Start Cursor server
+./mcp_resolve_launcher.sh --start-claude    # Start Claude Desktop server
+./mcp_resolve_launcher.sh --start-both      # Start both servers
+./mcp_resolve_launcher.sh --stop-all        # Stop all running servers
+./mcp_resolve_launcher.sh --status          # Show server status
+```
+
+The launcher provides an interactive menu for:
+- Starting Cursor or Claude Desktop servers individually or together
+- Stopping servers
+- Checking server status
+- Force mode (skip Resolve running check) with `--force` flag
+- Project selection with `--project "Project Name"` flag
+
+### Legacy Pre-Launch Check
+
+The original pre-launch check script is still available:
 
 ```bash
 # Make the script executable
@@ -57,7 +87,7 @@ This script will:
 4. Check and update Cursor MCP configuration as needed
 5. Optionally launch Cursor when ready
 
-**Using the pre-launch script is strongly recommended before working with DaVinci Resolve and Cursor together.**
+**Using a pre-launch script is strongly recommended before working with DaVinci Resolve and AI assistants together.**
 
 ## Full Installation
 

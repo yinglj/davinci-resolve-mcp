@@ -132,6 +132,14 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
 - **Startup Scripts**:
   - `run-direct-server.sh`: Basic script to launch the JSON-RPC server
   - `mcp_resolve-cursor_start`: Enhanced startup script with environment validation, Resolve running check, and better error reporting
+  - `mcp_resolve-claude_start`: Dedicated startup script for Claude Desktop integration
+  - `mcp_resolve_launcher.sh`: Universal launcher that provides an interactive menu and command-line options to:
+    - Start/stop Cursor MCP server
+    - Start/stop Claude Desktop MCP server
+    - Start/stop both servers simultaneously
+    - Check server status
+    - Start servers with specific DaVinci Resolve projects
+    - Force server startup when DaVinci Resolve process isn't detected
 
 ## Testing Procedure
 

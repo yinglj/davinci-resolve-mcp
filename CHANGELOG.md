@@ -2,6 +2,29 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
+## [1.3.1] - 2025-03-27
+
+### Added
+- Universal launcher script (`mcp_resolve_launcher.sh`) that provides both interactive and command-line interfaces for:
+  - Starting and stopping Cursor MCP server
+  - Starting and stopping Claude Desktop MCP server
+  - Running both servers simultaneously
+  - Checking server status
+  - Forcing server start even if DaVinci Resolve isn't detected
+  - Specifying a project to open on server start
+- Improved Claude Desktop integration script with better error handling and force mode
+- Enhanced detection for running DaVinci Resolve process
+
+### Changed
+- Updated documentation to include new universal launcher functionality
+- Improved server startup process with better error handling and logging
+- Enhanced cross-client compatibility between Cursor and Claude Desktop
+- Relocated and improved marker test script from root to examples/markers directory with better documentation and organization
+
+### Fixed
+- Process detection issues when looking for running DaVinci Resolve
+- Signal handling in server scripts for cleaner termination
+
 ## [1.3.0] - 2025-03-26
 
 ### Added
