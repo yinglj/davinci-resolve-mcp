@@ -22,8 +22,8 @@ The easiest way to get started is with our quick setup script:
 
 ```bash
 # Clone the repository 
-git clone https://github.com/yourusername/davinci-resolve-mcp-server.git
-cd davinci-resolve-mcp-server
+git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
+cd davinci-resolve-mcp
 
 # Make the script executable
 chmod +x scripts/run-now.sh
@@ -65,8 +65,8 @@ For a complete installation with AI assistant integration:
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/davinci-resolve-mcp-server.git
-   cd davinci-resolve-mcp-server
+   git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
+   cd davinci-resolve-mcp
    ```
 
 2. Run the setup script:
@@ -114,7 +114,7 @@ The project includes a consolidated server management script:
        "davinci-resolve": {
          "name": "DaVinci Resolve MCP",
          "command": "/path/to/venv/bin/python",
-         "args": ["/path/to/davinci-resolve-mcp-server/resolve_mcp_server.py"]
+         "args": ["/path/to/davinci-resolve-mcp/resolve_mcp_server.py"]
        }
      }
    }
@@ -218,6 +218,11 @@ MIT
 
 - Blackmagic Design for DaVinci Resolve and its API
 - The MCP protocol team for enabling AI assistant integration
+
+## Author
+
+Samuel Gursky (samgursky@gmail.com)
+- GitHub: [github.com/samuelgursky](https://github.com/samuelgursky)
 
 ## Future Plans
 
