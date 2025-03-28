@@ -1,13 +1,10 @@
 {
+  "__IMPORTANT_NOTE__": "This is a template! You MUST replace ${PROJECT_ROOT} with your actual path to the project directory (e.g., /Users/username/davinci-resolve-mcp)",
   "mcpServers": {
     "davinci-resolve": {
-      "command": "python3",
-      "args": ["${PROJECT_ROOT}/resolve_mcp_server.py"],
-      "env": {
-        "RESOLVE_SCRIPT_API": "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting",
-        "RESOLVE_SCRIPT_LIB": "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",
-        "PYTHONPATH": "$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"
-      }
+      "name": "DaVinci Resolve MCP",
+      "command": "${PROJECT_ROOT}/venv/bin/python",
+      "args": ["${PROJECT_ROOT}/resolve_mcp_server.py"]
     }
   }
 } 

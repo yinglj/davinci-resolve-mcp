@@ -2,6 +2,18 @@
 
 This directory contains configuration templates for integrating DaVinci Resolve MCP with different AI assistant clients.
 
+## ⚠️ IMPORTANT: Path Configuration Required
+
+**All template files require you to replace the placeholder paths with your actual paths to the repository.**
+
+The templates contain placeholders like `${PROJECT_ROOT}` that **MUST** be replaced with your actual filesystem paths. Cursor and other tools **do not** automatically resolve these variables.
+
+For example:
+- Replace `${PROJECT_ROOT}` with `/Users/username/davinci-resolve-mcp` on macOS
+- Replace `${PROJECT_ROOT}` with `C:\Users\username\davinci-resolve-mcp` on Windows
+
+**Failure to replace these placeholders is the most common cause of connection problems.**
+
 ## Available Templates
 
 ### Cursor Integration
@@ -15,8 +27,7 @@ To use this template:
    - Windows: `%APPDATA%\Cursor\mcp.json`
 
 2. Replace the placeholders with your actual paths:
-   - `${YOUR_PYTHON_PATH}` - Path to your Python interpreter (typically in a virtual environment)
-   - `${YOUR_REPO_PATH}` - Path to the DaVinci Resolve MCP repository
+   - `${PROJECT_ROOT}` - Path to the DaVinci Resolve MCP repository
 
 Example (macOS):
 ```json
@@ -41,8 +52,7 @@ To use this template:
   - Windows - %appdata%\Claude\claude_desktop_config.json
 - Rename it to `claude_desktop_config.json`
 - Replace the placeholders with your actual paths:
-   - `${YOUR_PYTHON_PATH}` - Path to your Python interpreter
-   - `${YOUR_REPO_PATH}` - Path to the DaVinci Resolve MCP repository
+   - `${PROJECT_ROOT}` - Path to the DaVinci Resolve MCP repository
 
 ## Automatic Setup
 

@@ -2,6 +2,20 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
+## [1.3.4] - 2025-03-28
+
+### Changed
+- Improved template configuration for MCP clients with better documentation
+- Fixed Cursor integration templates to use direct Python path instead of MCP CLI
+- Simplified configuration process by removing environment variable requirements
+- Added clearer warnings in templates and README about path replacement
+- Created VERSION.md file for easier version tracking
+
+### Fixed
+- Connection issues with Cursor MCP integration
+- Path variable handling in configuration templates
+- Configuration templates now use consistent variable naming
+
 ## [1.3.3] - 2025-03-27
 
 ### Fixed
