@@ -1,7 +1,7 @@
 #!/bin/bash
 # mcp_resolve-cursor_start
 # Script to start DaVinci Resolve MCP server for Cursor integration
-# This is a convenience wrapper around run-direct-server.sh with additional Cursor-specific functionality
+# This is a convenience wrapper with Cursor-specific functionality
 
 # Colors for terminal output
 GREEN='\033[0;32m'
@@ -10,8 +10,11 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Get the script directory and project root
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
 LOG_FILE="$SCRIPT_DIR/cursor_resolve_server.log"
+VENV_DIR="$PROJECT_ROOT/venv"
 
 # Display banner
 echo -e "${BLUE}=============================================${NC}"
@@ -37,10 +40,16 @@ echo "Starting Cursor-Resolve MCP Server at $(date)" > "$LOG_FILE"
 check_environment() {
     echo -e "${YELLOW}Checking environment variables...${NC}"
     
-    # Set default paths if not already set
-    export RESOLVE_SCRIPT_API="${RESOLVE_SCRIPT_API:-/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting}"
-    export RESOLVE_SCRIPT_LIB="${RESOLVE_SCRIPT_LIB:-/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so}"
-    export PYTHONPATH="$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"
+    # Import platform utilities if available
+    if [ -f "$PROJECT_ROOT/src/utils/platform.py" ]; then
+        echo -e "${GREEN}Using platform-specific config from project${NC}"
+    else
+        # Set default paths if not already set (macOS defaults)
+        export RESOLVE_SCRIPT_API="${RESOLVE_SCRIPT_API:-/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting}"
+        export RESOLVE_SCRIPT_LIB="${RESOLVE_SCRIPT_LIB:-/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so}"
+        export PYTHONPATH="$PYTHONPATH:$RESOLVE_SCRIPT_API/Modules/"
+    fi
+    
     export PYTHONUNBUFFERED=1
     
     # Log environment
@@ -49,13 +58,20 @@ check_environment() {
     echo "RESOLVE_SCRIPT_LIB=$RESOLVE_SCRIPT_LIB" >> "$LOG_FILE"
     echo "PYTHONPATH=$PYTHONPATH" >> "$LOG_FILE"
     
-    # Check if files exist
-    if [ ! -d "$RESOLVE_SCRIPT_API" ]; then
+    # Check virtual environment
+    if [ ! -d "$VENV_DIR" ]; then
+        echo -e "${RED}✗ Virtual environment not found at: $VENV_DIR${NC}"
+        echo -e "${YELLOW}Please run setup.sh to create the virtual environment${NC}"
+        return 1
+    fi
+    
+    # Check if files exist (if manually configured)
+    if [ -n "$RESOLVE_SCRIPT_API" ] && [ ! -d "$RESOLVE_SCRIPT_API" ]; then
         echo -e "${RED}✗ DaVinci Resolve API path not found: $RESOLVE_SCRIPT_API${NC}"
         return 1
     fi
     
-    if [ ! -f "$RESOLVE_SCRIPT_LIB" ]; then
+    if [ -n "$RESOLVE_SCRIPT_LIB" ] && [ ! -f "$RESOLVE_SCRIPT_LIB" ]; then
         echo -e "${RED}✗ DaVinci Resolve library not found: $RESOLVE_SCRIPT_LIB${NC}"
         return 1
     fi
@@ -64,11 +80,32 @@ check_environment() {
     return 0
 }
 
-# Make script executable
-make_executable() {
-    chmod +x "$SCRIPT_DIR/direct_resolve_server.py"
-    chmod +x "$SCRIPT_DIR/run-direct-server.sh"
-    echo -e "${GREEN}✓ Made server scripts executable${NC}"
+# Setup Cursor MCP config
+setup_cursor_config() {
+    echo -e "${YELLOW}Setting up Cursor MCP configuration...${NC}"
+    
+    # Create cursor config directory if it doesn't exist
+    CURSOR_CONFIG_DIR="$HOME/.cursor/mcp"
+    mkdir -p "$CURSOR_CONFIG_DIR"
+    
+    # Create or update config file
+    CURSOR_CONFIG_FILE="$CURSOR_CONFIG_DIR/config.json"
+    
+    # Generate config based on template
+    cat > "$CURSOR_CONFIG_FILE" << EOF
+{
+  "mcpServers": {
+    "davinci-resolve": {
+      "name": "DaVinci Resolve MCP",
+      "command": "${PROJECT_ROOT}/venv/bin/python",
+      "args": ["${PROJECT_ROOT}/resolve_mcp_server.py"]
+    }
+  }
+}
+EOF
+    
+    echo -e "${GREEN}✓ Cursor MCP config created at: $CURSOR_CONFIG_FILE${NC}"
+    return 0
 }
 
 # Parse arguments
@@ -109,19 +146,25 @@ main() {
         exit 1
     fi
     
+    # Setup Cursor config
+    if ! setup_cursor_config; then
+        echo -e "${RED}Failed to setup Cursor configuration.${NC}"
+        exit 1
+    fi
+    
     # Make scripts executable
-    make_executable
+    chmod +x "$PROJECT_ROOT/resolve_mcp_server.py"
     
     # Start the server
     echo -e "${GREEN}Starting MCP server...${NC}"
     echo -e "${BLUE}Connecting to DaVinci Resolve...${NC}"
     
-    # Run the direct server script
+    # Run the server with the virtual environment's Python
     if [ -n "$PROJECT_NAME" ]; then
         echo -e "${YELLOW}Opening project: $PROJECT_NAME${NC}"
-        "$SCRIPT_DIR/run-direct-server.sh" --project "$PROJECT_NAME"
+        "$VENV_DIR/bin/python" "$PROJECT_ROOT/resolve_mcp_server.py" --project "$PROJECT_NAME"
     else
-        "$SCRIPT_DIR/run-direct-server.sh"
+        "$VENV_DIR/bin/python" "$PROJECT_ROOT/resolve_mcp_server.py"
     fi
     
     # Server shouldn't reach this point unless it crashed

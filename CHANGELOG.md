@@ -2,6 +2,24 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
+## [1.3.5] - 2025-03-29
+
+### Added
+- Updated Cursor integration with new templating system
+- Improved client-specific launcher scripts for better usability
+- Added automatic Cursor MCP configuration generation
+- Enhanced cross-platform compatibility in launcher scripts
+
+### Changed
+- Updated Cursor integration script to use project root relative paths
+- Simplified launcher script by removing dependencies on intermediate scripts
+- Improved virtual environment detection and validation
+
+### Fixed
+- Path handling in Cursor configuration for more reliable connections
+- Virtual environment validation to prevent launch failures
+- Environment variable checking with more robust validation
+
 ## [1.3.4] - 2025-03-28
 
 ### Changed
