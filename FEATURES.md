@@ -1,4 +1,4 @@
-# DaVinci Resolve Integration - Feature Tracking
+# DaVinci Resolve Integration - Feature Tracking (v1.3.3)
 
 This document provides detailed tracking of DaVinci Resolve API features implemented in our JSON-RPC Server, along with compatibility status across different clients and platforms.
 
@@ -18,8 +18,8 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
 
 | Client | macOS | Windows | Linux |
 |--------|-------|---------|-------|
-| Cursor | ✅ Priority | ⚠️ Experimental | ❌ |
-| Claude Desktop | ✅ Full Functionality | ⚠️ Experimental | ❌ |
+| Cursor | ✅ Stable | ✅ Stable | ❌ |
+| Claude Desktop | ✅ Stable | ✅ Stable | ❌ |
 
 ## Implementation Methods
 
@@ -97,34 +97,40 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
 | Get Render Status | ❌ | ❌ | ❌ | ❌ | ❌ | Check job status |
 
 ## Notes on Recent Improvements
-- Added experimental Windows support in v1.3.2 with platform-specific path detection
-- Completed full integration with Claude Desktop on macOS
+- Significantly improved Windows support in v1.3.3 with enhanced batch scripts and error handling
+- Added robust platform detection and environment setup via dedicated platform utilities
+- Windows-specific configuration templates now available for easier setup
+- Enhanced cross-platform compatibility with dynamic path resolution
+- Improved batch file for Windows with better ANSI color handling and process detection
+- Increased timeout waiting for DaVinci Resolve to start on Windows
+- Better detection of multiple possible DaVinci Resolve executable names on Windows
 - Claude Desktop now has full feature parity with Cursor on macOS
-- Implementation uses properly configured environment variables for Resolve API access
-- Configuration includes proper paths to Resolve scripting libraries and modules
+- Configuration includes proper paths to Resolve scripting libraries and modules for each platform
 
 ## Development Priorities Update
 
 1. **Current Focus**:
    - ✅ Complete Claude Desktop functionality on macOS
-   - 🔄 Improve error handling for API calls
+   - ✅ Improve Windows compatibility through robust platform detection
+   - 🔄 Enhance batch files and runners for Windows
    - 🔄 Expand media pool and color page operations
-   - 🔄 Stabilize Windows support
 
 2. **Next Steps**:
    - 🔄 Develop comprehensive error reporting
-   - 🔄 Improve Windows integration and compatibility
+   - 🔄 Further improve Windows integration and compatibility
+   - 🔄 Add support for easier installation process on Windows
    - 🟡 Implement more advanced timeline editing operations
    - 🟡 Add support for Fusion page functionality
 
 3. **Future Work**:
-   - 🔄 Windows support expansion
+   - 🔄 Windows support expansion and stabilization
    - 🟡 Implement missing API functions
-   - 🟡 Enhance cross-platform compatibility
+   - 🟡 Fusion page functionality
    - 🟡 Linux support investigation
 
 ## Implementation Notes
 
+- **Platform-Specific Utilities**: Added utilities for handling OS differences, dynamic path resolution, and environment setup
 - **Direct JSON-RPC**: Using a custom JSON-RPC server that directly communicates with DaVinci Resolve's API
 - **Project Management**: Using ProjectManager API with proper error handling for non-existent projects
 - **Timeline Operations**: Most timeline functions work reliably with the direct API binding
@@ -133,8 +139,10 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
   - Global config: Using .cursor/mcp.json for system-wide configuration
   - Project-specific config: Using project-level mcp.json for project-specific settings
   - Claude Desktop: Using claude_desktop_config.json for Claude desktop integration
+  - Windows-specific templates: New platform-specific templates in config-templates directory
 - **Startup Scripts**:
-  - `run-direct-server.sh`: Basic script to launch the JSON-RPC server
+  - `run-direct-server.sh`: Basic script to launch the JSON-RPC server on macOS
+  - `run-now.bat`: Enhanced Windows batch file for launching server with improved compatibility
   - `mcp_resolve-cursor_start`: Enhanced startup script with environment validation, Resolve running check, and better error reporting
   - `mcp_resolve-claude_start`: Dedicated startup script for Claude Desktop integration
   - `mcp_resolve_launcher.sh`: Universal launcher that provides an interactive menu and command-line options to:
@@ -146,8 +154,8 @@ This document provides detailed tracking of DaVinci Resolve API features impleme
     - Force server startup when DaVinci Resolve process isn't detected
 - **Platform Support**:
   - macOS: Fully supported and tested
-  - Windows: Experimental support added in v1.3.2
-  - Linux: Not currently implemented
+  - Windows: Improved experimental support with platform-specific path detection
+  - Linux: Not currently implemented but framework in place for future support
 
 ## Testing Procedure
 
@@ -158,4 +166,4 @@ For each feature, testing involves:
 4. Cross-checking results for accuracy
 
 Features are marked as "✅ Implemented and tested" only after all steps are completed successfully. 
-Windows features are currently marked as "⚠️ Implemented but needs testing" as they require more field testing. 
+Windows features are currently marked as "⚠️ Implemented but needs testing" as they require more field testing with the enhanced Windows support.
