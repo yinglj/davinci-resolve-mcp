@@ -2,7 +2,7 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
-## [1.3.6] - 2025-03-31
+## [1.3.6] - 2025-03-29
 
 ### Added
 - Comprehensive Feature Additions:
