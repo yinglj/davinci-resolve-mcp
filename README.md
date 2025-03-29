@@ -1,6 +1,6 @@
 # DaVinci Resolve MCP Server
 
-[![Version](https://img.shields.io/badge/version-1.3.5-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.3.6-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
 [![DaVinci Resolve](https://img.shields.io/badge/DaVinci%20Resolve-18.5+-darkred.svg)](https://www.blackmagicdesign.com/products/davinciresolve)
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://www.python.org/downloads/)
 [![macOS](https://img.shields.io/badge/macOS-stable-brightgreen.svg)](https://www.apple.com/macos/)
@@ -11,12 +11,7 @@ A Model Context Protocol (MCP) server that connects AI coding assistants (Cursor
 
 ## Features
 
-- **Connect to DaVinci Resolve**: Query information and control DaVinci Resolve from your AI assistant
-- **Project Management**: List, open, and create DaVinci Resolve projects
-- **Timeline Operations**: Create timelines, switch between them, add markers
-- **Media Management**: Import media, create bins, list clips
-- **Multi-Client Support**: Works with both Cursor and Claude Desktop
-- **Cross-Platform**: Full support for both macOS and Windows
+For a comprehensive list of implemented and planned features, see [docs/FEATURES.md](docs/FEATURES.md).
 
 ## Requirements
 
@@ -327,46 +322,40 @@ Make sure DaVinci Resolve is running before starting the server. If the server c
 
 ```
 davinci-resolve-mcp/
-├── README.md                 # Main documentation
-├── CHANGELOG.md              # Version history
-├── FEATURES.md               # Feature matrix
-├── LICENSE                   # License information
-├── resolve_mcp_server.py     # Main server implementation
-├── mcp_resolve_launcher.sh   # Symbolic link to the universal launcher
-├── run-now.sh                # Symbolic link to the quick start script
-├── run-now.bat               # Symbolic link to the Windows quick start script
-├── src/                      # Source code modules
-│   └── utils/                # Utility modules
-│       ├── platform.py       # Platform-specific functionality
-│       └── resolve_connection.py # Resolve connection utilities
-├── config-templates/         # Configuration templates
-│   ├── README.md             # Template documentation
-│   ├── cursor-mcp-config.template.json # Cursor configuration template
-│   └── claude-desktop-config.template.json # Claude Desktop configuration template
-├── scripts/                  # Helper scripts
-│   ├── README.md             # Script documentation
-│   ├── run-now.sh            # Quick start script
-│   ├── run-now.bat           # Quick start script (Windows)
-│   ├── check-resolve-ready.bat # Pre-launch check (Windows)
-│   ├── setup.sh              # Full installation
-│   ├── server.sh             # Consolidated server management
-│   ├── mcp_resolve_launcher.sh # Universal launcher script
-│   ├── mcp_resolve-cursor_start # Cursor-specific launcher
-│   ├── mcp_resolve-claude_start # Claude-specific launcher
-│   └── check-resolve-ready.sh # Pre-launch check
-├── examples/                 # Example usage scripts
-│   ├── README.md             # Examples documentation
-│   ├── getting_started.py    # Simple starter example
-│   ├── markers/              # Marker-related examples
-│   │   ├── README.md         # Marker examples documentation
-│   │   └── ...               # Marker example scripts
-│   ├── timeline/             # Timeline examples
-│   │   ├── README.md         # Timeline examples documentation
-│   │   └── ...               # Timeline example scripts
-│   └── media/                # Media management examples
-│       ├── README.md         # Media examples documentation
-│       └── ...               # Media example scripts
-└── venv/                     # Python virtual environment (created by setup script)
+├── README.md               # This file
+├── docs/                   # Documentation
+│   ├── FEATURES.md         # Feature list and status
+│   ├── CHANGELOG.md        # Version history
+│   ├── VERSION.md          # Version information
+│   ├── TOOLS_README.md     # Tools documentation
+│   ├── PROJECT_MCP_SETUP.md # Project setup guide
+│   └── COMMIT_MESSAGE.txt  # Latest commit information
+├── config-templates/       # Configuration templates
+│   ├── sample_config.json  # Example configuration
+│   ├── cursor-mcp-example.json # Cursor config example
+│   └── mcp-project-template.json # MCP project template
+├── scripts/                # Utility scripts
+│   ├── tests/              # Test scripts
+│   │   ├── benchmark_server.py # Performance tests
+│   │   ├── test_improvements.py # Test scripts
+│   │   ├── test_custom_timeline.py # Timeline tests
+│   │   ├── create_test_timeline.py # Create test timeline
+│   │   ├── test-after-restart.sh # Test after restart (Unix)
+│   │   └── test-after-restart.bat # Test after restart (Windows)
+│   ├── batch_automation.py # Batch automation script
+│   ├── restart-server.sh   # Server restart script (Unix)
+│   ├── restart-server.bat  # Server restart script (Windows)
+│   ├── run-now.sh          # Quick start script (Unix)
+│   └── run-now.bat         # Quick start script (Windows)
+├── resolve_mcp_server.py   # Main server implementation
+├── src/                    # Source code
+│   ├── api/                # API implementation
+│   ├── features/           # Feature modules
+│   └── utils/              # Utility functions
+├── logs/                   # Log files
+├── tools/                  # Development tools
+├── assets/                 # Project assets
+└── examples/               # Example code
 ```
 
 ## License
@@ -420,3 +409,7 @@ After cleanup, the project has the following structure:
 - `scripts/` - Helper scripts
 
 When developing, it's recommended to use `./run-now.sh` which sets up the environment and launches the server in one step. 
+
+## Changelog
+
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for a detailed history of changes. 

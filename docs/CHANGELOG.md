@@ -2,6 +2,69 @@
 
 All notable changes to the DaVinci Resolve MCP Server project will be documented in this file.
 
+## [1.3.6] - 2025-03-31
+
+### Added
+- Comprehensive Feature Additions:
+  - Complete MediaPoolItem functionality:
+    - LinkProxyMedia/UnlinkProxyMedia for proxy media workflow
+    - ReplaceClip functionality for swapping media files
+    - TranscribeAudio/ClearTranscription for audio transcription
+  - Complete Folder object methods:
+    - Export functionality for DRB folder archives
+    - TranscribeAudio for batch audio transcription
+    - ClearTranscription for managing folder-level transcriptions
+  - Cache Management implementation:
+    - Get/set cache mode (auto, on, off)
+    - Control optimized media settings
+    - Manage proxy media settings including quality
+    - Configure cache file paths (local/network)
+    - Generate and delete optimized media for specific clips
+  - Timeline Item Properties implementation:
+    - Transform properties (position, scale, rotation, anchor point)
+    - Crop controls (left, right, top, bottom)
+    - Composite mode and opacity settings
+    - Retime controls including speed and process type
+    - Stabilization controls including method and strength
+    - Audio properties including volume, pan, and EQ settings
+  - Keyframe Control implementation:
+    - Resource endpoint for retrieving all keyframes for timeline items
+    - Add/modify/delete keyframe tools for precise animation control
+    - Keyframe interpolation control (Linear, Bezier, Ease-In, Ease-Out)
+    - Keyframe mode selection (All, Color, Sizing)
+    - Support for all keyframeable properties (transform, crop, composite)
+  - Color Preset Management implementation:
+    - Resource endpoint for retrieving all color presets in albums
+    - Save color presets from timeline clips with customizable naming
+    - Apply color presets to timeline clips by ID or name
+    - Delete color presets from albums
+    - Create and manage color preset albums
+  - LUT Export functionality:
+    - Tool for exporting grades from clips as LUT files
+    - Support for multiple LUT formats (Cube, DaVinci, 3DL, Panasonic)
+    - Variable LUT sizing options (17-point, 33-point, 65-point)
+    - Batch export functionality for PowerGrades
+  - Added helper functions for recursively accessing media pool items
+  - Updated FEATURES.md with comprehensive documentation
+
+### Changed
+- Project directory restructuring to better organize files:
+  - Moved documentation files to `docs/` directory
+  - Moved test scripts to `scripts/tests/` directory
+  - Moved configuration templates to `config-templates/` directory
+  - Moved utility scripts to `scripts/` directory
+  - Updated all scripts to work with the new directory structure
+  - Created simpler launcher scripts in the root directory
+- Updated Implementation Progress Summary to reflect 100% completion of MediaPoolItem and Folder features
+- Enhanced project documentation with better usage examples
+- Improved media management functionality with expanded clip operations
+- Enhanced timeline item handling with ID-based lookup
+- Improved property validation with comprehensive error reporting
+- Added support for both video and audio timeline item properties
+- Enhanced color workflow efficiency with preset system
+- Improved organization of saved grades with album management
+- Enhanced cross-application compatibility with industry-standard LUT formats
+
 ## [1.3.5] - 2025-03-29
 
 ### Added
@@ -228,3 +291,14 @@ All notable changes to the DaVinci Resolve MCP Server project will be documented
 ### Future Work
 - [ ] Task 1 – Description of the task
 - [ ] Task 2 – Description of the task
+
+## Unreleased
+
+### Added
+- Project directory restructuring to better organize files:
+  - Moved documentation files to `docs/` directory
+  - Moved test scripts to `scripts/tests/` directory
+  - Moved configuration templates to `config-templates/` directory
+  - Moved utility scripts to `scripts/` directory
+  - Updated all scripts to work with the new directory structure
+  - Created simpler launcher scripts in the root directory

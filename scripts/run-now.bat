@@ -7,10 +7,11 @@ echo   DaVinci Resolve MCP Server - Quick Start
 echo ==============================================
 echo.
 
-REM Get the script directory
+REM Get the script directory and root directory
 set SCRIPT_DIR=%~dp0
-set VENV_DIR=%SCRIPT_DIR%venv
-set RESOLVE_MCP_SERVER=%SCRIPT_DIR%resolve_mcp_server.py
+set ROOT_DIR=%SCRIPT_DIR%..
+set VENV_DIR=%ROOT_DIR%venv
+set RESOLVE_MCP_SERVER=%ROOT_DIR%resolve_mcp_server.py
 
 REM Check if Python is installed
 where python >nul 2>nul
@@ -101,5 +102,5 @@ REM Start the server
 echo Starting DaVinci Resolve MCP Server...
 echo.
 
-cd "%SCRIPT_DIR%"
+cd "%ROOT_DIR%"
 "%VENV_DIR%\Scripts\python" "%RESOLVE_MCP_SERVER%"

@@ -244,7 +244,7 @@ else {
 DaVinci Resolve MCP Server
 A server that connects to DaVinci Resolve via the Model Context Protocol (MCP)
 
-Version: 1.3.2 - Experimental Windows Support
+Version: 1.3.6 - Windows Support
 """
 
 import os
@@ -286,7 +286,7 @@ logging.basicConfig(
 logger = logging.getLogger("davinci-resolve-mcp")
 
 # Log server version and platform
-VERSION = "1.3.2"
+VERSION = "1.3.6"
 logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 logger.info(f"Detected platform: {get_platform()}")
 logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")

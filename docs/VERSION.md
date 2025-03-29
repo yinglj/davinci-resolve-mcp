@@ -1,8 +1,20 @@
 # DaVinci Resolve MCP Server
 
-Current Version: 1.3.5
+Current Version: 1.3.6
 
 ## Release Information
+
+### 1.3.6 Changes
+- Comprehensive Feature Additions:
+  - Complete MediaPoolItem and Folder object functionality
+  - Cache Management implementation
+  - Timeline Item Properties implementation
+  - Keyframe Control implementation
+  - Color Preset Management implementation
+  - LUT Export functionality
+- Project directory restructuring
+- Updated Implementation Progress Summary to reflect 100% completion of multiple feature sets
+- Enhanced documentation and examples
 
 ### 1.3.5 Changes
 - Updated Cursor integration with new templating system
