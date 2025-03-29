@@ -216,11 +216,22 @@ function Update-CursorConfig {
     }
 }
 
-# Print header
-Write-Blue "============================================================="
+# Main section starts here
+Write-Host ""
+Write-Blue "================================================="
 Write-Blue "  DaVinci Resolve MCP Pre-Launch Check (Windows Version)     "
-Write-Blue "============================================================="
-Write-Output ""
+Write-Blue "================================================="
+Write-Host ""
+
+# Check if the script is running as admin
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Yellow "Note: This script is not running as administrator. Some operations may be limited."
+    Write-Host ""
+}
+
+Write-Yellow "Performing pre-launch checks for DaVinci Resolve MCP..."
+Write-Host "Version: 1.3.7 - Windows Support"
+Write-Host ""
 
 # Check 1: Required files
 Write-Yellow "Checking required files..."
@@ -244,7 +255,7 @@ else {
 DaVinci Resolve MCP Server
 A server that connects to DaVinci Resolve via the Model Context Protocol (MCP)
 
-Version: 1.3.6 - Windows Support
+Version: 1.3.7 - Windows Support
 """
 
 import os
@@ -286,7 +297,7 @@ logging.basicConfig(
 logger = logging.getLogger("davinci-resolve-mcp")
 
 # Log server version and platform
-VERSION = "1.3.6"
+VERSION = "1.3.7"
 logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 logger.info(f"Detected platform: {get_platform()}")
 logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")

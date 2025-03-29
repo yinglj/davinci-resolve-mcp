@@ -7,10 +7,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-# Get the root directory (one level up from scripts)
+# Get the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 ROOT_DIR="$( cd "$SCRIPT_DIR/.." &> /dev/null && pwd )"
 VENV_DIR="$ROOT_DIR/venv"
+SERVER_PATH="$ROOT_DIR/src/resolve_mcp_server.py"
 
 echo -e "${GREEN}Setting up DaVinci Resolve MCP Server with virtual environment...${NC}"
 
@@ -36,11 +37,26 @@ else
 fi
 
 # Make the server script executable
-chmod +x "$ROOT_DIR/resolve_mcp_server.py"
+chmod +x "$SERVER_PATH"
+
+# Check if DaVinci Resolve is running
+if ps -ef | grep -i "[D]aVinci Resolve" > /dev/null; then
+    echo -e "${GREEN}✓ DaVinci Resolve is running${NC}"
+else
+    echo -e "${RED}✗ DaVinci Resolve is not running${NC}"
+    echo -e "${YELLOW}Please start DaVinci Resolve before continuing${NC}"
+    echo -e "${YELLOW}Waiting 10 seconds for you to start DaVinci Resolve...${NC}"
+    sleep 10
+    if ! ps -ef | grep -i "[D]aVinci Resolve" > /dev/null; then
+        echo -e "${RED}DaVinci Resolve still not running. Please start it manually.${NC}"
+        echo -e "${YELLOW}You can run this script again after starting DaVinci Resolve.${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ DaVinci Resolve is now running${NC}"
+fi
 
 # Run the server with the virtual environment's Python
 echo -e "${GREEN}Starting DaVinci Resolve MCP Server...${NC}"
-echo -e "${YELLOW}Make sure DaVinci Resolve is running!${NC}"
 echo ""
 
-"$VENV_DIR/bin/mcp" dev "$ROOT_DIR/resolve_mcp_server.py" 
+"$VENV_DIR/bin/mcp" dev "$SERVER_PATH" 

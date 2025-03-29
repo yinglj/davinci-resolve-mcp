@@ -1,8 +1,20 @@
 # DaVinci Resolve MCP Server
 
-Current Version: 1.3.6
+Current Version: 1.3.7
 
 ## Release Information
+
+### 1.3.7 Changes
+- Improved installation experience:
+  - New one-step installation script for macOS/Linux and Windows
+  - Enhanced path resolution in scripts
+  - More reliable DaVinci Resolve detection
+  - Support for absolute paths in project and global configurations
+  - Added comprehensive verification tools for troubleshooting
+  - Improved error handling and feedback
+  - Enhanced documentation with detailed installation guide
+- Fixed configuration issues with project-level MCP configuration
+- Updated documentation with detailed installation and troubleshooting steps
 
 ### 1.3.6 Changes
 - Comprehensive Feature Additions:

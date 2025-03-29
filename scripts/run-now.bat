@@ -11,7 +11,7 @@ REM Get the script directory and root directory
 set SCRIPT_DIR=%~dp0
 set ROOT_DIR=%SCRIPT_DIR%..
 set VENV_DIR=%ROOT_DIR%venv
-set RESOLVE_MCP_SERVER=%ROOT_DIR%resolve_mcp_server.py
+set RESOLVE_MCP_SERVER=%ROOT_DIR%src\resolve_mcp_server.py
 
 REM Check if Python is installed
 where python >nul 2>nul

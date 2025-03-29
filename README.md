@@ -1,6 +1,6 @@
 # DaVinci Resolve MCP Server
 
-[![Version](https://img.shields.io/badge/version-1.3.6-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.3.7-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
 [![DaVinci Resolve](https://img.shields.io/badge/DaVinci%20Resolve-18.5+-darkred.svg)](https://www.blackmagicdesign.com/products/davinciresolve)
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://www.python.org/downloads/)
 [![macOS](https://img.shields.io/badge/macOS-stable-brightgreen.svg)](https://www.apple.com/macos/)
@@ -20,56 +20,92 @@ For a comprehensive list of implemented and planned features, see [docs/FEATURES
 - DaVinci Resolve running in the background
 - (Optional) Node.js/npm for some features
 
+## Installation Guide
+
+For detailed installation instructions, please see [INSTALL.md](INSTALL.md). This guide covers:
+- Prerequisites and system requirements
+- Step-by-step installation process
+- Configuration details
+- Common troubleshooting steps
+
 ## Platform Support
 
-| Platform | Status | Quick Start |
-|----------|--------|-------------|
-| macOS | ✅ Stable | `./run-now.sh` |
-| Windows | ✅ Stable | `run-now.bat` |
-| Linux | ❌ Not supported | N/A |
+| Platform | Status | One-Step Install | Quick Start |
+|----------|--------|------------------|-------------|
+| macOS | ✅ Stable | `./install.sh` | `./run-now.sh` |
+| Windows | ✅ Stable | `install.bat` | `run-now.bat` |
+| Linux | ❌ Not supported | N/A | N/A |
 
 ## Quick Start Guide
 
-### All
+### New One-Step Installation (Recommended)
+
+The easiest way to get started is with our new unified installation script. This script does everything automatically:
 
 - Clone the repository:
    ```bash
-   git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
+   git clone https://github.com/your-repo/davinci-resolve-mcp.git
    cd davinci-resolve-mcp
    ```
+
 - Make sure DaVinci Resolve Studio is installed and running
 
+- Run the installation script:
+   **macOS/Linux:**
+   ```bash
+   ./install.sh
+   ```
+   
+   **Windows:**
+   ```batch
+   install.bat
+   ```
 
-These quick start scripts will:
-1. Check if DaVinci Resolve is running
+This will:
+1. Automatically detect the correct paths on your system
 2. Create a Python virtual environment
 3. Install the MCP SDK from the official repository
 4. Set up environment variables
-5. Configure Cursor/Claude integration
-6. Start the MCP server in development mode
+5. Configure Cursor/Claude integration 
+6. Verify the installation is correct
+7. Optionally start the MCP server
 
+### Alternative Quick Start
 
-### For Windows Users
+You can also use the original quick start scripts:
 
-- Double-click run-now.bat in the root of the repo or run it from Command Prompt
+**Windows Users:**
 ```bash
 run-now.bat
 ``` 
 
-
-### For macOS Users
-
-Make the script executable and run:
-   ```bash
-   chmod +x run-now.sh
-   ./run-now.sh
-   ```
+**macOS Users:**
+```bash
+chmod +x run-now.sh
+./run-now.sh
+```
 
 ## Configuration
 
 For configuration of DaVinci Resolve MCP with different AI assistant clients like Cursor or Claude, see the [config-templates](config-templates) directory.
 
 ## Troubleshooting
+
+For detailed troubleshooting guidance, refer to the [INSTALL.md](INSTALL.md#troubleshooting) file which contains solutions to common issues.
+
+### Common Issues
+
+#### Path Resolution
+- The installation scripts now use more robust path resolution, fixing issues with `run-now.sh` looking for files in the wrong locations
+- Always let the scripts determine the correct paths based on their location
+
+#### DaVinci Resolve Detection
+- We've improved the process detection to reliably find DaVinci Resolve regardless of how it appears in the process list
+- Make sure DaVinci Resolve is running before starting the MCP server
+
+#### Environment Variables
+- Make sure all required environment variables are set correctly
+- Review the log file at `scripts/cursor_resolve_server.log` for troubleshooting
 
 ### Windows
 - Make sure to use forward slashes (/) in configuration files

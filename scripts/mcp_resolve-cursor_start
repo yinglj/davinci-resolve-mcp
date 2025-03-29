@@ -23,7 +23,7 @@ echo -e "${BLUE}=============================================${NC}"
 
 # Check if DaVinci Resolve is running
 check_resolve_running() {
-    if pgrep -q "DaVinci Resolve"; then
+    if ps -ef | grep -i "[D]aVinci Resolve" > /dev/null; then
         echo -e "${GREEN}✓ DaVinci Resolve is running${NC}"
         return 0
     else
@@ -68,11 +68,15 @@ check_environment() {
     # Check if files exist (if manually configured)
     if [ -n "$RESOLVE_SCRIPT_API" ] && [ ! -d "$RESOLVE_SCRIPT_API" ]; then
         echo -e "${RED}✗ DaVinci Resolve API path not found: $RESOLVE_SCRIPT_API${NC}"
+        echo -e "${YELLOW}This path might be different on your system.${NC}"
+        echo -e "${YELLOW}You can set it manually in your shell profile.${NC}"
         return 1
     fi
     
     if [ -n "$RESOLVE_SCRIPT_LIB" ] && [ ! -f "$RESOLVE_SCRIPT_LIB" ]; then
         echo -e "${RED}✗ DaVinci Resolve library not found: $RESOLVE_SCRIPT_LIB${NC}"
+        echo -e "${YELLOW}This path might be different on your system.${NC}"
+        echo -e "${YELLOW}You can set it manually in your shell profile.${NC}"
         return 1
     fi
     
@@ -84,20 +88,40 @@ check_environment() {
 setup_cursor_config() {
     echo -e "${YELLOW}Setting up Cursor MCP configuration...${NC}"
     
-    # Create cursor config directory if it doesn't exist
+    # Create system-level cursor config directory if it doesn't exist
     CURSOR_CONFIG_DIR="$HOME/.cursor/mcp"
     mkdir -p "$CURSOR_CONFIG_DIR"
     
-    # Create or update config file
+    # Create or update system-level config file
     CURSOR_CONFIG_FILE="$CURSOR_CONFIG_DIR/config.json"
     
-    # Generate config based on template
+    # Generate system-level config based on template with absolute paths
     cat > "$CURSOR_CONFIG_FILE" << EOF
 {
   "mcpServers": {
     "davinci-resolve": {
       "name": "DaVinci Resolve MCP",
-      "command": "${PROJECT_ROOT}/venv/bin/python",
+      "command": "${VENV_DIR}/bin/python",
+      "args": ["${PROJECT_ROOT}/resolve_mcp_server.py"]
+    }
+  }
+}
+EOF
+
+    # Create project-level cursor config directory if it doesn't exist
+    PROJECT_CURSOR_DIR="$PROJECT_ROOT/.cursor"
+    mkdir -p "$PROJECT_CURSOR_DIR"
+    
+    # Create or update project-level config file
+    PROJECT_CONFIG_FILE="$PROJECT_CURSOR_DIR/mcp.json"
+    
+    # Generate project-level config with absolute paths (same as system-level)
+    cat > "$PROJECT_CONFIG_FILE" << EOF
+{
+  "mcpServers": {
+    "davinci-resolve": {
+      "name": "DaVinci Resolve MCP",
+      "command": "${VENV_DIR}/bin/python",
       "args": ["${PROJECT_ROOT}/resolve_mcp_server.py"]
     }
   }
@@ -105,6 +129,8 @@ setup_cursor_config() {
 EOF
     
     echo -e "${GREEN}✓ Cursor MCP config created at: $CURSOR_CONFIG_FILE${NC}"
+    echo -e "${GREEN}✓ Project-level MCP config created at: $PROJECT_CONFIG_FILE${NC}"
+    echo -e "${GREEN}✓ MCP config points to: ${PROJECT_ROOT}/resolve_mcp_server.py${NC}"
     return 0
 }
 
@@ -132,8 +158,8 @@ main() {
     
     # Check if Resolve is running
     if ! check_resolve_running; then
-        echo -e "${YELLOW}Waiting for DaVinci Resolve to start...${NC}"
-        sleep 5
+        echo -e "${YELLOW}DaVinci Resolve not detected. Waiting for 10 seconds...${NC}"
+        sleep 10
         if ! check_resolve_running; then
             echo -e "${RED}DaVinci Resolve must be running. Please start it and try again.${NC}"
             exit 1

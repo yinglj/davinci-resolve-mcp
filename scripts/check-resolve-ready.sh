@@ -136,12 +136,13 @@ else
 """
 DaVinci Resolve MCP Server
 A server that connects to DaVinci Resolve via the Model Context Protocol (MCP)
+
+Version: 1.3.7 - Basic Server
 """
 
 import os
 import sys
 import logging
-from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
 
 # Configure logging
@@ -151,6 +152,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("davinci-resolve-mcp")
+
+# Log server version and platform
+VERSION = "1.3.7"
+logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 
 # Create MCP server instance
 mcp = FastMCP("DaVinciResolveMCP")
