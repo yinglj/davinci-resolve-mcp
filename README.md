@@ -44,7 +44,7 @@ The easiest way to get started is with our new unified installation script. This
 
 - Clone the repository:
    ```bash
-   git clone https://github.com/your-repo/davinci-resolve-mcp.git
+   git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
    cd davinci-resolve-mcp
    ```
 
