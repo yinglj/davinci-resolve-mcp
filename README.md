@@ -1,6 +1,6 @@
 # DaVinci Resolve MCP Server
 
-[![Version](https://img.shields.io/badge/version-1.3.7-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.3.8-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
 [![DaVinci Resolve](https://img.shields.io/badge/DaVinci%20Resolve-18.5+-darkred.svg)](https://www.blackmagicdesign.com/products/davinciresolve)
 [![Python](https://img.shields.io/badge/python-3.6+-green.svg)](https://www.python.org/downloads/)
 [![macOS](https://img.shields.io/badge/macOS-stable-brightgreen.svg)](https://www.apple.com/macos/)
@@ -209,7 +209,10 @@ For a complete manual installation:
    # On Windows:
    venv\Scripts\activate
    
-   # Install MCP SDK from the official repository
+   # Install dependencies from requirements.txt
+   pip install -r requirements.txt
+   
+   # Alternatively, install MCP SDK directly
    pip install git+https://github.com/modelcontextprotocol/python-sdk.git
    ```
 
@@ -246,8 +249,10 @@ For a complete manual installation:
      "mcpServers": {
        "davinci-resolve": {
          "name": "DaVinci Resolve MCP",
-         "command": "/path/to/venv/bin/python",
-         "args": ["/path/to/davinci-resolve-mcp/resolve_mcp_server.py"]
+         "command": "/path/to/your/venv/bin/python",
+         "args": [
+           "/path/to/your/davinci-resolve-mcp/src/main.py"
+         ]
        }
      }
    }
@@ -260,7 +265,7 @@ For a complete manual installation:
        "davinci-resolve": {
          "name": "DaVinci Resolve MCP",
          "command": "C:\\path\\to\\venv\\Scripts\\python.exe",
-         "args": ["C:\\path\\to\\davinci-resolve-mcp\\resolve_mcp_server.py"]
+         "args": ["C:\\path\\to\\davinci-resolve-mcp\\src\\main.py"]
        }
      }
    }
@@ -449,3 +454,43 @@ When developing, it's recommended to use `./run-now.sh` which sets up the enviro
 ## Changelog
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) for a detailed history of changes. 
+
+### Cursor-Specific Setup
+
+When integrating with Cursor, follow these specific steps:
+
+1. Make sure DaVinci Resolve is running before starting Cursor
+
+2. Install required dependencies:
+   ```bash
+   # From the davinci-resolve-mcp directory:
+   pip install -r requirements.txt
+   ```
+   Note: This will install the MCP package and other dependencies automatically.
+
+3. Set up the MCP server configuration in Cursor:
+   
+   Create or edit `~/.cursor/mcp.json` on macOS (or `%USERPROFILE%\.cursor\mcp.json` on Windows):
+   
+   ```json
+   {
+     "mcpServers": {
+       "davinci-resolve": {
+         "name": "DaVinci Resolve MCP",
+         "command": "/path/to/your/venv/bin/python",
+         "args": [
+           "/path/to/your/davinci-resolve-mcp/src/main.py"
+         ]
+       }
+     }
+   }
+   ```
+   
+   **Important Notes:**
+   - Use `main.py` as the entry point (not `resolve_mcp_server.py`)
+   - Use absolute paths in the configuration
+
+4. Common issues:
+   - "Client closed" error: Check that paths are correct in mcp.json and dependencies are installed
+   - Connection problems: Make sure DaVinci Resolve is running before starting Cursor
+   - Environment variables: The main.py script will handle setting environment variables

@@ -94,7 +94,7 @@ if [ -z "\$RESOLVE_SCRIPT_API" ]; then
 fi
 
 # Activate virtual environment and run server
-"$VENV_DIR/bin/python" "$SCRIPT_DIR/resolve_mcp_server.py" "\$@"
+"$VENV_DIR/bin/python" "$SCRIPT_DIR/../src/main.py" "\$@"
 EOF
 
 chmod +x "$SCRIPT_DIR/run-server.sh"

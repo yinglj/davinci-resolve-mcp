@@ -1,8 +1,14 @@
 # DaVinci Resolve MCP Server
 
-Current Version: 1.3.7
+Current Version: 1.3.8
 
 ## Release Information
+
+### 1.3.8 Changes
+- **Cursor Integration**: Added comprehensive documentation for Cursor setup process
+- **Entry Point**: Standardized on `main.py` as the proper entry point (replaces direct use of `resolve_mcp_server.py`)
+- **Configuration Templates**: Updated example configuration files to use correct paths
+- **Fixed**: Ensured consistent documentation for environment setup
 
 ### 1.3.7 Changes
 - Improved installation experience:

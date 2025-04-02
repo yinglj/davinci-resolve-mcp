@@ -62,7 +62,14 @@ python3 -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-#### Step 3.2: Install the MCP SDK
+#### Step 3.2: Install Dependencies
+
+```bash
+# Install all required dependencies from requirements.txt
+pip install -r requirements.txt
+```
+
+Alternatively, you can install just the MCP SDK:
 
 ```bash
 pip install "mcp[cli]"

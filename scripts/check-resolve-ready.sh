@@ -137,7 +137,7 @@ else
 DaVinci Resolve MCP Server
 A server that connects to DaVinci Resolve via the Model Context Protocol (MCP)
 
-Version: 1.3.7 - Basic Server
+Version: 1.3.8 - Basic Server
 """
 
 import os
@@ -154,7 +154,7 @@ logging.basicConfig(
 logger = logging.getLogger("davinci-resolve-mcp")
 
 # Log server version and platform
-VERSION = "1.3.7"
+VERSION = "1.3.8"
 logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 
 # Create MCP server instance
@@ -387,7 +387,7 @@ cat > "$CURSOR_MCP_CONFIG" << EOF
     "davinci-resolve": {
       "name": "DaVinci Resolve MCP",
       "command": "$VENV_DIR/bin/python",
-      "args": ["$SCRIPT_DIR/resolve_mcp_server.py"]
+      "args": ["$SCRIPT_DIR/../src/main.py"]
     }
   }
 }
@@ -509,7 +509,7 @@ elif [ "$cursor_status" -eq 1 ]; then
     "davinci-resolve": {
       "name": "DaVinci Resolve MCP",
       "command": "$VENV_DIR/bin/python",
-      "args": ["$RESOLVE_MCP_SERVER"]
+      "args": ["$SCRIPT_DIR/../src/main.py"]
     }
   }
 }
@@ -526,7 +526,7 @@ else
     # A more robust approach would use jq if available
     if grep -q "\"mcpServers\"" "$CURSOR_CONFIG_FILE"; then
         # mcpServers already exists, try to add our server
-        sed -i '' -e 's/"mcpServers": {/"mcpServers": {\n    "davinci-resolve": {\n      "name": "DaVinci Resolve MCP",\n      "command": "'"$VENV_DIR\/bin\/python"'",\n      "args": ["'"$RESOLVE_MCP_SERVER"'"]\n    },/g' "$CURSOR_CONFIG_FILE"
+        sed -i '' -e 's/"mcpServers": {/"mcpServers": {\n    "davinci-resolve": {\n      "name": "DaVinci Resolve MCP",\n      "command": "'"$VENV_DIR\/bin\/python"'",\n      "args": ["'"$SCRIPT_DIR/../src/main.py"'"]\n    },/g' "$CURSOR_CONFIG_FILE"
     else
         # No mcpServers exists, create everything
         cat > "$CURSOR_CONFIG_FILE" << EOF
@@ -535,7 +535,7 @@ else
     "davinci-resolve": {
       "name": "DaVinci Resolve MCP",
       "command": "$VENV_DIR/bin/python",
-      "args": ["$RESOLVE_MCP_SERVER"]
+      "args": ["$SCRIPT_DIR/../src/main.py"]
     }
   }
 }

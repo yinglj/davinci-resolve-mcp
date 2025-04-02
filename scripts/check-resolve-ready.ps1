@@ -160,7 +160,7 @@ function Set-CursorConfig {
     # Python path in virtual environment for Windows
     $pythonPath = Join-Path -Path $VenvDir -ChildPath "Scripts\python.exe"
     $pythonPath = $pythonPath.Replace("\", "\\")
-    $serverPath = $ResolveMcpServer.Replace("\", "\\")
+    $serverPath = (Join-Path -Path $RootDir -ChildPath "src\main.py").Replace("\", "\\")
     
     # Create config file
     $configContent = @"
@@ -187,7 +187,7 @@ function Update-CursorConfig {
     # Python path in virtual environment for Windows
     $pythonPath = Join-Path -Path $VenvDir -ChildPath "Scripts\python.exe"
     $pythonPath = $pythonPath.Replace("\", "\\")
-    $serverPath = $ResolveMcpServer.Replace("\", "\\")
+    $serverPath = (Join-Path -Path $RootDir -ChildPath "src\main.py").Replace("\", "\\")
     
     try {
         # Read existing config
@@ -230,7 +230,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 Write-Yellow "Performing pre-launch checks for DaVinci Resolve MCP..."
-Write-Host "Version: 1.3.7 - Windows Support"
+Write-Host "Version: 1.3.8 - Windows Support"
 Write-Host ""
 
 # Check 1: Required files
@@ -255,7 +255,7 @@ else {
 DaVinci Resolve MCP Server
 A server that connects to DaVinci Resolve via the Model Context Protocol (MCP)
 
-Version: 1.3.7 - Windows Support
+Version: 1.3.8 - Windows Support
 """
 
 import os
@@ -297,7 +297,7 @@ logging.basicConfig(
 logger = logging.getLogger("davinci-resolve-mcp")
 
 # Log server version and platform
-VERSION = "1.3.7"
+VERSION = "1.3.8"
 logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 logger.info(f"Detected platform: {get_platform()}")
 logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")

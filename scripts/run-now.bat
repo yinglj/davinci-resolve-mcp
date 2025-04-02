@@ -7,9 +7,11 @@ echo   DaVinci Resolve MCP Server - Quick Start
 echo ==============================================
 echo.
 
-REM Get the script directory and root directory
+REM Get the script directory and root directory (using absolute paths)
 set SCRIPT_DIR=%~dp0
 set ROOT_DIR=%SCRIPT_DIR%..
+echo Project root: %ROOT_DIR%
+
 set VENV_DIR=%ROOT_DIR%venv
 set RESOLVE_MCP_SERVER=%ROOT_DIR%src\resolve_mcp_server.py
 
@@ -83,9 +85,28 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     )
 )
 
-REM Install MCP SDK with CLI support
-echo Installing MCP SDK with CLI support in virtual environment...
-call "%VENV_DIR%\Scripts\pip" install "mcp[cli]"
+REM Check if requirements.txt exists
+if not exist "%ROOT_DIR%\requirements.txt" (
+    echo Error: Could not find requirements.txt at %ROOT_DIR%\requirements.txt
+    pause
+    exit /b 1
+)
+
+REM Install dependencies from requirements.txt
+echo Installing dependencies from requirements.txt...
+call "%VENV_DIR%\Scripts\pip" install -r "%ROOT_DIR%\requirements.txt"
+
+REM Check if MCP CLI is installed
+if not exist "%VENV_DIR%\Scripts\mcp.exe" (
+    echo MCP command not found. Installing MCP[cli]...
+    call "%VENV_DIR%\Scripts\pip" install "mcp[cli]"
+    
+    if %ERRORLEVEL% NEQ 0 (
+        echo Failed to install MCP. Please check your internet connection and try again.
+        pause
+        exit /b 1
+    )
+)
 
 REM Set environment variables
 echo Setting environment variables...
@@ -98,9 +119,17 @@ setx RESOLVE_SCRIPT_API "%RESOLVE_SCRIPT_API%" >nul
 setx RESOLVE_SCRIPT_LIB "%RESOLVE_SCRIPT_LIB%" >nul
 setx PYTHONPATH "%RESOLVE_SCRIPT_API%\Modules" >nul
 
+REM Check if server script exists
+if not exist "%RESOLVE_MCP_SERVER%" (
+    echo Error: Server script not found at %RESOLVE_MCP_SERVER%
+    pause
+    exit /b 1
+)
+
 REM Start the server
 echo Starting DaVinci Resolve MCP Server...
+echo Using server script: %RESOLVE_MCP_SERVER%
 echo.
 
 cd "%ROOT_DIR%"
-"%VENV_DIR%\Scripts\python" "%RESOLVE_MCP_SERVER%"
+"%VENV_DIR%\Scripts\mcp" dev "%RESOLVE_MCP_SERVER%"
