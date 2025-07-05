@@ -13,6 +13,50 @@ A Model Context Protocol (MCP) server that connects AI coding assistants (Cursor
 
 For a comprehensive list of implemented and planned features, see [docs/FEATURES.md](docs/FEATURES.md).
 
+## 🤖 AI Agent Copilot (New!)
+
+The DaVinci Resolve MCP Server now includes an intelligent AI agent that can understand complex natural language requests and automatically execute multi-step workflows. This transforms your AI assistant into a powerful video editing copilot.
+
+### Key AI Agent Capabilities
+
+- **Natural Language Processing**: Just describe what you want in plain English
+- **Intelligent Planning**: Breaks down complex tasks into executable steps
+- **Video Analysis**: Analyze composition, color, motion, and content using AI vision models
+- **Self-Correction**: Automatically detects and fixes errors during execution
+- **Learning Memory**: Improves over time based on your feedback
+
+### Example AI Agent Commands
+
+```
+"Create a new project for my documentary, import all footage from the USB drive, 
+create proxies for 4K files, and organize clips by creation date"
+
+"Analyze the color grading in my timeline and suggest improvements for a more 
+cinematic look"
+
+"Find all shaky shots in the timeline and apply stabilization"
+
+"Create a rough cut by selecting the best takes based on audio quality and 
+removing silent sections"
+```
+
+### Using the AI Agent
+
+Simply use the `agent_process_request` tool in your AI assistant:
+
+```python
+# In Cursor or Claude, just type:
+agent_process_request("Apply a warm sunset color grade to all outdoor shots")
+
+# For video analysis:
+agent_analyze_video("current_timeline", "composition")
+
+# Get AI suggestions:
+agent_suggest_next_actions()
+```
+
+For detailed documentation about the AI Agent, see [docs/AI_AGENT_README.md](docs/AI_AGENT_README.md).
+
 ## Requirements
 
 - **macOS** or **Windows** with DaVinci Resolve installed

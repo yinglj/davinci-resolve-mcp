@@ -10,6 +10,7 @@ import os
 import sys
 import logging
 from typing import List, Dict, Any, Optional, Union
+import asyncio
 
 # Add src directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -84,6 +85,9 @@ from src.utils.project_properties import (
     get_project_info
 )
 
+# Import AI Agent components
+from src.agent import ResolveAgent
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -123,6 +127,20 @@ except ImportError as e:
 except Exception as e:
     logger.error(f"Unexpected error initializing Resolve: {str(e)}")
     resolve = None
+
+# Initialize AI Agent
+agent = None
+if resolve:
+    try:
+        logger.info("Initializing DaVinci Resolve AI Agent...")
+        # Pass the MCP server instance to the agent
+        agent = ResolveAgent(resolve_server=mcp)
+        logger.info("AI Agent initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize AI Agent: {str(e)}")
+        agent = None
+else:
+    logger.warning("Skipping AI Agent initialization - Resolve not connected")
 
 # ------------------
 # MCP Tools/Resources
@@ -4624,6 +4642,252 @@ def get_project_info_endpoint() -> Dict[str, Any]:
         return {"error": "No project currently open"}
     
     return get_project_info(current_project)
+
+# ------------------
+# AI Agent Tools
+# ------------------
+
+@mcp.tool()
+def agent_process_request(request: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Process a natural language request using the AI agent.
+    
+    The agent will analyze your request, create a plan, and execute it automatically.
+    It can handle complex tasks like:
+    - Creating and managing projects and timelines
+    - Importing and organizing media
+    - Applying color grades and effects
+    - Analyzing video content
+    - And much more!
+    
+    Args:
+        request: Natural language description of what you want to do
+        context: Optional additional context for the request
+        
+    Returns:
+        Dict with execution results and actions taken
+    """
+    if agent is None:
+        return {
+            "success": False,
+            "error": "AI Agent not initialized. Please check DaVinci Resolve connection."
+        }
+    
+    # Run the async method in sync context
+    import asyncio
+    
+    async def run_request():
+        return await agent.process_request(request, context)
+    
+    try:
+        # Get or create event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Run the async request
+        result = loop.run_until_complete(run_request())
+        return result
+    except Exception as e:
+        logger.error(f"Error processing agent request: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@mcp.tool()
+def agent_analyze_video(video_path: str, analysis_type: str = "general") -> Dict[str, Any]:
+    """
+    Analyze video content using AI vision models.
+    
+    Analysis types:
+    - general: Overall content description and quality metrics
+    - color: Color analysis including dominant colors, temperature, brightness
+    - composition: Rule of thirds, leading lines, focal points
+    - motion: Motion intensity, camera movement, shake detection
+    - scene: Scene detection and classification
+    
+    Args:
+        video_path: Path to video file or "current_timeline" for current timeline
+        analysis_type: Type of analysis to perform
+        
+    Returns:
+        Analysis results based on the requested type
+    """
+    if agent is None:
+        return {
+            "success": False,
+            "error": "AI Agent not initialized. Please check DaVinci Resolve connection."
+        }
+    
+    import asyncio
+    
+    async def run_analysis():
+        return await agent.analyze_video(video_path, analysis_type)
+    
+    try:
+        # Get or create event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        result = loop.run_until_complete(run_analysis())
+        return result
+    except Exception as e:
+        logger.error(f"Error analyzing video: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@mcp.tool()
+def agent_get_documentation(topic: str) -> str:
+    """
+    Get DaVinci Resolve documentation on a specific topic.
+    
+    The agent has a built-in knowledge base about DaVinci Resolve operations.
+    
+    Args:
+        topic: The topic or command to get documentation for
+        
+    Returns:
+        Relevant documentation and examples
+    """
+    if agent is None:
+        return "AI Agent not initialized. Please check DaVinci Resolve connection."
+    
+    import asyncio
+    
+    async def get_docs():
+        return await agent.get_documentation(topic)
+    
+    try:
+        # Get or create event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        result = loop.run_until_complete(get_docs())
+        return result
+    except Exception as e:
+        logger.error(f"Error getting documentation: {str(e)}")
+        return f"Error getting documentation: {str(e)}"
+
+@mcp.tool()
+def agent_suggest_next_actions() -> List[str]:
+    """
+    Get AI-suggested next actions based on current context.
+    
+    The agent analyzes the current state of your project and suggests
+    logical next steps you might want to take.
+    
+    Returns:
+        List of suggested actions
+    """
+    if agent is None:
+        return ["AI Agent not initialized. Please check DaVinci Resolve connection."]
+    
+    import asyncio
+    
+    async def get_suggestions():
+        return await agent.suggest_next_actions()
+    
+    try:
+        # Get or create event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        result = loop.run_until_complete(get_suggestions())
+        return result
+    except Exception as e:
+        logger.error(f"Error getting suggestions: {str(e)}")
+        return [f"Error getting suggestions: {str(e)}"]
+
+@mcp.tool()
+def agent_learn_from_feedback(task_id: str, feedback: str, success: bool) -> str:
+    """
+    Provide feedback to help the AI agent learn and improve.
+    
+    Args:
+        task_id: The ID of the task (from agent_process_request result)
+        feedback: Your feedback about what worked or didn't work
+        success: Whether the task was ultimately successful
+        
+    Returns:
+        Confirmation message
+    """
+    if agent is None:
+        return "AI Agent not initialized. Please check DaVinci Resolve connection."
+    
+    import asyncio
+    
+    async def provide_feedback():
+        await agent.learn_from_feedback(task_id, feedback, success)
+        return "Feedback recorded. Thank you for helping improve the agent!"
+    
+    try:
+        # Get or create event loop
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        result = loop.run_until_complete(provide_feedback())
+        return result
+    except Exception as e:
+        logger.error(f"Error recording feedback: {str(e)}")
+        return f"Error recording feedback: {str(e)}"
+
+@mcp.resource("resolve://agent/state")
+def get_agent_state() -> Dict[str, Any]:
+    """Get the current state and statistics of the AI agent."""
+    if agent is None:
+        return {
+            "initialized": False,
+            "error": "AI Agent not initialized"
+        }
+    
+    stats = agent.state.get_statistics()
+    stats["initialized"] = True
+    stats["memory_stats"] = agent.memory.get_statistics()
+    
+    return stats
+
+@mcp.resource("resolve://agent/current-task")
+def get_agent_current_task() -> Dict[str, Any]:
+    """Get information about the task currently being executed by the agent."""
+    if agent is None:
+        return {
+            "error": "AI Agent not initialized"
+        }
+    
+    current_task = agent.state.get_current_task()
+    if current_task:
+        return current_task
+    else:
+        return {
+            "message": "No task currently being executed"
+        }
+
+@mcp.resource("resolve://agent/task-history")
+def get_agent_task_history() -> List[Dict[str, Any]]:
+    """Get recent task history from the AI agent."""
+    if agent is None:
+        return [{
+            "error": "AI Agent not initialized"
+        }]
+    
+    return agent.state.get_task_history(limit=20)
 
 # Start the server
 if __name__ == "__main__":
