@@ -8,6 +8,35 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A Model Context Protocol (MCP) server that connects AI coding assistants (Cursor, Claude Desktop) to DaVinci Resolve, enabling them to query and control DaVinci Resolve through natural language.
+---
+
+## Supported Startup Modes (Protocols)
+
+**DaVinci Resolve MCP Server** now supports three startup/connection modes (protocols):
+
+| Mode/Protocol      | Description                                                     | Example Usage / Endpoint   | Authentication Support |
+|--------------------|-----------------------------------------------------------------|---------------------------|-----------------------|
+| `stdio`            | Run as a subprocess, communicating via standard input/output.    | `python src/main.py` or `./mcp-server` | None                  |
+| `sse`              | Run as a network server using Server-Sent Events protocol.       | `http://localhost:8020/sse`| Bearer/Header/None    |
+| `streamable-http`  | Run as a network server using HTTP with streaming responses.     | `http://localhost:8020/mcp`| Bearer/Header/None    |
+
+**How to choose:**
+- Use **`stdio`** when integrating as a local subprocess (e.g. for Cursor/Claude or embedded agent/server scenarios).
+- Use **`sse`** or **`streamable-http`** when exposing the server over the network for remote or multi-client access.
+
+**Authentication:**  
+- Only `sse` and `streamable-http` modes support HTTP authentication (Bearer token, custom headers, or no auth).
+- When using `stdio`, authentication is not used.
+
+### Example (n8n node or client configuration):
+
+| Protocol           | Endpoint/Command Example                | Authentication |
+|--------------------|-----------------------------------------|----------------|
+| stdio              | `python src/main.py`                    | None           |
+| sse                | `http://localhost:8020/sse`             | Optional       |
+| streamable-http    | `http://localhost:8020/mcp`             | Optional       |
+
+---
 
 ## Features
 
