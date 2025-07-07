@@ -100,7 +100,7 @@ logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")
 logger.info(f"Using Resolve library path: {RESOLVE_LIB_PATH}")
 
 # Create MCP server instance with dynamic configuration based on mode
-def create_mcp_instance(mode: str, host: str = "0.0.0.0", port: int = 8020) -> FastMCP:
+def create_mcp_instance(mode: str = "stdio", host: str = "0.0.0.0", port: int = 8020) -> FastMCP:
     """Create a FastMCP instance based on the specified mode."""
     valid_modes = ["stdio", "sse", "streamable-http"]
     if mode not in valid_modes:
@@ -116,7 +116,7 @@ def create_mcp_instance(mode: str, host: str = "0.0.0.0", port: int = 8020) -> F
         return FastMCP("DaVinciResolveMCP", host=host, port=port)
 
 # Global MCP instance (to be used in main.py)
-# mcp = None
+mcp = create_mcp_instance()
 
 # Initialize connection to DaVinci Resolve
 try:
