@@ -18,14 +18,14 @@ sys.path.insert(0, str(project_dir))
 # Import the connection utils first to set environment variables
 from src.utils.resolve_connection import check_environment_variables, set_default_environment_variables
 from src.resolve_mcp_server import create_mcp_instance, register_mcp_resources
-
+from src.utils.logger import logger
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()]
-)
-logger = logging.getLogger("davinci-resolve-mcp.main")
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+#     handlers=[logging.StreamHandler()]
+# )
+# logger = logging.getLogger("davinci-resolve-mcp.main")
 
 def check_setup():
     """Check if the environment is properly set up."""
