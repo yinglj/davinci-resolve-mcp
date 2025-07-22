@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "mcp_prompts_enhancement": {
+        "command": "sse", 
+        "args": ["http://localhost:3002/sse"], 
+        "timeout": 30
+    },
+    "mysql_server": {
+        "command": "streamable-http", 
+        "args": ["http://localhost:3001/mcp"], 
+        "timeout": 15
+    },
+    "get_local_time": {
+        "command": "uvx",
+        "args": ["mcp-server-time", "--local-timezone=Asia/Shanghai"],
+        "timeout": 15
+    },
+    "billing_test_server": {
+        "command": "sse",
+        "args": ["http://localhost:8000/sse"],
+        "timeout": 10
+    }
+  },
+  "apiKeys": {
+    "sk-1234567890abcdef": "user1",
+    "sk-abcdef1234567890": "user2"
+  },
+  "timeout": 60,
+  "llm_preference": "ollama"
+}

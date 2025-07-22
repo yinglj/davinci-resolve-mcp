@@ -1,0 +1,18 @@
+[project]
+name = "agno-mcp"
+version = "0.1.0"
+description = "Davinci Resolve Agent for MCP"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "agno>=1.7.0",
+    "aiohttp>=3.11.16",
+    "httpx[socks]>=0.28.1",
+    "mcp>=1.10.0",
+    "ollama>=0.5.1",
+    "openai-agents>=0.0.19",
+    "pyfiglet>=1.0.2",
+    "referencing>=0.36.2",
+    "rpds-py>=0.25.1",
+    "termcolor>=3.0.1",
+]
