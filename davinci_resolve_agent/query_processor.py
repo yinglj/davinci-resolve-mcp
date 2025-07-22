@@ -15,24 +15,24 @@ from agno.tools.mcp import MultiMCPTools
 from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
 
-logger.debug("加载 query_processor 模块")
+logger.debug("Loading query_processor module")
 
 class QueryProcessor:
     def __init__(self):
-        logger.debug("初始化 QueryProcessor")
+        logger.debug("Initializing QueryProcessor")
         self.agent = None
         self.sessions: Dict[str, Dict] = {}
 
     async def initialize(self) -> None:
-        logger.info("开始初始化 QueryProcessor")
+        logger.info("Starting initialization of QueryProcessor")
         try:
             self.agent = await create_multi_agent()
             if not self.agent:
-                logger.warning("没有有效的代理，查询功能可能受限")
+                logger.warning("No valid agent found, query functionality may be limited")
             else:
-                logger.info(f"QueryProcessor 初始化成功，代理: {self.agent.name}")
+                logger.info(f"QueryProcessor initialization successful, agent: {self.agent.name}")
         except Exception as e:
-            logger.error(f"QueryProcessor 初始化失败: {str(e)}")
+            logger.error(f"QueryProcessor initialization failed: {str(e)}")
             self.agent = None
             raise
 
@@ -43,25 +43,25 @@ class QueryProcessor:
             "context": {"history": []},
             "starting_agent": self.agent,
         }
-        logger.info(f"开始会话: {session_id}")
+        logger.info(f"Starting session: {session_id}")
         return session_id
 
     def is_session_valid(self, session_id: str) -> bool:
         valid = session_id in self.sessions
-        logger.info(f"会话验证 {session_id}: {'有效' if valid else '无效'}")
+        logger.info(f"Session validation {session_id}: {'valid' if valid else 'invalid'}")
         return valid
 
     async def process_query(self, session_id: str, query: str) -> Dict[str, object]:
         if session_id not in self.sessions:
-            logger.error(f"会话不存在: {session_id}")
-            return {"error": "会话不存在", "session_id": session_id}
+            logger.error(f"Session does not exist: {session_id}")
+            return {"error": "Session does not exist", "session_id": session_id}
         if not self.agent:
-            logger.error("代理未初始化")
-            return {"error": "代理未初始化", "session_id": session_id}
+            logger.error("Agent not initialized")
+            return {"error": "Agent not initialized", "session_id": session_id}
         session = self.sessions[session_id]
         session["history"].append({"query": query})
         session["context"]["history"].append({"query": query})
-        logger.info(f"处理非流式查询: {query}，会话: {session_id}")
+        logger.info(f"Processing non-streaming query: {query}, session: {session_id}")
 
         try:
             response = await run_multimcp_agent(query, stream=True)
@@ -71,35 +71,35 @@ class QueryProcessor:
                 "complete": True
             }
         except asyncio.CancelledError as e:
-            logger.error(f"非流式查询被取消，会话 {session_id}: {str(e)}")
-            return {"error": f"查询被取消: {str(e)}", "session_id": session_id}
+            logger.error(f"Non-streaming query cancelled, session {session_id}: {str(e)}")
+            return {"error": f"Query cancelled: {str(e)}", "session_id": session_id}
         except Exception as e:
             if isinstance(e, ClosedResourceError):
-                logger.info(f"检测到 ClosedResourceError，尝试重新初始化，会话 {session_id}")
+                logger.info(f"Detected ClosedResourceError, attempting reinitialization, session {session_id}")
                 try:
                     await self.reinitialize()
-                    return {"error": "服务器资源已关闭，已尝试重新初始化，请重试查询", "session_id": session_id}
+                    return {"error": "Server resources closed, attempted reinitialization, please retry query", "session_id": session_id}
                 except Exception as reinit_e:
-                    logger.error(f"重新初始化失败: {str(reinit_e)}")
-                    return {"error": f"重新初始化失败: {str(reinit_e)}", "session_id": session_id}
-            logger.error(f"查询处理错误，会话 {session_id}: type={type(e).__name__}, message={str(e)}")
-            return {"error": f"查询处理失败: {str(e) or '未知错误'}", "session_id": session_id}
+                    logger.error(f"Reinitialization failed: {str(reinit_e)}")
+                    return {"error": f"Reinitialization failed: {str(reinit_e)}", "session_id": session_id}
+            logger.error(f"Query processing error, session {session_id}: type={type(e).__name__}, message={str(e)}")
+            return {"error": f"Query processing failed: {str(e) or 'Unknown error'}", "session_id": session_id}
 
     async def reinitialize(self) -> None:
-        logger.info("开始重新初始化 QueryProcessor")
+        logger.info("Start reinitialization of QueryProcessor")
         try:
             self.agent = None
             self.agent = await create_multi_agent()
             if not self.agent:
-                logger.warning("重新初始化后没有有效的代理")
+                logger.warning("Reinitialization failed: no valid agent")
             for session in self.sessions.values():
                 session["starting_agent"] = self.agent
-            logger.info(f"QueryProcessor 重新初始化成功，代理: {self.agent.name if self.agent else '无'}")
+            logger.info(f"QueryProcessor reinitialization succeeded, agent: {self.agent.name if self.agent else 'none'}")
         except asyncio.CancelledError:
-            logger.warning("QueryProcessor 重新初始化被取消")
+            logger.warning("QueryProcessor was reinitialization cancelled")
             raise
         except Exception as e:
-            logger.error(f"QueryProcessor 重新初始化失败: {str(e)}")
+            logger.error(f"QueryProcessor reinitialization failed: {str(e)}")
             self.agent = None
             raise
 
@@ -109,7 +109,7 @@ class QueryProcessor:
             "error": {"code": code, "message": message},
             "id": request_id
         }
-        logger.error(f"生成流式错误响应: {message}")
+        logger.error(f"Generate streaming error response: {message}")
         return error_response
 
     async def _yield_success_response(
@@ -134,15 +134,15 @@ class QueryProcessor:
             "result": result,
             "id": request_id
         }
-        logger.info(f"生成流式成功响应，类型: {event_type}, 完成: {complete}")
+        logger.info(f"Successfully generated streaming success response, type: {event_type}, complete: {complete}")
         return response
 
     async def process_query_stream(self, session_id: str, query: str, request_id: Optional[int] = None) -> AsyncGenerator[Dict, None]:
         if session_id not in self.sessions:
-            logger.error(f"流式会话不存在: {session_id}")
+            logger.error(f"Stream session does not exist: {session_id}")
             yield await self._yield_error_response(
                 code=-32600,
-                message=f"无效的会话: {session_id}。请调用 start_session 创建新会话",
+                message=f"Invalid session: {session_id}. Please call start_session to create a new session",
                 request_id=request_id
             )
             return
@@ -150,10 +150,10 @@ class QueryProcessor:
         # Load server configurations
         server_configs = load_server_config()
         if not server_configs:
-            logger.warning("没有有效的服务器配置，无法创建代理")
+            logger.warning("There are no valid server configurations available for MultiMCPTools")
             yield await self._yield_error_response(
                 code=-32603,
-                message="没有有效的服务器配置，无法创建代理",
+                message="There are no valid server configurations available for MultiMCPTools",
                 request_id=request_id
             )
             return
@@ -175,14 +175,14 @@ class QueryProcessor:
                 else:
                     commands.append(" ".join([command] + args))
             except Exception as e:
-                logger.error(f"处理服务器配置失败，服务器 {name}: {str(e)}")
+                logger.error(f"failed to process server config {name}: {str(e)}")
                 continue
 
         if not commands and not urls:
-            logger.warning("没有有效的服务器配置可用于 MultiMCPTools")
+            logger.warning("There are no valid server configurations available for MultiMCPTools")
             yield await self._yield_error_response(
                 code=-32603,
-                message="没有有效的服务器配置可用于 MultiMCPTools",
+                message="There are no valid server configurations available for MultiMCPTools",
                 request_id=request_id
             )
             return
@@ -198,7 +198,7 @@ class QueryProcessor:
             ) as mcp_tools:
                 agent = Agent(
                     name="MultiMCPAgent",
-                    instructions="You are a database agent. Use the MCP tools to complete the user's queries.",
+                    instructions="You are a Davinci Resolve agent. Use the MCP tools to complete the user's queries.",
                     tools=[mcp_tools],
                     # model=OpenAIChat(id="gpt-4o"),
                     model=Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest"),
@@ -225,6 +225,7 @@ class QueryProcessor:
 
                 # After all chunks are processed, send the final response
                 if final_output:
+
                     self.sessions[session_id]["history"].append({"response": final_output.strip()})
                     self.sessions[session_id]["context"]["history"].append({"response": final_output.strip()})
                     yield await self._yield_success_response(
@@ -234,32 +235,32 @@ class QueryProcessor:
                         complete=True,
                         request_id=request_id
                     )
-                    logger.info(f"流式查询成功完成，会话 {session_id}")
+                    logger.info(f"Stream query succeeded, session {session_id}")
                 else:
-                    logger.warning(f"流式查询无输出，会话 {session_id}")
+                    logger.warning(f"Stream query produced no output, session {session_id}")
                     yield await self._yield_error_response(
                         code=-32603,
-                        message="流式查询无有效输出",
+                        message="Stream query produced no valid output",
                         request_id=request_id
                     )
         except Exception as e:
-            logger.error(f"流式查询错误，会话 {session_id}: {str(e)}\n{traceback.format_exc()}")
+            logger.error(f"Stream query error, session {session_id}: {str(e)}\n{traceback.format_exc()}")
             yield await self._yield_error_response(
                 code=-32603,
-                message=f"流式查询失败: {str(e)}",
+                message=f"Stream query failed: {str(e)}",
                 request_id=request_id
             )
 
     def end_session(self, session_id: str) -> Dict[str, str]:
         if session_id in self.sessions:
             del self.sessions[session_id]
-            logger.info(f"结束会话: {session_id}")
-            return {"response": "会话已结束", "session_id": session_id}
-        logger.error(f"会话不存在: {session_id}")
-        return {"error": "会话不存在", "session_id": session_id}
+            logger.info(f"Session ended: {session_id}")
+            return {"response": "Session ended", "session_id": session_id}
+        logger.error(f"Session does not exist: {session_id}")
+        return {"error": "Session does not exist", "session_id": session_id}
 
     async def cleanup(self) -> None:
-        logger.info("开始清理 QueryProcessor")
+        logger.info("Start cleanup of QueryProcessor")
         self.sessions.clear()
         self.agent = None
-        logger.info("QueryProcessor 已清理")
+        logger.info("QueryProcessor cleanup completed")
