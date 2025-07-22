@@ -170,17 +170,38 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://version")
     def get_resolve_version() -> str:
-        """Get DaVinci Resolve version information."""
+        """Get DaVinci Resolve version information.
+        
+        Returns:
+            str: The product name and version string of DaVinci Resolve, 
+                 or an error message if not connected.
+        """
+        logger.debug("Fetching DaVinci Resolve version")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
+        logger.info("Connected to DaVinci Resolve")
         return f"{resolve.GetProductName()} {resolve.GetVersionString()}"
 
     @mcp.resource("resolve://current-page")
     def get_current_page() -> str:
         """Get the current page open in DaVinci Resolve (Edit, Color, Fusion, etc.)."""
+        # Log the attempt to fetch the current page
+        logger.debug("Fetching current page in DaVinci Resolve")
         if resolve is None:
+            # Log error if not connected to DaVinci Resolve
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
-        return resolve.GetCurrentPage()
+        try:
+            # Retrieve the current page
+            page = resolve.GetCurrentPage()
+            # Log the retrieved page
+            logger.info(f"Current page: {page}")
+            return page
+        except Exception as e:
+            # Log any errors that occur during page retrieval
+            logger.error(f"Failed to get current page: {str(e)}")
+            return f"Error: Failed to get current page: {str(e)}"
 
     @mcp.tool()
     def switch_page(page: str) -> str:
@@ -188,21 +209,35 @@ def register_mcp_resources(mcp: FastMCP):
         
         Args:
             page: The page to switch to. Options: 'media', 'cut', 'edit', 'fusion', 'color', 'fairlight', 'deliver'
+        
+        Returns:
+            str: A message indicating the success or failure of the page switch operation.
+                - On success: "Successfully switched to {page} page"
+                - On failure: An error message describing the issue (e.g., "Error: Not connected to DaVinci Resolve")
         """
+        logger.debug(f"Attempting to switch to page: {page}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         valid_pages = ['media', 'cut', 'edit', 'fusion', 'color', 'fairlight', 'deliver']
         page = page.lower()
         
         if page not in valid_pages:
+            logger.error(f"Invalid page name: {page}. Valid options: {', '.join(valid_pages)}")
             return f"Error: Invalid page name. Must be one of: {', '.join(valid_pages)}"
         
-        result = resolve.OpenPage(page)
-        if result:
-            return f"Successfully switched to {page} page"
-        else:
-            return f"Failed to switch to {page} page"
+        try:
+            result = resolve.OpenPage(page)
+            if result:
+                logger.info(f"Successfully switched to {page} page")
+                return f"Successfully switched to {page} page"
+            else:
+                logger.error(f"Failed to switch to {page} page")
+                return f"Failed to switch to {page} page"
+        except Exception as e:
+            logger.error(f"Error switching to page {page}: {str(e)}")
+            return f"Error switching to page {page}: {str(e)}"
 
     # ------------------
     # Project Management
@@ -210,53 +245,85 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://projects")
     def list_projects() -> List[str]:
-        """List all available projects in the current database."""
+        """List all available projects in the current database.
+        
+        Returns:
+            List[str]: A list of project names in the current database, 
+                       or a list containing an error message if the operation fails.
+        """
+        logger.debug("Received request to list projects")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return ["Error: Not connected to DaVinci Resolve"]
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return ["Error: Failed to get Project Manager"]
         
         projects = project_manager.GetProjectListInCurrentFolder()
         
         # Filter out any empty strings that might be in the list
-        return [p for p in projects if p]
+        projects = [p for p in projects if p]
+        if not projects:
+            logger.info("No projects found in the current database")
+            return ["No projects found in the current database"]
+        logger.info(f"Found {len(projects)} projects: {', '.join(projects)}")
+        return projects
 
     @mcp.resource("resolve://current-project")
     def get_current_project_name() -> str:
-        """Get the name of the currently open project."""
+        """Get the name of the currently open project.
+        Returns:
+            str: The name of the current project, or an error message if not connected or no project is open.
+        """
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.error("No project currently open")
             return "No project currently open"
-        
+        logger.info(f"Current project: {current_project.GetName()}")
         return current_project.GetName()
 
     @mcp.resource("resolve://project-settings")
     def get_project_settings() -> Dict[str, Any]:
-        """Get all project settings from the current project."""
+        """Get all project settings from the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing all project settings, 
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to fetch project settings
+        logger.debug("Fetching all project settings")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         try:
             # Get all settings
-            return current_project.GetSetting('')
+            settings = current_project.GetSetting('')
+            logger.info(f"Retrieved project settings: {settings}")
+            return settings
         except Exception as e:
+            logger.error(f"Failed to get project settings: {str(e)}")
             return {"error": f"Failed to get project settings: {str(e)}"}
 
     @mcp.resource("resolve://project-setting/{setting_name}")
@@ -265,23 +332,34 @@ def register_mcp_resources(mcp: FastMCP):
         
         Args:
             setting_name: The specific setting to retrieve.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the requested setting name and its value,
+                           or a dictionary with an error message if the operation fails.
         """
+        # Log the attempt to fetch the specific project setting
+        logger.debug(f"Fetching project setting: {setting_name}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         try:
             # Get specific setting
             value = current_project.GetSetting(setting_name)
+            logger.info(f"Retrieved setting '{setting_name}': {value}")
             return {setting_name: value}
         except Exception as e:
+            logger.error(f"Failed to get project setting '{setting_name}': {str(e)}")
             return {"error": f"Failed to get project setting '{setting_name}': {str(e)}"}
 
     @mcp.tool()
@@ -289,18 +367,28 @@ def register_mcp_resources(mcp: FastMCP):
         """Set a project setting to the specified value.
         
         Args:
-            setting_name: The name of the setting to change
-            setting_value: The new value for the setting (can be string, integer, float, or boolean)
+            setting_name: The name of the setting to change.
+            setting_value: The new value for the setting (can be string, integer, float, or boolean).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the setting was updated with the new value.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set the project setting
+        logger.debug(f"Setting project setting '{setting_name}' to '{setting_value}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         try:
@@ -317,96 +405,147 @@ def register_mcp_resources(mcp: FastMCP):
                     numeric_value = int(setting_value)
                     # Try with numeric value first
                     if current_project.SetSetting(setting_name, numeric_value):
+                        logger.info(f"Successfully set project setting '{setting_name}' to numeric value {numeric_value}")
                         return f"Successfully set project setting '{setting_name}' to numeric value {numeric_value}"
                 elif '.' in setting_value and setting_value.replace('.', '', 1).replace('-', '', 1).isdigit():
                     # It's a float
                     numeric_value = float(setting_value)
                     # Try with float value
                     if current_project.SetSetting(setting_name, numeric_value):
+                        logger.info(f"Successfully set project setting '{setting_name}' to numeric value {numeric_value}")
                         return f"Successfully set project setting '{setting_name}' to numeric value {numeric_value}"
             except (ValueError, TypeError):
                 # Not a number or conversion failed, continue with string value
+                logger.debug(f"Value '{setting_value}' is not numeric, attempting as string")
                 pass
                 
             # Fall back to string value if numeric didn't work or wasn't applicable
             result = current_project.SetSetting(setting_name, setting_value)
             if result:
+                logger.info(f"Successfully set project setting '{setting_name}' to '{setting_value}'")
                 return f"Successfully set project setting '{setting_name}' to '{setting_value}'"
             else:
+                logger.error(f"Failed to set project setting '{setting_name}'")
                 return f"Failed to set project setting '{setting_name}'"
         except Exception as e:
+            logger.error(f"Error setting project setting '{setting_name}': {str(e)}")
             return f"Error setting project setting: {str(e)}"
 
     @mcp.tool()
     def open_project(name: str) -> str:
-        """Open a Davinci Resolve project by name.
+        """Open a DaVinci Resolve project by name.
+        
         Args:
-            name: The name of the Davinci Resolve project to open
+            name: The name of the DaVinci Resolve project to open.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the project was opened.
+                 - On failure: An error message describing the issue (e.g., project not found).
         """
+        # Log the attempt to open a project
+        logger.debug(f"Attempting to open project: {name}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         if not name:
+            logger.error("Project name cannot be empty")
             return "Error: Project name cannot be empty"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         # Check if project exists
         projects = project_manager.GetProjectListInCurrentFolder()
         if name not in projects:
+            logger.error(f"Project '{name}' not found. Available projects: {', '.join(projects)}")
             return f"Error: Project '{name}' not found. Available projects: {', '.join(projects)}"
         
-        result = project_manager.LoadProject(name)
-        if result:
-            return f"Successfully opened project '{name}'"
-        else:
-            return f"Failed to open project '{name}'"
+        try:
+            result = project_manager.LoadProject(name)
+            if result:
+                logger.info(f"Successfully opened project '{name}'")
+                return f"Successfully opened project '{name}'"
+            else:
+                logger.error(f"Failed to open project '{name}'")
+                return f"Failed to open project '{name}'"
+        except Exception as e:
+            logger.error(f"Error opening project '{name}': {str(e)}")
+            return f"Error opening project '{name}': {str(e)}"
 
     @mcp.tool()
     def create_project(name: str) -> str:
         """Create a new project with the given name.
         
         Args:
-            name: The name for the new project
+            name: The name for the new project.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the project was created.
+                 - On failure: An error message describing the issue (e.g., project already exists).
         """
+        # Log the attempt to create a project
+        logger.debug(f"Attempting to create project: {name}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         if not name:
+            logger.error("Project name cannot be empty")
             return "Error: Project name cannot be empty"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         # Check if project already exists
         projects = project_manager.GetProjectListInCurrentFolder()
         if name in projects:
+            logger.error(f"Project '{name}' already exists")
             return f"Error: Project '{name}' already exists"
         
-        result = project_manager.CreateProject(name)
-        if result:
-            return f"Successfully created project '{name}'"
-        else:
-            return f"Failed to create project '{name}'"
+        try:
+            result = project_manager.CreateProject(name)
+            if result:
+                logger.info(f"Successfully created project '{name}'")
+                return f"Successfully created project '{name}'"
+            else:
+                logger.error(f"Failed to create project '{name}'")
+                return f"Failed to create project '{name}'"
+        except Exception as e:
+            logger.error(f"Error creating project '{name}': {str(e)}")
+            return f"Error creating project '{name}': {str(e)}"
 
     @mcp.tool()
     def save_project() -> str:
         """Save the current project.
         
         Note that DaVinci Resolve typically auto-saves projects, so this may not be necessary.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the project was saved.
+                 - On failure: An error message describing the issue or reliance on auto-save.
         """
+        # Log the attempt to save the current project
+        logger.debug("Attempting to save current project")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         project_name = current_project.GetName()
@@ -456,7 +595,9 @@ def register_mcp_resources(mcp: FastMCP):
                         try:
                             if os.path.exists(temp_file):
                                 os.remove(temp_file)
-                        except:
+                                logger.debug(f"Cleaned up temporary file: {temp_file}")
+                        except Exception as e:
+                            logger.warning(f"Failed to clean up temporary file {temp_file}: {str(e)}")
                             pass
                         success = True
                 except Exception as e:
@@ -466,8 +607,10 @@ def register_mcp_resources(mcp: FastMCP):
                         
             # If all else fails, rely on auto-save
             if not success:
+                logger.warning(f"Automatic save likely in effect for project '{project_name}'. Manual save attempts failed: {error_message if error_message else 'Unknown error'}")
                 return f"Automatic save likely in effect for project '{project_name}'. Manual save attempts failed: {error_message if error_message else 'Unknown error'}"
             else:
+                logger.info(f"Successfully saved project '{project_name}'")
                 return f"Successfully saved project '{project_name}'"
                 
         except Exception as e:
@@ -479,16 +622,26 @@ def register_mcp_resources(mcp: FastMCP):
         """Close the current project.
         
         This closes the current project without saving. If you need to save, use the save_project function first.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the project was closed.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to close the current project
+        logger.debug("Attempting to close current project")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         project_name = current_project.GetName()
@@ -512,7 +665,13 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://timelines")
     def list_timelines() -> List[str]:
-        """List all timelines in the current project."""
+        """List all timelines in the current project.
+        
+        Returns:
+            List[str]: A list of timeline names in the current project,
+                       or a list containing an error message if the operation fails.
+        """
+        # Log the attempt to list timelines
         logger.info("Received request to list timelines")
         
         if resolve is None:
@@ -550,34 +709,51 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://current-timeline")
     def get_current_timeline() -> Dict[str, Any]:
-        """Get information about the current timeline."""
+        """Get information about the current timeline.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the current timeline's name, frame rate,
+                           resolution (width and height), and duration in frames,
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to fetch current timeline information
+        logger.debug("Fetching current timeline information")
+        
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return {"error": "No timeline currently active"}
         
-        # Get basic timeline information
-        result = {
-            "name": current_timeline.GetName(),
-            "fps": current_timeline.GetSetting("timelineFrameRate"),
-            "resolution": {
-                "width": current_timeline.GetSetting("timelineResolutionWidth"),
-                "height": current_timeline.GetSetting("timelineResolutionHeight")
-            },
-            "duration": current_timeline.GetEndFrame() - current_timeline.GetStartFrame() + 1
-        }
-        
-        return result
+        try:
+            # Get basic timeline information
+            result = {
+                "name": current_timeline.GetName(),
+                "fps": current_timeline.GetSetting("timelineFrameRate"),
+                "resolution": {
+                    "width": current_timeline.GetSetting("timelineResolutionWidth"),
+                    "height": current_timeline.GetSetting("timelineResolutionHeight")
+                },
+                "duration": current_timeline.GetEndFrame() - current_timeline.GetStartFrame() + 1
+            }
+            logger.info(f"Retrieved current timeline info: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get current timeline info: {str(e)}")
+            return {"error": f"Failed to get current timeline info: {str(e)}"}
 
     @mcp.resource("resolve://timeline-tracks/{timeline_name}")
     def get_timeline_tracks(timeline_name: str = None) -> Dict[str, Any]:
@@ -585,94 +761,161 @@ def register_mcp_resources(mcp: FastMCP):
         
         Args:
             timeline_name: Optional name of the timeline to get tracks from. Uses current timeline if None.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the track structure of the specified or current timeline,
+                           or a dictionary with an error message if the operation fails.
         """
+        # Log the attempt to fetch timeline tracks
+        logger.debug(f"Fetching track structure for timeline: {timeline_name or 'current'}")
         from api.timeline_operations import get_timeline_tracks as get_tracks_func
-        return get_tracks_func(resolve, timeline_name)
+        try:
+            result = get_tracks_func(resolve, timeline_name)
+            logger.info(f"Retrieved track structure for timeline '{timeline_name or 'current'}': {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Failed to get track structure for timeline '{timeline_name or 'current'}': {str(e)}")
+            return {"error": f"Failed to get track structure: {str(e)}"}
 
     @mcp.tool()
     def create_timeline(name: str) -> str:
         """Create a new timeline with the given name.
         
         Args:
-            name: The name for the new timeline
+            name: The name for the new timeline.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the timeline was created.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to create a timeline
+        logger.debug(f"Attempting to create timeline: {name}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         if not name:
+            logger.error("Timeline name cannot be empty")
             return "Error: Timeline name cannot be empty"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
-        timeline = media_pool.CreateEmptyTimeline(name)
-        if timeline:
-            return f"Successfully created timeline '{name}'"
-        else:
-            return f"Failed to create timeline '{name}'"
+        try:
+            timeline = media_pool.CreateEmptyTimeline(name)
+            if timeline:
+                logger.info(f"Successfully created timeline '{name}'")
+                return f"Successfully created timeline '{name}'"
+            else:
+                logger.error(f"Failed to create timeline '{name}'")
+                return f"Failed to create timeline '{name}'"
+        except Exception as e:
+            logger.error(f"Error creating timeline '{name}': {str(e)}")
+            return f"Error creating timeline '{name}': {str(e)}"
 
     @mcp.tool()
     def create_empty_timeline(name: str, 
-                        frame_rate: str = None, 
-                        resolution_width: int = None, 
-                        resolution_height: int = None,
-                        start_timecode: str = None,
-                        video_tracks: int = None,
-                        audio_tracks: int = None) -> str:
+                            frame_rate: str = None, 
+                            resolution_width: int = None, 
+                            resolution_height: int = None,
+                            start_timecode: str = None,
+                            video_tracks: int = None,
+                            audio_tracks: int = None) -> str:
         """Create a new timeline with the given name and custom settings.
         
         Args:
-            name: The name for the new timeline
-            frame_rate: Optional frame rate (e.g. "24", "29.97", "30", "60")
-            resolution_width: Optional width in pixels (e.g. 1920)
-            resolution_height: Optional height in pixels (e.g. 1080)
-            start_timecode: Optional start timecode (e.g. "01:00:00:00")
-            video_tracks: Optional number of video tracks (Default is project setting)
-            audio_tracks: Optional number of audio tracks (Default is project setting)
+            name: The name for the new timeline.
+            frame_rate: Optional frame rate (e.g., "24", "29.97", "30", "60").
+            resolution_width: Optional width in pixels (e.g., 1920).
+            resolution_height: Optional height in pixels (e.g., 1080).
+            start_timecode: Optional start timecode (e.g., "01:00:00:00").
+            video_tracks: Optional number of video tracks (default is project setting).
+            audio_tracks: Optional number of audio tracks (default is project setting).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the timeline was created.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to create an empty timeline with custom settings
+        logger.debug(f"Attempting to create empty timeline '{name}' with settings: frame_rate={frame_rate}, resolution={resolution_width}x{resolution_height}, start_timecode={start_timecode}, video_tracks={video_tracks}, audio_tracks={audio_tracks}")
         from api.timeline_operations import create_empty_timeline as create_empty_timeline_func
-        return create_empty_timeline_func(resolve, name, frame_rate, resolution_width, 
-                                        resolution_height, start_timecode, 
-                                        video_tracks, audio_tracks)
+        try:
+            result = create_empty_timeline_func(resolve, name, frame_rate, resolution_width, 
+                                              resolution_height, start_timecode, 
+                                              video_tracks, audio_tracks)
+            logger.info(f"Create empty timeline result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error creating empty timeline '{name}': {str(e)}")
+            return f"Error creating empty timeline '{name}': {str(e)}"
 
     @mcp.tool()
     def delete_timeline(name: str) -> str:
         """Delete a timeline by name.
         
         Args:
-            name: The name of the timeline to delete
+            name: The name of the timeline to delete.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the timeline was deleted.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to delete a timeline
+        logger.debug(f"Attempting to delete timeline: {name}")
         from api.timeline_operations import delete_timeline as delete_timeline_func
-        return delete_timeline_func(resolve, name)
+        try:
+            result = delete_timeline_func(resolve, name)
+            logger.info(f"Delete timeline result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error deleting timeline '{name}': {str(e)}")
+            return f"Error deleting timeline '{name}': {str(e)}"
 
     @mcp.tool()
     def set_current_timeline(name: str) -> str:
         """Switch to a timeline by name.
         
         Args:
-            name: The name of the timeline to set as current
+            name: The name of the timeline to set as current.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the timeline was switched.
+                 - On failure: An error message describing the issue (e.g., timeline not found).
         """
+        # Log the attempt to switch to a timeline
+        logger.debug(f"Attempting to switch to timeline: {name}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         if not name:
+            logger.error("Timeline name cannot be empty")
             return "Error: Timeline name cannot be empty"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Find the timeline by name
@@ -680,12 +923,19 @@ def register_mcp_resources(mcp: FastMCP):
         for i in range(1, timeline_count + 1):
             timeline = current_project.GetTimelineByIndex(i)
             if timeline and timeline.GetName() == name:
-                result = current_project.SetCurrentTimeline(timeline)
-                if result:
-                    return f"Successfully switched to timeline '{name}'"
-                else:
-                    return f"Failed to switch to timeline '{name}'"
+                try:
+                    result = current_project.SetCurrentTimeline(timeline)
+                    if result:
+                        logger.info(f"Successfully switched to timeline '{name}'")
+                        return f"Successfully switched to timeline '{name}'"
+                    else:
+                        logger.error(f"Failed to switch to timeline '{name}'")
+                        return f"Failed to switch to timeline '{name}'"
+                except Exception as e:
+                    logger.error(f"Error switching to timeline '{name}': {str(e)}")
+                    return f"Error switching to timeline '{name}': {str(e)}"
         
+        logger.error(f"Timeline '{name}' not found")
         return f"Error: Timeline '{name}' not found"
 
     @mcp.tool()
@@ -693,12 +943,25 @@ def register_mcp_resources(mcp: FastMCP):
         """Add a marker at the specified frame in the current timeline.
         
         Args:
-            frame: The frame number to add the marker at (defaults to current position if None)
-            color: The marker color (Blue, Cyan, Green, Yellow, Red, Pink, Purple, Fuchsia, Rose, Lavender, Sky, Mint, Lemon, Sand, Cocoa, Cream)
-            note: Text note to add to the marker
+            frame: The frame number to add the marker at (defaults to current position if None).
+            color: The marker color (Blue, Cyan, Green, Yellow, Red, Pink, Purple, Fuchsia, Rose, Lavender, Sky, Mint, Lemon, Sand, Cocoa, Cream).
+            note: Text note to add to the marker.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the marker was added.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to add a marker
+        logger.debug(f"Attempting to add marker at frame {frame}, color: {color}, note: {note}")
         from api.timeline_operations import add_marker as add_marker_func
-        return add_marker_func(resolve, frame, color, note)
+        try:
+            result = add_marker_func(resolve, frame, color, note)
+            logger.info(f"Add marker result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error adding marker: {str(e)}")
+            return f"Error adding marker: {str(e)}"
 
     # ------------------
     # Media Pool Operations
@@ -706,39 +969,58 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://media-pool-clips")
     def list_media_pool_clips() -> List[Dict[str, Any]]:
-        """List all clips in the root folder of the media pool."""
+        """List all clips in the root folder of the media pool.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing clip information (name, duration, fps),
+                                 or a list with an error/info dictionary if the operation fails or no clips are found.
+        """
+        # Log the attempt to list media pool clips
+        logger.debug("Listing clips in the media pool root folder")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return [{"error": "Not connected to DaVinci Resolve"}]
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return [{"error": "Failed to get Project Manager"}]
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return [{"error": "No project currently open"}]
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return [{"error": "Failed to get Media Pool"}]
         
         root_folder = media_pool.GetRootFolder()
         if not root_folder:
+            logger.error("Failed to get root folder")
             return [{"error": "Failed to get root folder"}]
         
         clips = root_folder.GetClipList()
         if not clips:
+            logger.info("No clips found in the root folder")
             return [{"info": "No clips found in the root folder"}]
         
         # Return a simplified list with basic clip info
         result = []
         for clip in clips:
-            result.append({
-                "name": clip.GetName(),
-                "duration": clip.GetDuration(),
-                "fps": clip.GetClipProperty("FPS")
-            })
+            try:
+                clip_info = {
+                    "name": clip.GetName(),
+                    "duration": clip.GetDuration(),
+                    "fps": clip.GetClipProperty("FPS")
+                }
+                result.append(clip_info)
+                logger.debug(f"Found clip: {clip_info['name']}")
+            except Exception as e:
+                logger.warning(f"Failed to get info for a clip: {str(e)}")
         
+        logger.info(f"Returning {len(result)} clips from the media pool")
         return result
 
     @mcp.tool()
@@ -746,31 +1028,70 @@ def register_mcp_resources(mcp: FastMCP):
         """Import media file into the current project's media pool.
         
         Args:
-            file_path: The path to the media file to import
+            file_path: The path to the media file to import.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the media was imported.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to import media
+        logger.debug(f"Attempting to import media: {file_path}")
         from api.media_operations import import_media as import_media_func
-        return import_media_func(resolve, file_path)
+        try:
+            result = import_media_func(resolve, file_path)
+            logger.info(f"Import media result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error importing media '{file_path}': {str(e)}")
+            return f"Error importing media '{file_path}': {str(e)}"
 
     @mcp.tool()
     def delete_media(clip_name: str) -> str:
         """Delete a media clip from the media pool by name.
         
         Args:
-            clip_name: Name of the clip to delete
+            clip_name: Name of the clip to delete.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the clip was deleted.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to delete a media clip
+        logger.debug(f"Attempting to delete media clip: {clip_name}")
         from api.media_operations import delete_media as delete_media_func
-        return delete_media_func(resolve, clip_name)
+        try:
+            result = delete_media_func(resolve, clip_name)
+            logger.info(f"Delete media result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error deleting media clip '{clip_name}': {str(e)}")
+            return f"Error deleting media clip '{clip_name}': {str(e)}"
 
     @mcp.tool()
     def move_media_to_bin(clip_name: str, bin_name: str) -> str:
         """Move a media clip to a specific bin in the media pool.
         
         Args:
-            clip_name: Name of the clip to move
-            bin_name: Name of the target bin
+            clip_name: Name of the clip to move.
+            bin_name: Name of the target bin.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the clip was moved.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to move a media clip
+        logger.debug(f"Attempting to move media clip '{clip_name}' to bin '{bin_name}'")
         from api.media_operations import move_media_to_bin as move_media_func
-        return move_media_func(resolve, clip_name, bin_name)
+        try:
+            result = move_media_func(resolve, clip_name, bin_name)
+            logger.info(f"Move media result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error moving media clip '{clip_name}' to bin '{bin_name}': {str(e)}")
+            return f"Error moving media clip '{clip_name}' to bin '{bin_name}': {str(e)}"
 
     @mcp.tool()
     def auto_sync_audio(clip_names: List[str], sync_method: str = "waveform", 
@@ -778,23 +1099,49 @@ def register_mcp_resources(mcp: FastMCP):
         """Sync audio between clips with customizable settings.
         
         Args:
-            clip_names: List of clip names to sync
-            sync_method: Method to use for synchronization - 'waveform' or 'timecode'
-            append_mode: Whether to append the audio or replace it
-            target_bin: Optional bin to move synchronized clips to
+            clip_names: List of clip names to sync.
+            sync_method: Method to use for synchronization ('waveform' or 'timecode').
+            append_mode: Whether to append the audio or replace it.
+            target_bin: Optional bin to move synchronized clips to.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the audio sync operation.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to sync audio
+        logger.debug(f"Attempting to sync audio for clips {clip_names} using method '{sync_method}', append_mode={append_mode}, target_bin={target_bin}")
         from api.media_operations import auto_sync_audio as auto_sync_audio_func
-        return auto_sync_audio_func(resolve, clip_names, sync_method, append_mode, target_bin)
+        try:
+            result = auto_sync_audio_func(resolve, clip_names, sync_method, append_mode, target_bin)
+            logger.info(f"Auto-sync audio result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error syncing audio for clips {clip_names}: {str(e)}")
+            return f"Error syncing audio for clips {clip_names}: {str(e)}"
 
     @mcp.tool()
     def unlink_clips(clip_names: List[str]) -> str:
         """Unlink specified clips, disconnecting them from their media files.
         
         Args:
-            clip_names: List of clip names to unlink
+            clip_names: List of clip names to unlink.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the clips were unlinked.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to unlink clips
+        logger.debug(f"Attempting to unlink clips: {clip_names}")
         from api.media_operations import unlink_clips as unlink_clips_func
-        return unlink_clips_func(resolve, clip_names)
+        try:
+            result = unlink_clips_func(resolve, clip_names)
+            logger.info(f"Unlink clips result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error unlinking clips {clip_names}: {str(e)}")
+            return f"Error unlinking clips {clip_names}: {str(e)}"
 
     @mcp.tool()
     def relink_clips(clip_names: List[str], media_paths: List[str] = None, 
@@ -802,13 +1149,26 @@ def register_mcp_resources(mcp: FastMCP):
         """Relink specified clips to their media files.
         
         Args:
-            clip_names: List of clip names to relink
-            media_paths: Optional list of specific media file paths to use for relinking
-            folder_path: Optional folder path to search for media files
-            recursive: Whether to search the folder path recursively
+            clip_names: List of clip names to relink.
+            media_paths: Optional list of specific media file paths to use for relinking.
+            folder_path: Optional folder path to search for media files.
+            recursive: Whether to search the folder path recursively.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the clips were relinked.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to relink clips
+        logger.debug(f"Attempting to relink clips {clip_names}, media_paths={media_paths}, folder_path={folder_path}, recursive={recursive}")
         from api.media_operations import relink_clips as relink_clips_func
-        return relink_clips_func(resolve, clip_names, media_paths, folder_path, recursive)
+        try:
+            result = relink_clips_func(resolve, clip_names, media_paths, folder_path, recursive)
+            logger.info(f"Relink clips result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error relinking clips {clip_names}: {str(e)}")
+            return f"Error relinking clips {clip_names}: {str(e)}"
 
     @mcp.tool()
     def create_sub_clip(clip_name: str, start_frame: int, end_frame: int, 
@@ -816,30 +1176,69 @@ def register_mcp_resources(mcp: FastMCP):
         """Create a subclip from the specified clip using in and out points.
         
         Args:
-            clip_name: Name of the source clip
-            start_frame: Start frame (in point)
-            end_frame: End frame (out point)
-            sub_clip_name: Optional name for the subclip (defaults to original name with '_subclip')
-            bin_name: Optional bin to place the subclip in
+            clip_name: Name of the source clip.
+            start_frame: Start frame (in point).
+            end_frame: End frame (out point).
+            sub_clip_name: Optional name for the subclip (defaults to original name with '_subclip').
+            bin_name: Optional bin to place the subclip in.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the subclip was created.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to create a subclip
+        logger.debug(f"Attempting to create subclip from '{clip_name}', start_frame={start_frame}, end_frame={end_frame}, sub_clip_name={sub_clip_name}, bin_name={bin_name}")
         from api.media_operations import create_sub_clip as create_sub_clip_func
-        return create_sub_clip_func(resolve, clip_name, start_frame, end_frame, sub_clip_name, bin_name)
+        try:
+            result = create_sub_clip_func(resolve, clip_name, start_frame, end_frame, sub_clip_name, bin_name)
+            logger.info(f"Create subclip result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error creating subclip from '{clip_name}': {str(e)}")
+            return f"Error creating subclip from '{clip_name}': {str(e)}"
 
     @mcp.tool()
     def create_bin(name: str) -> str:
         """Create a new bin/folder in the media pool.
         
         Args:
-            name: The name for the new bin
+            name: The name for the new bin.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the bin was created.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to create a bin
+        logger.debug(f"Attempting to create bin: {name}")
         from api.media_operations import create_bin as create_bin_func
-        return create_bin_func(resolve, name)
+        try:
+            result = create_bin_func(resolve, name)
+            logger.info(f"Create bin result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error creating bin '{name}': {str(e)}")
+            return f"Error creating bin '{name}': {str(e)}"
 
     @mcp.resource("resolve://media-pool-bins")
     def list_media_pool_bins() -> List[Dict[str, Any]]:
-        """List all bins/folders in the media pool."""
+        """List all bins/folders in the media pool.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing bin information,
+                                 or a list with an error dictionary if the operation fails.
+        """
+        # Log the attempt to list media pool bins
+        logger.debug("Listing all bins in the media pool")
         from api.media_operations import list_bins as list_bins_func
-        return list_bins_func(resolve)
+        try:
+            result = list_bins_func(resolve)
+            logger.info(f"Retrieved {len(result)} bins from the media pool")
+            return result
+        except Exception as e:
+            logger.error(f"Error listing media pool bins: {str(e)}")
+            return [{"error": f"Error listing media pool bins: {str(e)}"}]
 
     @mcp.resource("resolve://media-pool-bin/{bin_name}")
     def get_media_pool_bin_contents(bin_name: str) -> List[Dict[str, Any]]:
@@ -847,26 +1246,49 @@ def register_mcp_resources(mcp: FastMCP):
         
         Args:
             bin_name: The name of the bin to get contents from. Use 'Master' for the root folder.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing the contents of the specified bin,
+                                 or a list with an error dictionary if the operation fails.
         """
+        # Log the attempt to get bin contents
+        logger.debug(f"Fetching contents of bin: {bin_name}")
         from api.media_operations import get_bin_contents as get_bin_contents_func
-        return get_bin_contents_func(resolve, bin_name)
+        try:
+            result = get_bin_contents_func(resolve, bin_name)
+            logger.info(f"Retrieved contents for bin '{bin_name}': {len(result)} items")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting contents of bin '{bin_name}': {str(e)}")
+            return [{"error": f"Error getting contents of bin '{bin_name}': {str(e)}"}]
 
     @mcp.resource("resolve://timeline-clips")
     def list_timeline_clips() -> List[Dict[str, Any]]:
-        """List all clips in the current timeline."""
+        """List all clips in the current timeline.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing clip information (name, type, track, start_frame, end_frame, duration),
+                                 or a list with an error/info dictionary if the operation fails or no clips are found.
+        """
+        # Log the attempt to list timeline clips
+        logger.debug("Listing clips in the current timeline")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return [{"error": "Not connected to DaVinci Resolve"}]
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return [{"error": "Failed to get Project Manager"}]
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return [{"error": "No project currently open"}]
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return [{"error": "No timeline currently active"}]
         
         try:
@@ -882,52 +1304,90 @@ def register_mcp_resources(mcp: FastMCP):
                 track_items = current_timeline.GetItemListInTrack("video", track_index)
                 if track_items:
                     for item in track_items:
-                        clips.append({
-                            "name": item.GetName(),
-                            "type": "video",
-                            "track": track_index,
-                            "start_frame": item.GetStart(),
-                            "end_frame": item.GetEnd(),
-                            "duration": item.GetDuration()
-                        })
+                        try:
+                            clip_info = {
+                                "name": item.GetName(),
+                                "type": "video",
+                                "track": track_index,
+                                "start_frame": item.GetStart(),
+                                "end_frame": item.GetEnd(),
+                                "duration": item.GetDuration()
+                            }
+                            clips.append(clip_info)
+                            logger.debug(f"Found video clip on track {track_index}: {clip_info['name']}")
+                        except Exception as e:
+                            logger.warning(f"Failed to get info for a video clip on track {track_index}: {str(e)}")
             
             # Process audio tracks
             for track_index in range(1, audio_track_count + 1):
                 track_items = current_timeline.GetItemListInTrack("audio", track_index)
                 if track_items:
                     for item in track_items:
-                        clips.append({
-                            "name": item.GetName(),
-                            "type": "audio",
-                            "track": track_index,
-                            "start_frame": item.GetStart(),
-                            "end_frame": item.GetEnd(),
-                            "duration": item.GetDuration()
-                        })
+                        try:
+                            clip_info = {
+                                "name": item.GetName(),
+                                "type": "audio",
+                                "track": track_index,
+                                "start_frame": item.GetStart(),
+                                "end_frame": item.GetEnd(),
+                                "duration": item.GetDuration()
+                            }
+                            clips.append(clip_info)
+                            logger.debug(f"Found audio clip on track {track_index}: {clip_info['name']}")
+                        except Exception as e:
+                            logger.warning(f"Failed to get info for an audio clip on track {track_index}: {str(e)}")
             
             if not clips:
+                logger.info("No clips found in the current timeline")
                 return [{"info": "No clips found in the current timeline"}]
             
+            logger.info(f"Returning {len(clips)} clips from the current timeline")
             return clips
         except Exception as e:
+            logger.error(f"Error listing timeline clips: {str(e)}")
             return [{"error": f"Error listing timeline clips: {str(e)}"}]
 
     @mcp.tool()
     def list_timelines_tool() -> List[str]:
-        """List all timelines in the current project as a tool."""
+        """List all timelines in the current project as a tool.
+        
+        Returns:
+            List[str]: A list of timeline names in the current project,
+                       or a list with an error message if the operation fails.
+        """
+        # Log the attempt to list timelines via tool
         logger.info("Received request to list timelines via tool")
-        return list_timelines()
+        try:
+            result = list_timelines()
+            logger.info(f"List timelines tool result: {len(result)} timelines")
+            return result
+        except Exception as e:
+            logger.error(f"Error listing timelines via tool: {str(e)}")
+            return [f"Error listing timelines: {str(e)}"]
 
     @mcp.tool()
     def add_clip_to_timeline(clip_name: str, timeline_name: str = None) -> str:
         """Add a media pool clip to the timeline.
         
         Args:
-            clip_name: Name of the clip in the media pool
-            timeline_name: Optional timeline to target (uses current if not specified)
+            clip_name: Name of the clip in the media pool.
+            timeline_name: Optional timeline to target (uses current if not specified).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the clip was added.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to add a clip to the timeline
+        logger.debug(f"Attempting to add clip '{clip_name}' to timeline '{timeline_name or 'current'}'")
         from api.media_operations import add_clip_to_timeline as add_clip_func
-        return add_clip_func(resolve, clip_name, timeline_name)
+        try:
+            result = add_clip_func(resolve, clip_name, timeline_name)
+            logger.info(f"Add clip to timeline result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error adding clip '{clip_name}' to timeline '{timeline_name or 'current'}': {str(e)}")
+            return f"Error adding clip '{clip_name}' to timeline '{timeline_name or 'current'}': {str(e)}"
 
     # ------------------
     # Color Page Operations
@@ -935,66 +1395,143 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://color/current-node")
     def get_current_color_node() -> Dict[str, Any]:
-        """Get information about the current node in the color page."""
+        """Get information about the current node in the color page.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing information about the current node,
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to fetch current node information
+        logger.debug("Fetching current node information in the color page")
         from api.color_operations import get_current_node as get_node_func
-        return get_node_func(resolve)
+        try:
+            result = get_node_func(resolve)
+            logger.info(f"Retrieved current node info: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting current node info: {str(e)}")
+            return {"error": f"Error getting current node info: {str(e)}"}
 
     @mcp.resource("resolve://color/wheels/{node_index}")
     def get_color_wheel_params(node_index: int = None) -> Dict[str, Any]:
         """Get color wheel parameters for a specific node.
         
         Args:
-            node_index: Index of the node to get color wheels from (uses current node if None)
+            node_index: Index of the node to get color wheels from (uses current node if None).
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing color wheel parameters for the specified node,
+                           or a dictionary with an error message if the operation fails.
         """
+        # Log the attempt to fetch color wheel parameters
+        logger.debug(f"Fetching color wheel parameters for node index: {node_index or 'current'}")
         from api.color_operations import get_color_wheels as get_wheels_func
-        return get_wheels_func(resolve, node_index)
+        try:
+            result = get_wheels_func(resolve, node_index)
+            logger.info(f"Retrieved color wheel parameters for node {node_index or 'current'}: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting color wheel parameters for node {node_index or 'current'}: {str(e)}")
+            return {"error": f"Error getting color wheel parameters: {str(e)}"}
 
     @mcp.tool()
     def apply_lut(lut_path: str, node_index: int = None) -> str:
         """Apply a LUT to a node in the color page.
         
         Args:
-            lut_path: Path to the LUT file to apply
-            node_index: Index of the node to apply the LUT to (uses current node if None)
+            lut_path: Path to the LUT file to apply.
+            node_index: Index of the node to apply the LUT to (uses current node if None).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the LUT was applied.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to apply a LUT
+        logger.debug(f"Attempting to apply LUT '{lut_path}' to node index: {node_index or 'current'}")
         from api.color_operations import apply_lut as apply_lut_func
-        return apply_lut_func(resolve, lut_path, node_index)
+        try:
+            result = apply_lut_func(resolve, lut_path, node_index)
+            logger.info(f"Apply LUT result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error applying LUT '{lut_path}' to node {node_index or 'current'}: {str(e)}")
+            return f"Error applying LUT '{lut_path}' to node {node_index or 'current'}: {str(e)}"
 
     @mcp.tool()
     def set_color_wheel_param(wheel: str, param: str, value: float, node_index: int = None) -> str:
         """Set a color wheel parameter for a node.
         
         Args:
-            wheel: Which color wheel to adjust ('lift', 'gamma', 'gain', 'offset')
-            param: Which parameter to adjust ('red', 'green', 'blue', 'master')
-            value: The value to set (typically between -1.0 and 1.0)
-            node_index: Index of the node to set parameter for (uses current node if None)
+            wheel: Which color wheel to adjust ('lift', 'gamma', 'gain', 'offset').
+            param: Which parameter to adjust ('red', 'green', 'blue', 'master').
+            value: The value to set (typically between -1.0 and 1.0).
+            node_index: Index of the node to set parameter for (uses current node if None).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the color wheel parameter was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set a color wheel parameter
+        logger.debug(f"Attempting to set color wheel parameter: wheel={wheel}, param={param}, value={value}, node_index={node_index or 'current'}")
         from api.color_operations import set_color_wheel_param as set_param_func
-        return set_param_func(resolve, wheel, param, value, node_index)
+        try:
+            result = set_param_func(resolve, wheel, param, value, node_index)
+            logger.info(f"Set color wheel parameter result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error setting color wheel parameter for wheel '{wheel}', param '{param}' on node {node_index or 'current'}: {str(e)}")
+            return f"Error setting color wheel parameter: {str(e)}"
 
     @mcp.tool()
     def add_node(node_type: str = "serial", label: str = None) -> str:
         """Add a new node to the current grade in the color page.
         
         Args:
-            node_type: Type of node to add. Options: 'serial', 'parallel', 'layer'
-            label: Optional label/name for the new node
+            node_type: Type of node to add. Options: 'serial', 'parallel', 'layer'.
+            label: Optional label/name for the new node.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the node was added.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to add a node
+        logger.debug(f"Attempting to add node: type={node_type}, label={label}")
         from api.color_operations import add_node as add_node_func
-        return add_node_func(resolve, node_type, label)
+        try:
+            result = add_node_func(resolve, node_type, label)
+            logger.info(f"Add node result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error adding node of type '{node_type}': {str(e)}")
+            return f"Error adding node of type '{node_type}': {str(e)}"
 
     @mcp.tool()
     def copy_grade(source_clip_name: str = None, target_clip_name: str = None, mode: str = "full") -> str:
         """Copy a grade from one clip to another in the color page.
         
         Args:
-            source_clip_name: Name of the source clip to copy grade from (uses current clip if None)
-            target_clip_name: Name of the target clip to apply grade to (uses current clip if None)
-            mode: What to copy - 'full' (entire grade), 'current_node', or 'all_nodes'
+            source_clip_name: Name of the source clip to copy grade from (uses current clip if None).
+            target_clip_name: Name of the target clip to apply grade to (uses current clip if None).
+            mode: What to copy - 'full' (entire grade), 'current_node', or 'all_nodes'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the grade was copied.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to copy a grade
+        logger.debug(f"Attempting to copy grade: source={source_clip_name or 'current'}, target={target_clip_name or 'current'}, mode={mode}")
         from api.color_operations import copy_grade as copy_grade_func
-        return copy_grade_func(resolve, source_clip_name, target_clip_name, mode)
+        try:
+            result = copy_grade_func(resolve, source_clip_name, target_clip_name, mode)
+            logger.info(f"Copy grade result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error copying grade from '{source_clip_name or 'current'}' to '{target_clip_name or 'current'}': {str(e)}")
+            return f"Error copying grade: {str(e)}"
 
     # ------------------
     # Delivery Page Operations
@@ -1002,61 +1539,136 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://delivery/render-presets")
     def get_render_presets() -> List[Dict[str, Any]]:
-        """Get all available render presets in the current project."""
+        """Get all available render presets in the current project.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing render preset information,
+                                 or a list with an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch render presets
+        logger.debug("Fetching all render presets")
         from api.delivery_operations import get_render_presets as get_presets_func
-        return get_presets_func(resolve)
+        try:
+            result = get_presets_func(resolve)
+            logger.info(f"Retrieved {len(result)} render presets")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting render presets: {str(e)}")
+            return [{"error": f"Error getting render presets: {str(e)}"}]
 
     @mcp.tool()
     def add_to_render_queue(preset_name: str, timeline_name: str = None, use_in_out_range: bool = False) -> Dict[str, Any]:
         """Add a timeline to the render queue with the specified preset.
         
         Args:
-            preset_name: Name of the render preset to use
-            timeline_name: Name of the timeline to render (uses current if None)
-            use_in_out_range: Whether to render only the in/out range instead of entire timeline
+            preset_name: Name of the render preset to use.
+            timeline_name: Name of the timeline to render (uses current if None).
+            use_in_out_range: Whether to render only the in/out range instead of entire timeline.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the result of the operation,
+                           or a dictionary with an error message if the operation fails.
         """
+        # Log the attempt to add to render queue
+        logger.debug(f"Adding to render queue: preset={preset_name}, timeline={timeline_name or 'current'}, use_in_out={use_in_out_range}")
         from api.delivery_operations import add_to_render_queue as add_queue_func
-        return add_queue_func(resolve, preset_name, timeline_name, use_in_out_range)
+        try:
+            result = add_queue_func(resolve, preset_name, timeline_name, use_in_out_range)
+            logger.info(f"Add to render queue result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error adding to render queue: {str(e)}")
+            return {"error": f"Error adding to render queue: {str(e)}"}
 
     @mcp.tool()
     def start_render() -> Dict[str, Any]:
-        """Start rendering the jobs in the render queue."""
+        """Start rendering the jobs in the render queue.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the result of the render operation,
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to start rendering
+        logger.debug("Starting render queue")
         from api.delivery_operations import start_render as start_render_func
-        return start_render_func(resolve)
+        try:
+            result = start_render_func(resolve)
+            logger.info(f"Start render result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error starting render: {str(e)}")
+            return {"error": f"Error starting render: {str(e)}"}
 
     @mcp.resource("resolve://delivery/render-queue/status")
     def get_render_queue_status() -> Dict[str, Any]:
-        """Get the status of jobs in the render queue."""
+        """Get the status of jobs in the render queue.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the status of render queue jobs,
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to fetch render queue status
+        logger.debug("Fetching render queue status")
         from api.delivery_operations import get_render_queue_status as get_status_func
-        return get_status_func(resolve)
+        try:
+            result = get_status_func(resolve)
+            logger.info(f"Retrieved render queue status: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error getting render queue status: {str(e)}")
+            return {"error": f"Error getting render queue status: {str(e)}"}
 
     @mcp.tool()
     def clear_render_queue() -> Dict[str, Any]:
-        """Clear all jobs from the render queue."""
+        """Clear all jobs from the render queue.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the result of the operation,
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to clear render queue
+        logger.debug("Clearing render queue")
         from api.delivery_operations import clear_render_queue as clear_queue_func
-        return clear_queue_func(resolve)
+        try:
+            result = clear_queue_func(resolve)
+            logger.info(f"Clear render queue result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error clearing render queue: {str(e)}")
+            return {"error": f"Error clearing render queue: {str(e)}"}
 
     @mcp.tool()
     def link_proxy_media(clip_name: str, proxy_file_path: str) -> str:
         """Link a proxy media file to a clip.
         
         Args:
-            clip_name: Name of the clip to link proxy to
-            proxy_file_path: Path to the proxy media file
+            clip_name: Name of the clip to link proxy to.
+            proxy_file_path: Path to the proxy media file.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the proxy media was linked.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to link proxy media
+        logger.debug(f"Attempting to link proxy media '{proxy_file_path}' to clip '{clip_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the clip by name
@@ -1069,19 +1681,24 @@ def register_mcp_resources(mcp: FastMCP):
                 break
         
         if not target_clip:
+            logger.error(f"Clip '{clip_name}' not found in Media Pool")
             return f"Error: Clip '{clip_name}' not found in Media Pool"
         
         # Check if file exists
         if not os.path.exists(proxy_file_path):
+            logger.error(f"Proxy file '{proxy_file_path}' does not exist")
             return f"Error: Proxy file '{proxy_file_path}' does not exist"
         
         try:
             result = target_clip.LinkProxyMedia(proxy_file_path)
             if result:
+                logger.info(f"Successfully linked proxy media '{proxy_file_path}' to clip '{clip_name}'")
                 return f"Successfully linked proxy media '{proxy_file_path}' to clip '{clip_name}'"
             else:
+                logger.error(f"Failed to link proxy media to clip '{clip_name}'")
                 return f"Failed to link proxy media to clip '{clip_name}'"
         except Exception as e:
+            logger.error(f"Error linking proxy media to clip '{clip_name}': {str(e)}")
             return f"Error linking proxy media: {str(e)}"
 
     @mcp.tool()
@@ -1089,21 +1706,32 @@ def register_mcp_resources(mcp: FastMCP):
         """Unlink proxy media from a clip.
         
         Args:
-            clip_name: Name of the clip to unlink proxy from
+            clip_name: Name of the clip to unlink proxy from.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the proxy media was unlinked.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to unlink proxy media
+        logger.debug(f"Attempting to unlink proxy media from clip '{clip_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the clip by name
@@ -1116,15 +1744,19 @@ def register_mcp_resources(mcp: FastMCP):
                 break
         
         if not target_clip:
+            logger.error(f"Clip '{clip_name}' not found in Media Pool")
             return f"Error: Clip '{clip_name}' not found in Media Pool"
         
         try:
             result = target_clip.UnlinkProxyMedia()
             if result:
+                logger.info(f"Successfully unlinked proxy media from clip '{clip_name}'")
                 return f"Successfully unlinked proxy media from clip '{clip_name}'"
             else:
+                logger.error(f"Failed to unlink proxy media from clip '{clip_name}'")
                 return f"Failed to unlink proxy media from clip '{clip_name}'"
         except Exception as e:
+            logger.error(f"Error unlinking proxy media from clip '{clip_name}': {str(e)}")
             return f"Error unlinking proxy media: {str(e)}"
 
     @mcp.tool()
@@ -1132,22 +1764,33 @@ def register_mcp_resources(mcp: FastMCP):
         """Replace a clip with another media file.
         
         Args:
-            clip_name: Name of the clip to be replaced
-            replacement_path: Path to the replacement media file
+            clip_name: Name of the clip to be replaced.
+            replacement_path: Path to the replacement media file.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the clip was replaced.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to replace a clip
+        logger.debug(f"Attempting to replace clip '{clip_name}' with '{replacement_path}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the clip by name
@@ -1160,19 +1803,24 @@ def register_mcp_resources(mcp: FastMCP):
                 break
         
         if not target_clip:
+            logger.error(f"Clip '{clip_name}' not found in Media Pool")
             return f"Error: Clip '{clip_name}' not found in Media Pool"
         
         # Check if file exists
         if not os.path.exists(replacement_path):
+            logger.error(f"Replacement file '{replacement_path}' does not exist")
             return f"Error: Replacement file '{replacement_path}' does not exist"
         
         try:
             result = target_clip.ReplaceClip(replacement_path)
             if result:
+                logger.info(f"Successfully replaced clip '{clip_name}' with '{replacement_path}'")
                 return f"Successfully replaced clip '{clip_name}' with '{replacement_path}'"
             else:
+                logger.error(f"Failed to replace clip '{clip_name}'")
                 return f"Failed to replace clip '{clip_name}'"
         except Exception as e:
+            logger.error(f"Error replacing clip '{clip_name}': {str(e)}")
             return f"Error replacing clip: {str(e)}"
 
     @mcp.tool()
@@ -1180,22 +1828,33 @@ def register_mcp_resources(mcp: FastMCP):
         """Transcribe audio for a clip.
         
         Args:
-            clip_name: Name of the clip to transcribe
-            language: Language code for transcription (default: en-US)
+            clip_name: Name of the clip to transcribe.
+            language: Language code for transcription (default: en-US).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the audio transcription started.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to transcribe audio
+        logger.debug(f"Attempting to transcribe audio for clip '{clip_name}' in language '{language}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the clip by name
@@ -1208,15 +1867,19 @@ def register_mcp_resources(mcp: FastMCP):
                 break
         
         if not target_clip:
+            logger.error(f"Clip '{clip_name}' not found in Media Pool")
             return f"Error: Clip '{clip_name}' not found in Media Pool"
         
         try:
             result = target_clip.TranscribeAudio(language)
             if result:
+                logger.info(f"Successfully started audio transcription for clip '{clip_name}' in language '{language}'")
                 return f"Successfully started audio transcription for clip '{clip_name}' in language '{language}'"
             else:
+                logger.error(f"Failed to start audio transcription for clip '{clip_name}'")
                 return f"Failed to start audio transcription for clip '{clip_name}'"
         except Exception as e:
+            logger.error(f"Error during audio transcription for clip '{clip_name}': {str(e)}")
             return f"Error during audio transcription: {str(e)}"
 
     @mcp.tool()
@@ -1224,21 +1887,32 @@ def register_mcp_resources(mcp: FastMCP):
         """Clear audio transcription for a clip.
         
         Args:
-            clip_name: Name of the clip to clear transcription from
+            clip_name: Name of the clip to clear transcription from.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the transcription was cleared.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to clear transcription
+        logger.debug(f"Attempting to clear transcription for clip '{clip_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the clip by name
@@ -1251,15 +1925,19 @@ def register_mcp_resources(mcp: FastMCP):
                 break
         
         if not target_clip:
+            logger.error(f"Clip '{clip_name}' not found in Media Pool")
             return f"Error: Clip '{clip_name}' not found in Media Pool"
         
         try:
             result = target_clip.ClearTranscription()
             if result:
+                logger.info(f"Successfully cleared audio transcription for clip '{clip_name}'")
                 return f"Successfully cleared audio transcription for clip '{clip_name}'"
             else:
+                logger.error(f"Failed to clear audio transcription for clip '{clip_name}'")
                 return f"Failed to clear audio transcription for clip '{clip_name}'"
         except Exception as e:
+            logger.error(f"Error clearing audio transcription for clip '{clip_name}': {str(e)}")
             return f"Error clearing audio transcription: {str(e)}"
 
     # Utility function to get all clips from the media pool (recursively)
@@ -1285,23 +1963,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Export a folder to a DRB file or other format.
         
         Args:
-            folder_name: Name of the folder to export
-            export_path: Path to save the exported file
-            export_type: Export format (DRB is default and currently the only supported option)
+            folder_name: Name of the folder to export.
+            export_path: Path to save the exported file.
+            export_type: Export format (DRB is default and currently the only supported option).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the folder was exported.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to export a folder
+        logger.debug(f"Attempting to export folder '{folder_name}' to '{export_path}' as '{export_type}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the folder by name
@@ -1319,6 +2008,7 @@ def register_mcp_resources(mcp: FastMCP):
                     break
         
         if not target_folder:
+            logger.error(f"Folder '{folder_name}' not found in Media Pool")
             return f"Error: Folder '{folder_name}' not found in Media Pool"
         
         # Check if directory exists, create if not
@@ -1326,17 +2016,22 @@ def register_mcp_resources(mcp: FastMCP):
         if not os.path.exists(export_dir) and export_dir:
             try:
                 os.makedirs(export_dir)
+                logger.debug(f"Created export directory: {export_dir}")
             except Exception as e:
+                logger.error(f"Error creating directory for export: {str(e)}")
                 return f"Error creating directory for export: {str(e)}"
         
         # Export the folder
         try:
             result = target_folder.Export(export_path)
             if result:
+                logger.info(f"Successfully exported folder '{folder_name}' to '{export_path}'")
                 return f"Successfully exported folder '{folder_name}' to '{export_path}'"
             else:
+                logger.error(f"Failed to export folder '{folder_name}'")
                 return f"Failed to export folder '{folder_name}'"
         except Exception as e:
+            logger.error(f"Error exporting folder '{folder_name}': {str(e)}")
             return f"Error exporting folder: {str(e)}"
 
     @mcp.tool()
@@ -1344,22 +2039,33 @@ def register_mcp_resources(mcp: FastMCP):
         """Transcribe audio for all clips in a folder.
         
         Args:
-            folder_name: Name of the folder containing clips to transcribe
-            language: Language code for transcription (default: en-US)
+            folder_name: Name of the folder containing clips to transcribe.
+            language: Language code for transcription (default: en-US).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the audio transcription started for the folder.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to transcribe folder audio
+        logger.debug(f"Attempting to transcribe audio for folder '{folder_name}' in language '{language}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the folder by name
@@ -1377,16 +2083,20 @@ def register_mcp_resources(mcp: FastMCP):
                     break
         
         if not target_folder:
+            logger.error(f"Folder '{folder_name}' not found in Media Pool")
             return f"Error: Folder '{folder_name}' not found in Media Pool"
         
         # Transcribe audio in the folder
         try:
             result = target_folder.TranscribeAudio(language)
             if result:
+                logger.info(f"Successfully started audio transcription for folder '{folder_name}' in language '{language}'")
                 return f"Successfully started audio transcription for folder '{folder_name}' in language '{language}'"
             else:
+                logger.error(f"Failed to start audio transcription for folder '{folder_name}'")
                 return f"Failed to start audio transcription for folder '{folder_name}'"
         except Exception as e:
+            logger.error(f"Error during audio transcription for folder '{folder_name}': {str(e)}")
             return f"Error during audio transcription: {str(e)}"
 
     @mcp.tool()
@@ -1394,21 +2104,32 @@ def register_mcp_resources(mcp: FastMCP):
         """Clear audio transcription for all clips in a folder.
         
         Args:
-            folder_name: Name of the folder to clear transcriptions from
+            folder_name: Name of the folder to clear transcriptions from.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the transcriptions were cleared.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to clear folder transcription
+        logger.debug(f"Attempting to clear transcription for folder '{folder_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Find the folder by name
@@ -1426,16 +2147,20 @@ def register_mcp_resources(mcp: FastMCP):
                     break
         
         if not target_folder:
+            logger.error(f"Folder '{folder_name}' not found in Media Pool")
             return f"Error: Folder '{folder_name}' not found in Media Pool"
         
         # Clear transcription for the folder
         try:
             result = target_folder.ClearTranscription()
             if result:
+                logger.info(f"Successfully cleared audio transcription for folder '{folder_name}'")
                 return f"Successfully cleared audio transcription for folder '{folder_name}'"
             else:
+                logger.error(f"Failed to clear audio transcription for folder '{folder_name}'")
                 return f"Failed to clear audio transcription for folder '{folder_name}'"
         except Exception as e:
+            logger.error(f"Error clearing audio transcription for folder '{folder_name}': {str(e)}")
             return f"Error clearing audio transcription: {str(e)}"
 
     # Utility function to get all folders from the media pool (recursively)
@@ -1460,16 +2185,26 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://cache/settings")
     def get_cache_settings() -> Dict[str, Any]:
-        """Get current cache settings from the project."""
+        """Get current cache settings from the project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing cache-related settings (e.g., CacheMode, ProxyMode),
+                           or a dictionary with an error message if the operation fails.
+        """
+        # Log the attempt to fetch cache settings
+        logger.debug("Fetching cache settings")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         try:
@@ -1489,9 +2224,12 @@ def register_mcp_resources(mcp: FastMCP):
             for key in cache_keys:
                 value = current_project.GetSetting(key)
                 settings[key] = value
+                logger.debug(f"Retrieved cache setting: {key} = {value}")
                 
+            logger.info(f"Successfully retrieved cache settings: {settings}")
             return settings
         except Exception as e:
+            logger.error(f"Failed to get cache settings: {str(e)}")
             return {"error": f"Failed to get cache settings: {str(e)}"}
 
     @mcp.tool()
@@ -1499,23 +2237,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Set cache mode for the current project.
         
         Args:
-            mode: Cache mode to set. Options: 'auto', 'on', 'off'
+            mode: Cache mode to set. Options: 'auto', 'on', 'off'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the cache mode was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set cache mode
+        logger.debug(f"Attempting to set cache mode to '{mode}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Validate mode
         valid_modes = ["auto", "on", "off"]
         mode = mode.lower()
         if mode not in valid_modes:
+            logger.error(f"Invalid cache mode '{mode}'. Must be one of: {', '.join(valid_modes)}")
             return f"Error: Invalid cache mode. Must be one of: {', '.join(valid_modes)}"
         
         # Convert mode to API value
@@ -1528,10 +2277,13 @@ def register_mcp_resources(mcp: FastMCP):
         try:
             result = current_project.SetSetting("CacheMode", mode_map[mode])
             if result:
+                logger.info(f"Successfully set cache mode to '{mode}'")
                 return f"Successfully set cache mode to '{mode}'"
             else:
+                logger.error(f"Failed to set cache mode to '{mode}'")
                 return f"Failed to set cache mode to '{mode}'"
         except Exception as e:
+            logger.error(f"Error setting cache mode to '{mode}': {str(e)}")
             return f"Error setting cache mode: {str(e)}"
 
     @mcp.tool()
@@ -1539,23 +2291,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Set optimized media mode for the current project.
         
         Args:
-            mode: Optimized media mode to set. Options: 'auto', 'on', 'off'
+            mode: Optimized media mode to set. Options: 'auto', 'on', 'off'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the optimized media mode was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set optimized media mode
+        logger.debug(f"Attempting to set optimized media mode to '{mode}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Validate mode
         valid_modes = ["auto", "on", "off"]
         mode = mode.lower()
         if mode not in valid_modes:
+            logger.error(f"Invalid optimized media mode '{mode}'. Must be one of: {', '.join(valid_modes)}")
             return f"Error: Invalid optimized media mode. Must be one of: {', '.join(valid_modes)}"
         
         # Convert mode to API value
@@ -1568,10 +2331,13 @@ def register_mcp_resources(mcp: FastMCP):
         try:
             result = current_project.SetSetting("OptimizedMediaMode", mode_map[mode])
             if result:
+                logger.info(f"Successfully set optimized media mode to '{mode}'")
                 return f"Successfully set optimized media mode to '{mode}'"
             else:
+                logger.error(f"Failed to set optimized media mode to '{mode}'")
                 return f"Failed to set optimized media mode to '{mode}'"
         except Exception as e:
+            logger.error(f"Error setting optimized media mode to '{mode}': {str(e)}")
             return f"Error setting optimized media mode: {str(e)}"
 
     @mcp.tool()
@@ -1579,23 +2345,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Set proxy media mode for the current project.
         
         Args:
-            mode: Proxy mode to set. Options: 'auto', 'on', 'off'
+            mode: Proxy mode to set. Options: 'auto', 'on', 'off'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the proxy mode was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set proxy mode
+        logger.debug(f"Attempting to set proxy mode to '{mode}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Validate mode
         valid_modes = ["auto", "on", "off"]
         mode = mode.lower()
         if mode not in valid_modes:
+            logger.error(f"Invalid proxy mode '{mode}'. Must be one of: {', '.join(valid_modes)}")
             return f"Error: Invalid proxy mode. Must be one of: {', '.join(valid_modes)}"
         
         # Convert mode to API value
@@ -1608,10 +2385,13 @@ def register_mcp_resources(mcp: FastMCP):
         try:
             result = current_project.SetSetting("ProxyMode", mode_map[mode])
             if result:
+                logger.info(f"Successfully set proxy mode to '{mode}'")
                 return f"Successfully set proxy mode to '{mode}'"
             else:
+                logger.error(f"Failed to set proxy mode to '{mode}'")
                 return f"Failed to set proxy mode to '{mode}'"
         except Exception as e:
+            logger.error(f"Error setting proxy mode to '{mode}': {str(e)}")
             return f"Error setting proxy mode: {str(e)}"
 
     @mcp.tool()
@@ -1619,22 +2399,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Set proxy media quality for the current project.
         
         Args:
-            quality: Proxy quality to set. Options: 'quarter', 'half', 'threeQuarter', 'full'
+            quality: Proxy quality to set. Options: 'quarter', 'half', 'threeQuarter', 'full'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the proxy quality was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set proxy quality
+        logger.debug(f"Attempting to set proxy quality to '{quality}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Validate quality
         valid_qualities = ["quarter", "half", "threeQuarter", "full"]
+        quality = quality.lower()
         if quality not in valid_qualities:
+            logger.error(f"Invalid proxy quality '{quality}'. Must be one of: {', '.join(valid_qualities)}")
             return f"Error: Invalid proxy quality. Must be one of: {', '.join(valid_qualities)}"
         
         # Convert quality to API value
@@ -1648,10 +2440,13 @@ def register_mcp_resources(mcp: FastMCP):
         try:
             result = current_project.SetSetting("ProxyQuality", quality_map[quality])
             if result:
+                logger.info(f"Successfully set proxy quality to '{quality}'")
                 return f"Successfully set proxy quality to '{quality}'"
             else:
+                logger.error(f"Failed to set proxy quality to '{quality}'")
                 return f"Failed to set proxy quality to '{quality}'"
         except Exception as e:
+            logger.error(f"Error setting proxy quality to '{quality}': {str(e)}")
             return f"Error setting proxy quality: {str(e)}"
 
     @mcp.tool()
@@ -1659,28 +2454,40 @@ def register_mcp_resources(mcp: FastMCP):
         """Set cache file path for the current project.
         
         Args:
-            path_type: Type of cache path to set. Options: 'local', 'network'
-            path: File system path for the cache
+            path_type: Type of cache path to set. Options: 'local', 'network'.
+            path: File system path for the cache.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the cache path was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set cache path
+        logger.debug(f"Attempting to set {path_type} cache path to '{path}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Validate path_type
         valid_path_types = ["local", "network"]
         path_type = path_type.lower()
         if path_type not in valid_path_types:
+            logger.error(f"Invalid path type '{path_type}'. Must be one of: {', '.join(valid_path_types)}")
             return f"Error: Invalid path type. Must be one of: {', '.join(valid_path_types)}"
         
         # Check if directory exists
         if not os.path.exists(path):
+            logger.error(f"Path '{path}' does not exist")
             return f"Error: Path '{path}' does not exist"
         
         setting_key = "LocalCachePath" if path_type == "local" else "NetworkCachePath"
@@ -1688,10 +2495,13 @@ def register_mcp_resources(mcp: FastMCP):
         try:
             result = current_project.SetSetting(setting_key, path)
             if result:
+                logger.info(f"Successfully set {path_type} cache path to '{path}'")
                 return f"Successfully set {path_type} cache path to '{path}'"
             else:
+                logger.error(f"Failed to set {path_type} cache path to '{path}'")
                 return f"Failed to set {path_type} cache path to '{path}'"
         except Exception as e:
+            logger.error(f"Error setting {path_type} cache path to '{path}': {str(e)}")
             return f"Error setting cache path: {str(e)}"
 
     @mcp.tool()
@@ -1699,21 +2509,32 @@ def register_mcp_resources(mcp: FastMCP):
         """Generate optimized media for specified clips or all clips if none specified.
         
         Args:
-            clip_names: Optional list of clip names. If None, processes all clips in media pool
+            clip_names: Optional list of clip names. If None, processes all clips in media pool.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming optimized media generation started.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to generate optimized media
+        logger.debug(f"Attempting to generate optimized media for clips: {clip_names or 'all clips'}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Get clips to process
@@ -1734,9 +2555,11 @@ def register_mcp_resources(mcp: FastMCP):
                     missing_clips.append(name)
             
             if missing_clips:
+                logger.error(f"Could not find clips: {', '.join(missing_clips)}")
                 return f"Error: Could not find these clips: {', '.join(missing_clips)}"
             
             if not clips_to_process:
+                logger.error("No valid clips found to process")
                 return "Error: No valid clips found to process"
         else:
             # Get all clips
@@ -1747,14 +2570,17 @@ def register_mcp_resources(mcp: FastMCP):
             media_pool.SetCurrentFolder(media_pool.GetRootFolder())
             for clip in clips_to_process:
                 clip.AddFlag("Green")  # Temporarily add flag to help with selection
+                logger.debug(f"Added Green flag to clip: {clip.GetName()}")
             
             # Switch to Media page if not already there
             current_page = resolve.GetCurrentPage()
             if current_page != "media":
+                logger.debug("Switching to Media page")
                 resolve.OpenPage("media")
             
             # Select clips with Green flag
             media_pool.SetClipSelection([clip for clip in clips_to_process])
+            logger.debug(f"Selected {len(clips_to_process)} clips for optimized media generation")
             
             # Generate optimized media
             result = current_project.GenerateOptimizedMedia()
@@ -1762,18 +2588,23 @@ def register_mcp_resources(mcp: FastMCP):
             # Remove temporary flags
             for clip in clips_to_process:
                 clip.ClearFlags("Green")
+                logger.debug(f"Removed Green flag from clip: {clip.GetName()}")
             
             if result:
+                logger.info(f"Successfully started optimized media generation for {len(clips_to_process)} clips")
                 return f"Successfully started optimized media generation for {len(clips_to_process)} clips"
             else:
+                logger.error(f"Failed to start optimized media generation")
                 return f"Failed to start optimized media generation"
         except Exception as e:
             # Clean up flags in case of error
             try:
                 for clip in clips_to_process:
                     clip.ClearFlags("Green")
-            except:
-                pass
+                    logger.debug(f"Removed Green flag from clip on error: {clip.GetName()}")
+            except Exception as cleanup_error:
+                logger.warning(f"Error cleaning up flags: {str(cleanup_error)}")
+            logger.error(f"Error generating optimized media: {str(e)}")
             return f"Error generating optimized media: {str(e)}"
 
     @mcp.tool()
@@ -1781,21 +2612,32 @@ def register_mcp_resources(mcp: FastMCP):
         """Delete optimized media for specified clips or all clips if none specified.
         
         Args:
-            clip_names: Optional list of clip names. If None, processes all clips in media pool
+            clip_names: Optional list of clip names. If None, processes all clips in media pool.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming optimized media was deleted.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to delete optimized media
+        logger.debug(f"Attempting to delete optimized media for clips: {clip_names or 'all clips'}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return "Error: Failed to get Media Pool"
         
         # Get clips to process
@@ -1816,9 +2658,11 @@ def register_mcp_resources(mcp: FastMCP):
                     missing_clips.append(name)
             
             if missing_clips:
+                logger.error(f"Could not find clips: {', '.join(missing_clips)}")
                 return f"Error: Could not find these clips: {', '.join(missing_clips)}"
             
             if not clips_to_process:
+                logger.error("No valid clips found to process")
                 return "Error: No valid clips found to process"
         else:
             # Get all clips
@@ -1829,14 +2673,17 @@ def register_mcp_resources(mcp: FastMCP):
             media_pool.SetCurrentFolder(media_pool.GetRootFolder())
             for clip in clips_to_process:
                 clip.AddFlag("Green")  # Temporarily add flag to help with selection
+                logger.debug(f"Added Green flag to clip: {clip.GetName()}")
             
             # Switch to Media page if not already there
             current_page = resolve.GetCurrentPage()
             if current_page != "media":
+                logger.debug("Switching to Media page")
                 resolve.OpenPage("media")
             
             # Select clips with Green flag
             media_pool.SetClipSelection([clip for clip in clips_to_process])
+            logger.debug(f"Selected {len(clips_to_process)} clips for optimized media deletion")
             
             # Delete optimized media
             result = current_project.DeleteOptimizedMedia()
@@ -1844,20 +2691,24 @@ def register_mcp_resources(mcp: FastMCP):
             # Remove temporary flags
             for clip in clips_to_process:
                 clip.ClearFlags("Green")
+                logger.debug(f"Removed Green flag from clip: {clip.GetName()}")
             
             if result:
+                logger.info(f"Successfully deleted optimized media for {len(clips_to_process)} clips")
                 return f"Successfully deleted optimized media for {len(clips_to_process)} clips"
             else:
+                logger.error(f"Failed to delete optimized media")
                 return f"Failed to delete optimized media"
         except Exception as e:
             # Clean up flags in case of error
             try:
                 for clip in clips_to_process:
                     clip.ClearFlags("Green")
-            except:
-                pass
+                    logger.debug(f"Removed Green flag from clip on error: {clip.GetName()}")
+            except Exception as cleanup_error:
+                logger.warning(f"Error cleaning up flags: {str(cleanup_error)}")
+            logger.error(f"Error deleting optimized media: {str(e)}")
             return f"Error deleting optimized media: {str(e)}"
-
     # ------------------
     # Timeline Item Properties
     # ------------------
@@ -1867,21 +2718,31 @@ def register_mcp_resources(mcp: FastMCP):
         """Get properties of a specific timeline item by ID.
         
         Args:
-            timeline_item_id: The ID of the timeline item to get properties for
+            timeline_item_id: The ID of the timeline item to get properties for.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing properties of the timeline item (e.g., id, name, type, transform),
+                           or a dictionary with an error message if the operation fails.
         """
+        # Log the attempt to fetch timeline item properties
+        logger.debug(f"Fetching properties for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return {"error": "No timeline currently active"}
         
         try:
@@ -1916,6 +2777,7 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return {"error": f"Timeline item with ID '{timeline_item_id}' not found"}
             
             # Get basic properties
@@ -1991,27 +2853,40 @@ def register_mcp_resources(mcp: FastMCP):
                     "normalize_level": timeline_item.GetProperty("NormalizeLevel")
                 }
             
+            logger.info(f"Successfully retrieved properties for timeline item ID: {timeline_item_id}")
             return properties
             
         except Exception as e:
+            logger.error(f"Error getting timeline item properties for ID '{timeline_item_id}': {str(e)}")
             return {"error": f"Error getting timeline item properties: {str(e)}"}
 
     @mcp.resource("resolve://timeline-items")
     def get_timeline_items() -> List[Dict[str, Any]]:
-        """Get all items in the current timeline with their IDs and basic properties."""
+        """Get all items in the current timeline with their IDs and basic properties.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing basic properties (id, name, type, track, etc.)
+                                 for all timeline items, or a list with an error/info dictionary if the operation fails.
+        """
+        # Log the attempt to fetch all timeline items
+        logger.debug("Fetching all timeline items")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return [{"error": "Not connected to DaVinci Resolve"}]
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return [{"error": "Failed to get Project Manager"}]
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return [{"error": "No project currently open"}]
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return [{"error": "No timeline currently active"}]
         
         try:
@@ -2026,7 +2901,7 @@ def register_mcp_resources(mcp: FastMCP):
                 track_items = current_timeline.GetItemListInTrack("video", track_index)
                 if track_items:
                     for item in track_items:
-                        items.append({
+                        item_info = {
                             "id": str(item.GetUniqueId()),
                             "name": item.GetName(),
                             "type": "video",
@@ -2034,14 +2909,16 @@ def register_mcp_resources(mcp: FastMCP):
                             "start_frame": item.GetStart(),
                             "end_frame": item.GetEnd(),
                             "duration": item.GetDuration()
-                        })
+                        }
+                        items.append(item_info)
+                        logger.debug(f"Found video item: {item_info['name']} on track {track_index}")
             
             # Process audio tracks
             for track_index in range(1, audio_track_count + 1):
                 track_items = current_timeline.GetItemListInTrack("audio", track_index)
                 if track_items:
                     for item in track_items:
-                        items.append({
+                        item_info = {
                             "id": str(item.GetUniqueId()),
                             "name": item.GetName(),
                             "type": "audio",
@@ -2049,13 +2926,18 @@ def register_mcp_resources(mcp: FastMCP):
                             "start_frame": item.GetStart(),
                             "end_frame": item.GetEnd(),
                             "duration": item.GetDuration()
-                        })
+                        }
+                        items.append(item_info)
+                        logger.debug(f"Found audio item: {item_info['name']} on track {track_index}")
             
             if not items:
+                logger.info("No items found in the current timeline")
                 return [{"info": "No items found in the current timeline"}]
             
+            logger.info(f"Retrieved {len(items)} timeline items")
             return items
         except Exception as e:
+            logger.error(f"Error listing timeline items: {str(e)}")
             return [{"error": f"Error listing timeline items: {str(e)}"}]
 
     @mcp.tool()
@@ -2065,25 +2947,36 @@ def register_mcp_resources(mcp: FastMCP):
         """Set a transform property for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item to modify
+            timeline_item_id: The ID of the timeline item to modify.
             property_name: The name of the property to set. Options include:
-                        'Pan', 'Tilt', 'ZoomX', 'ZoomY', 'Rotation', 'AnchorPointX', 
-                        'AnchorPointY', 'Pitch', 'Yaw'
-            property_value: The value to set for the property
+                         'Pan', 'Tilt', 'ZoomX', 'ZoomY', 'Rotation', 'AnchorPointX', 
+                         'AnchorPointY', 'Pitch', 'Yaw'.
+            property_value: The value to set for the property.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the transform property was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set timeline item transform
+        logger.debug(f"Attempting to set transform property '{property_name}' to {property_value} for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate property name
@@ -2093,6 +2986,7 @@ def register_mcp_resources(mcp: FastMCP):
         ]
         
         if property_name not in valid_properties:
+            logger.error(f"Invalid property name '{property_name}'. Must be one of: {', '.join(valid_properties)}")
             return f"Error: Invalid property name. Must be one of: {', '.join(valid_properties)}"
         
         try:
@@ -2113,18 +3007,23 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not timeline_item:
+                logger.error(f"Video timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
             
             if timeline_item.GetType() != "Video":
+                logger.error(f"Timeline item with ID '{timeline_item_id}' is not a video item")
                 return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
             
             # Set the property
             result = timeline_item.SetProperty(property_name, property_value)
             if result:
+                logger.info(f"Successfully set {property_name} to {property_value} for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully set {property_name} to {property_value} for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to set {property_name} for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to set {property_name} for timeline item '{timeline_item.GetName()}'"
         except Exception as e:
+            logger.error(f"Error setting transform property for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting timeline item property: {str(e)}"
 
     @mcp.tool()
@@ -2134,29 +3033,41 @@ def register_mcp_resources(mcp: FastMCP):
         """Set a crop property for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item to modify
-            crop_type: The type of crop to set. Options: 'Left', 'Right', 'Top', 'Bottom'
-            crop_value: The value to set for the crop (typically 0.0 to 1.0)
+            timeline_item_id: The ID of the timeline item to modify.
+            crop_type: The type of crop to set. Options: 'Left', 'Right', 'Top', 'Bottom'.
+            crop_value: The value to set for the crop (typically 0.0 to 1.0).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the crop property was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set timeline item crop
+        logger.debug(f"Attempting to set crop '{crop_type}' to {crop_value} for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate crop type
         valid_crop_types = ['Left', 'Right', 'Top', 'Bottom']
         
         if crop_type not in valid_crop_types:
+            logger.error(f"Invalid crop type '{crop_type}'. Must be one of: {', '.join(valid_crop_types)}")
             return f"Error: Invalid crop type. Must be one of: {', '.join(valid_crop_types)}"
         
         property_name = f"Crop{crop_type}"
@@ -2179,18 +3090,23 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not timeline_item:
+                logger.error(f"Video timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
             
             if timeline_item.GetType() != "Video":
+                logger.error(f"Timeline item with ID '{timeline_item_id}' is not a video item")
                 return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
             
             # Set the property
             result = timeline_item.SetProperty(property_name, crop_value)
             if result:
+                logger.info(f"Successfully set crop {crop_type.lower()} to {crop_value} for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully set crop {crop_type.lower()} to {crop_value} for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to set crop {crop_type.lower()} for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to set crop {crop_type.lower()} for timeline item '{timeline_item.GetName()}'"
         except Exception as e:
+            logger.error(f"Error setting crop property for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting timeline item crop: {str(e)}"
 
     @mcp.tool()
@@ -2200,27 +3116,39 @@ def register_mcp_resources(mcp: FastMCP):
         """Set composite properties for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item to modify
-            composite_mode: Optional composite mode to set (e.g., 'Normal', 'Add', 'Multiply')
-            opacity: Optional opacity value to set (0.0 to 1.0)
+            timeline_item_id: The ID of the timeline item to modify.
+            composite_mode: Optional composite mode to set (e.g., 'Normal', 'Add', 'Multiply').
+            opacity: Optional opacity value to set (0.0 to 1.0).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the composite properties were set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set timeline item composite
+        logger.debug(f"Attempting to set composite properties (mode={composite_mode}, opacity={opacity}) for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate inputs
         if composite_mode is None and opacity is None:
+            logger.error("Must specify at least one of composite_mode or opacity")
             return "Error: Must specify at least one of composite_mode or opacity"
         
         # Valid composite modes
@@ -2231,9 +3159,11 @@ def register_mcp_resources(mcp: FastMCP):
         ]
         
         if composite_mode and composite_mode not in valid_composite_modes:
+            logger.error(f"Invalid composite mode '{composite_mode}'. Must be one of: {', '.join(valid_composite_modes)}")
             return f"Error: Invalid composite mode. Must be one of: {', '.join(valid_composite_modes)}"
         
         if opacity is not None and (opacity < 0.0 or opacity > 1.0):
+            logger.error("Opacity must be between 0.0 and 1.0")
             return "Error: Opacity must be between 0.0 and 1.0"
         
         try:
@@ -2254,9 +3184,11 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not timeline_item:
+                logger.error(f"Video timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
             
             if timeline_item.GetType() != "Video":
+                logger.error(f"Timeline item with ID '{timeline_item_id}' is not a video item")
                 return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
             
             success = True
@@ -2266,12 +3198,14 @@ def register_mcp_resources(mcp: FastMCP):
                 result = timeline_item.SetProperty("CompositeMode", composite_mode)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set composite mode to '{composite_mode}'")
             
             # Set opacity if specified
             if opacity is not None:
                 result = timeline_item.SetProperty("Opacity", opacity)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set opacity to {opacity}")
             
             if success:
                 changes = []
@@ -2280,10 +3214,13 @@ def register_mcp_resources(mcp: FastMCP):
                 if opacity is not None:
                     changes.append(f"opacity to {opacity}")
                 
+                logger.info(f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to set some composite properties for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to set some composite properties for timeline item '{timeline_item.GetName()}'"
         except Exception as e:
+            logger.error(f"Error setting composite properties for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting timeline item composite properties: {str(e)}"
 
     @mcp.tool()
@@ -2293,34 +3230,48 @@ def register_mcp_resources(mcp: FastMCP):
         """Set retiming properties for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item to modify
-            speed: Optional speed factor (e.g., 0.5 for 50%, 2.0 for 200%)
-            process: Optional retime process. Options: 'NearestFrame', 'FrameBlend', 'OpticalFlow'
+            timeline_item_id: The ID of the timeline item to modify.
+            speed: Optional speed factor (e.g., 0.5 for 50%, 2.0 for 200%).
+            process: Optional retime process. Options: 'NearestFrame', 'FrameBlend', 'OpticalFlow'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the retime properties were set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set timeline item retime
+        logger.debug(f"Attempting to set retime properties (speed={speed}, process={process}) for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate inputs
         if speed is None and process is None:
+            logger.error("Must specify at least one of speed or process")
             return "Error: Must specify at least one of speed or process"
         
         if speed is not None and speed <= 0:
+            logger.error("Speed must be greater than 0")
             return "Error: Speed must be greater than 0"
         
         valid_processes = ['NearestFrame', 'FrameBlend', 'OpticalFlow']
         if process and process not in valid_processes:
+            logger.error(f"Invalid retime process '{process}'. Must be one of: {', '.join(valid_processes)}")
             return f"Error: Invalid retime process. Must be one of: {', '.join(valid_processes)}"
         
         try:
@@ -2341,6 +3292,7 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not timeline_item:
+                logger.error(f"Video timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
             
             success = True
@@ -2350,12 +3302,14 @@ def register_mcp_resources(mcp: FastMCP):
                 result = timeline_item.SetProperty("Speed", speed)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set speed to {speed}")
             
             # Set retime process if specified
             if process:
                 result = timeline_item.SetProperty("RetimeProcess", process)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set retime process to '{process}'")
             
             if success:
                 changes = []
@@ -2364,10 +3318,13 @@ def register_mcp_resources(mcp: FastMCP):
                 if process:
                     changes.append(f"retime process to '{process}'")
                 
+                logger.info(f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to set some retime properties for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to set some retime properties for timeline item '{timeline_item.GetName()}'"
         except Exception as e:
+            logger.error(f"Error setting retime properties for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting timeline item retime properties: {str(e)}"
 
     @mcp.tool()
@@ -2378,35 +3335,49 @@ def register_mcp_resources(mcp: FastMCP):
         """Set stabilization properties for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item to modify
-            enabled: Optional boolean to enable/disable stabilization
-            method: Optional stabilization method. Options: 'Perspective', 'Similarity', 'Translation'
-            strength: Optional strength value (0.0 to 1.0)
+            timeline_item_id: The ID of the timeline item to modify.
+            enabled: Optional boolean to enable/disable stabilization.
+            method: Optional stabilization method. Options: 'Perspective', 'Similarity', 'Translation'.
+            strength: Optional strength value (0.0 to 1.0).
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the stabilization properties were set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set timeline item stabilization
+        logger.debug(f"Attempting to set stabilization properties (enabled={enabled}, method={method}, strength={strength}) for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate inputs
         if enabled is None and method is None and strength is None:
+            logger.error("Must specify at least one parameter to modify")
             return "Error: Must specify at least one parameter to modify"
         
         valid_methods = ['Perspective', 'Similarity', 'Translation']
         if method and method not in valid_methods:
+            logger.error(f"Invalid stabilization method '{method}'. Must be one of: {', '.join(valid_methods)}")
             return f"Error: Invalid stabilization method. Must be one of: {', '.join(valid_methods)}"
         
         if strength is not None and (strength < 0.0 or strength > 1.0):
+            logger.error("Strength must be between 0.0 and 1.0")
             return "Error: Strength must be between 0.0 and 1.0"
         
         try:
@@ -2427,9 +3398,11 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not timeline_item:
+                logger.error(f"Video timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
             
             if timeline_item.GetType() != "Video":
+                logger.error(f"Timeline item with ID '{timeline_item_id}' is not a video item")
                 return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
             
             success = True
@@ -2439,18 +3412,21 @@ def register_mcp_resources(mcp: FastMCP):
                 result = timeline_item.SetProperty("StabilizationEnable", 1 if enabled else 0)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set stabilization enabled to {enabled}")
             
             # Set method if specified
             if method:
                 result = timeline_item.SetProperty("StabilizationMethod", method)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set stabilization method to '{method}'")
             
             # Set strength if specified
             if strength is not None:
                 result = timeline_item.SetProperty("StabilizationStrength", strength)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set stabilization strength to {strength}")
             
             if success:
                 changes = []
@@ -2461,10 +3437,13 @@ def register_mcp_resources(mcp: FastMCP):
                 if strength is not None:
                     changes.append(f"stabilization strength to {strength}")
                 
+                logger.info(f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to set some stabilization properties for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to set some stabilization properties for timeline item '{timeline_item.GetName()}'"
         except Exception as e:
+            logger.error(f"Error setting stabilization properties for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting timeline item stabilization properties: {str(e)}"
 
     @mcp.tool()
@@ -2475,34 +3454,48 @@ def register_mcp_resources(mcp: FastMCP):
         """Set audio properties for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item to modify
-            volume: Optional volume level (usually 0.0 to 2.0, where 1.0 is unity gain)
-            pan: Optional pan value (-1.0 to 1.0, where -1.0 is left, 0 is center, 1.0 is right)
-            eq_enabled: Optional boolean to enable/disable EQ
+            timeline_item_id: The ID of the timeline item to modify.
+            volume: Optional volume level (usually 0.0 to 2.0, where 1.0 is unity gain).
+            pan: Optional pan value (-1.0 to 1.0, where -1.0 is left, 0 is center, 1.0 is right).
+            eq_enabled: Optional boolean to enable/disable EQ.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the audio properties were set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set timeline item audio
+        logger.debug(f"Attempting to set audio properties (volume={volume}, pan={pan}, eq_enabled={eq_enabled}) for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate inputs
         if volume is None and pan is None and eq_enabled is None:
+            logger.error("Must specify at least one parameter to modify")
             return "Error: Must specify at least one parameter to modify"
         
         if volume is not None and volume < 0.0:
+            logger.error("Volume must be greater than or equal to 0.0")
             return "Error: Volume must be greater than or equal to 0.0"
         
         if pan is not None and (pan < -1.0 or pan > 1.0):
+            logger.error("Pan must be between -1.0 and 1.0")
             return "Error: Pan must be between -1.0 and 1.0"
         
         try:
@@ -2538,10 +3531,12 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Timeline item with ID '{timeline_item_id}' not found"
             
             # Check if the item has audio capabilities
             if not is_audio and timeline_item.GetMediaType() != "Audio":
+                logger.error(f"Timeline item with ID '{timeline_item_id}' does not have audio properties")
                 return f"Error: Timeline item with ID '{timeline_item_id}' does not have audio properties"
             
             success = True
@@ -2551,18 +3546,21 @@ def register_mcp_resources(mcp: FastMCP):
                 result = timeline_item.SetProperty("Volume", volume)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set volume to {volume}")
             
             # Set pan if specified
             if pan is not None:
                 result = timeline_item.SetProperty("Pan", pan)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set pan to {pan}")
             
             # Set EQ enabled if specified
             if eq_enabled is not None:
                 result = timeline_item.SetProperty("EQEnable", 1 if eq_enabled else 0)
                 if not result:
                     success = False
+                    logger.warning(f"Failed to set EQ enabled to {eq_enabled}")
             
             if success:
                 changes = []
@@ -2573,12 +3571,14 @@ def register_mcp_resources(mcp: FastMCP):
                 if eq_enabled is not None:
                     changes.append(f"EQ {'enabled' if eq_enabled else 'disabled'}")
                 
+                logger.info(f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to set some audio properties for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to set some audio properties for timeline item '{timeline_item.GetName()}'"
         except Exception as e:
+            logger.error(f"Error setting audio properties for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting timeline item audio properties: {str(e)}"
-
     # ------------------
     # Keyframe Control
     # ------------------
@@ -2588,22 +3588,32 @@ def register_mcp_resources(mcp: FastMCP):
         """Get keyframes for a specific timeline item by ID.
         
         Args:
-            timeline_item_id: The ID of the timeline item to get keyframes for
-            property_name: Optional property name to filter keyframes (e.g., 'Pan', 'ZoomX')
+            timeline_item_id: The ID of the timeline item to get keyframes for.
+            property_name: Optional property name to filter keyframes (e.g., 'Pan', 'ZoomX'). If not provided, returns all keyframes for all keyframeable properties.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the item ID, name, list of keyframeable properties, and their keyframes,
+                           or a dictionary with an error message if the operation fails.
         """
+        # Log the attempt to fetch keyframes
+        logger.debug(f"Fetching keyframes for timeline item ID: {timeline_item_id}, property: {property_name or 'all'}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return {"error": "No timeline currently active"}
         
         try:
@@ -2637,6 +3647,7 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return {"error": f"Timeline item with ID '{timeline_item_id}' not found"}
             
             # Get all keyframeable properties for this item
@@ -2658,13 +3669,10 @@ def register_mcp_resources(mcp: FastMCP):
                 for prop in video_properties:
                     if timeline_item.GetKeyframeCount(prop) > 0:
                         keyframeable_properties.append(prop)
-                        
-                        # Get all keyframes for this property
                         keyframes[prop] = []
                         keyframe_count = timeline_item.GetKeyframeCount(prop)
                         
                         for i in range(keyframe_count):
-                            # Get the frame position and value of the keyframe
                             frame_pos = timeline_item.GetKeyframeAtIndex(prop, i)["frame"]
                             value = timeline_item.GetPropertyAtKeyframeIndex(prop, i)
                             
@@ -2672,20 +3680,17 @@ def register_mcp_resources(mcp: FastMCP):
                                 "frame": frame_pos,
                                 "value": value
                             })
+                            logger.debug(f"Found keyframe for {prop} at frame {frame_pos} with value {value}")
             
-            # Check if it has audio properties (could be video with audio or audio-only)
+            # Check if it has audio properties
             if timeline_item.GetType() == "Audio" or timeline_item.GetMediaType() == "Audio":
-                # Check each audio property for keyframes
                 for prop in audio_properties:
                     if timeline_item.GetKeyframeCount(prop) > 0:
                         keyframeable_properties.append(prop)
-                        
-                        # Get all keyframes for this property
                         keyframes[prop] = []
                         keyframe_count = timeline_item.GetKeyframeCount(prop)
                         
                         for i in range(keyframe_count):
-                            # Get the frame position and value of the keyframe
                             frame_pos = timeline_item.GetKeyframeAtIndex(prop, i)["frame"]
                             value = timeline_item.GetPropertyAtKeyframeIndex(prop, i)
                             
@@ -2693,10 +3698,12 @@ def register_mcp_resources(mcp: FastMCP):
                                 "frame": frame_pos,
                                 "value": value
                             })
+                            logger.debug(f"Found keyframe for {prop} at frame {frame_pos} with value {value}")
             
             # Filter by property_name if specified
             if property_name:
                 if property_name in keyframes:
+                    logger.info(f"Retrieved keyframes for property '{property_name}' for timeline item ID: {timeline_item_id}")
                     return {
                         "item_id": timeline_item_id,
                         "item_name": timeline_item.GetName(),
@@ -2704,6 +3711,7 @@ def register_mcp_resources(mcp: FastMCP):
                         "keyframes": {property_name: keyframes[property_name]}
                     }
                 else:
+                    logger.info(f"No keyframes found for property '{property_name}' for timeline item ID: {timeline_item_id}")
                     return {
                         "item_id": timeline_item_id,
                         "item_name": timeline_item.GetName(),
@@ -2711,7 +3719,7 @@ def register_mcp_resources(mcp: FastMCP):
                         "keyframes": {}
                     }
             
-            # Return all keyframes
+            logger.info(f"Retrieved {len(keyframeable_properties)} keyframeable properties for timeline item ID: {timeline_item_id}")
             return {
                 "item_id": timeline_item_id,
                 "item_name": timeline_item.GetName(),
@@ -2720,6 +3728,7 @@ def register_mcp_resources(mcp: FastMCP):
             }
             
         except Exception as e:
+            logger.error(f"Error getting keyframes for timeline item ID '{timeline_item_id}': {str(e)}")
             return {"error": f"Error getting timeline item keyframes: {str(e)}"}
 
     @mcp.tool()
@@ -2727,24 +3736,35 @@ def register_mcp_resources(mcp: FastMCP):
         """Add a keyframe at the specified frame for a timeline item property.
         
         Args:
-            timeline_item_id: The ID of the timeline item to add keyframe to
-            property_name: The name of the property to keyframe (e.g., 'Pan', 'ZoomX')
-            frame: Frame position for the keyframe
-            value: Value to set at the keyframe
+            timeline_item_id: The ID of the timeline item to add the keyframe to.
+            property_name: The name of the property to keyframe (e.g., 'Pan', 'ZoomX', 'Volume').
+            frame: Frame position for the keyframe.
+            value: Value to set at the keyframe.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the keyframe was added.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to add a keyframe
+        logger.debug(f"Attempting to add keyframe for property '{property_name}' at frame {frame} with value {value} for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Valid keyframeable properties
@@ -2758,6 +3778,7 @@ def register_mcp_resources(mcp: FastMCP):
         valid_properties = video_properties + audio_properties
         
         if property_name not in valid_properties:
+            logger.error(f"Invalid property name '{property_name}'. Must be one of: {', '.join(valid_properties)}")
             return f"Error: Invalid property name. Must be one of: {', '.join(valid_properties)}"
         
         try:
@@ -2793,13 +3814,16 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Timeline item with ID '{timeline_item_id}' not found"
             
             # Check if the specified property is valid for this item type
             if is_audio and property_name not in audio_properties:
+                logger.error(f"Property '{property_name}' is not available for audio items")
                 return f"Error: Property '{property_name}' is not available for audio items"
             
             if not is_audio and property_name not in video_properties and timeline_item.GetType() != "Video":
+                logger.error(f"Property '{property_name}' is not available for this item type")
                 return f"Error: Property '{property_name}' is not available for this item type"
                 
             # Validate frame is within the item's range
@@ -2807,17 +3831,21 @@ def register_mcp_resources(mcp: FastMCP):
             end_frame = timeline_item.GetEnd()
             
             if frame < start_frame or frame > end_frame:
+                logger.error(f"Frame {frame} is outside the item's range ({start_frame} to {end_frame})")
                 return f"Error: Frame {frame} is outside the item's range ({start_frame} to {end_frame})"
             
             # Add the keyframe
             result = timeline_item.AddKeyframe(property_name, frame, value)
             
             if result:
+                logger.info(f"Successfully added keyframe for {property_name} at frame {frame} with value {value}")
                 return f"Successfully added keyframe for {property_name} at frame {frame} with value {value}"
             else:
+                logger.error(f"Failed to add keyframe for {property_name} at frame {frame}")
                 return f"Failed to add keyframe for {property_name} at frame {frame}"
             
         except Exception as e:
+            logger.error(f"Error adding keyframe for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error adding keyframe: {str(e)}"
 
     @mcp.tool()
@@ -2825,28 +3853,40 @@ def register_mcp_resources(mcp: FastMCP):
         """Modify an existing keyframe by changing its value or frame position.
         
         Args:
-            timeline_item_id: The ID of the timeline item
-            property_name: The name of the property with keyframe
-            frame: Current frame position of the keyframe to modify
-            new_value: Optional new value for the keyframe
-            new_frame: Optional new frame position for the keyframe
+            timeline_item_id: The ID of the timeline item.
+            property_name: The name of the property with the keyframe (e.g., 'Pan', 'ZoomX', 'Volume').
+            frame: Current frame position of the keyframe to modify.
+            new_value: Optional new value for the keyframe.
+            new_frame: Optional new frame position for the keyframe.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the keyframe was modified.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to modify a keyframe
+        logger.debug(f"Attempting to modify keyframe for property '{property_name}' at frame {frame} (new_value={new_value}, new_frame={new_frame}) for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         if new_value is None and new_frame is None:
+            logger.error("Must specify at least one of new_value or new_frame")
             return "Error: Must specify at least one of new_value or new_frame"
         
         try:
@@ -2880,11 +3920,13 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Timeline item with ID '{timeline_item_id}' not found"
             
             # Check if the property has keyframes
             keyframe_count = timeline_item.GetKeyframeCount(property_name)
             if keyframe_count == 0:
+                logger.error(f"No keyframes found for property '{property_name}'")
                 return f"Error: No keyframes found for property '{property_name}'"
             
             # Find the keyframe at the specified frame
@@ -2896,6 +3938,7 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if keyframe_index == -1:
+                logger.error(f"No keyframe found at frame {frame} for property '{property_name}'")
                 return f"Error: No keyframe found at frame {frame} for property '{property_name}'"
             
             if new_frame is not None:
@@ -2904,6 +3947,7 @@ def register_mcp_resources(mcp: FastMCP):
                 end_frame = timeline_item.GetEnd()
                 
                 if new_frame < start_frame or new_frame > end_frame:
+                    logger.error(f"New frame {new_frame} is outside the item's range ({start_frame} to {end_frame})")
                     return f"Error: New frame {new_frame} is outside the item's range ({start_frame} to {end_frame})"
                     
                 # Delete the keyframe at the current frame
@@ -2915,21 +3959,25 @@ def register_mcp_resources(mcp: FastMCP):
                 result = timeline_item.AddKeyframe(property_name, new_frame, value)
                 
                 if result:
+                    logger.info(f"Successfully moved keyframe for {property_name} from frame {frame} to frame {new_frame}")
                     return f"Successfully moved keyframe for {property_name} from frame {frame} to frame {new_frame}"
                 else:
+                    logger.error(f"Failed to move keyframe for {property_name}")
                     return f"Failed to move keyframe for {property_name}"
             else:
                 # Only changing the value, not the frame position
-                # We need to delete and re-add the keyframe with the new value
                 timeline_item.DeleteKeyframe(property_name, frame)
                 result = timeline_item.AddKeyframe(property_name, frame, new_value)
                 
                 if result:
+                    logger.info(f"Successfully updated keyframe value for {property_name} at frame {frame} to {new_value}")
                     return f"Successfully updated keyframe value for {property_name} at frame {frame} to {new_value}"
                 else:
+                    logger.error(f"Failed to update keyframe value for {property_name} at frame {frame}")
                     return f"Failed to update keyframe value for {property_name} at frame {frame}"
             
         except Exception as e:
+            logger.error(f"Error modifying keyframe for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error modifying keyframe: {str(e)}"
 
     @mcp.tool()
@@ -2937,23 +3985,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Delete a keyframe at the specified frame for a timeline item property.
         
         Args:
-            timeline_item_id: The ID of the timeline item
-            property_name: The name of the property with keyframe to delete
-            frame: Frame position of the keyframe to delete
+            timeline_item_id: The ID of the timeline item.
+            property_name: The name of the property with the keyframe to delete (e.g., 'Pan', 'ZoomX', 'Volume').
+            frame: Frame position of the keyframe to delete.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the keyframe was deleted.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to delete a keyframe
+        logger.debug(f"Attempting to delete keyframe for property '{property_name}' at frame {frame} for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         try:
@@ -2987,11 +4046,13 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Timeline item with ID '{timeline_item_id}' not found"
             
             # Check if the property has keyframes
             keyframe_count = timeline_item.GetKeyframeCount(property_name)
             if keyframe_count == 0:
+                logger.error(f"No keyframes found for property '{property_name}'")
                 return f"Error: No keyframes found for property '{property_name}'"
             
             # Check if there's a keyframe at the specified frame
@@ -3003,17 +4064,21 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not keyframe_exists:
+                logger.error(f"No keyframe found at frame {frame} for property '{property_name}'")
                 return f"Error: No keyframe found at frame {frame} for property '{property_name}'"
             
             # Delete the keyframe
             result = timeline_item.DeleteKeyframe(property_name, frame)
             
             if result:
+                logger.info(f"Successfully deleted keyframe for {property_name} at frame {frame}")
                 return f"Successfully deleted keyframe for {property_name} at frame {frame}"
             else:
+                logger.error(f"Failed to delete keyframe for {property_name} at frame {frame}")
                 return f"Failed to delete keyframe for {property_name} at frame {frame}"
             
         except Exception as e:
+            logger.error(f"Error deleting keyframe for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error deleting keyframe: {str(e)}"
 
     @mcp.tool()
@@ -3021,29 +4086,41 @@ def register_mcp_resources(mcp: FastMCP):
         """Set the interpolation type for a keyframe.
         
         Args:
-            timeline_item_id: The ID of the timeline item
-            property_name: The name of the property with keyframe
-            frame: Frame position of the keyframe
-            interpolation_type: Type of interpolation. Options: 'Linear', 'Bezier', 'Ease-In', 'Ease-Out'
+            timeline_item_id: The ID of the timeline item.
+            property_name: The name of the property with the keyframe (e.g., 'Pan', 'ZoomX', 'Volume').
+            frame: Frame position of the keyframe.
+            interpolation_type: Type of interpolation. Options: 'Linear', 'Bezier', 'Ease-In', 'Ease-Out'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the interpolation type was set.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to set keyframe interpolation
+        logger.debug(f"Attempting to set interpolation type '{interpolation_type}' for property '{property_name}' at frame {frame} for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate interpolation type
         valid_interpolation_types = ['Linear', 'Bezier', 'Ease-In', 'Ease-Out']
         if interpolation_type not in valid_interpolation_types:
+            logger.error(f"Invalid interpolation type '{interpolation_type}'. Must be one of: {', '.join(valid_interpolation_types)}")
             return f"Error: Invalid interpolation type. Must be one of: {', '.join(valid_interpolation_types)}"
         
         try:
@@ -3077,11 +4154,13 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not timeline_item:
+                logger.error(f"Timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Timeline item with ID '{timeline_item_id}' not found"
             
             # Check if the property has keyframes
             keyframe_count = timeline_item.GetKeyframeCount(property_name)
             if keyframe_count == 0:
+                logger.error(f"No keyframes found for property '{property_name}'")
                 return f"Error: No keyframes found for property '{property_name}'"
             
             # Check if there's a keyframe at the specified frame
@@ -3093,6 +4172,7 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not keyframe_exists:
+                logger.error(f"No keyframe found at frame {frame} for property '{property_name}'")
                 return f"Error: No keyframe found at frame {frame} for property '{property_name}'"
             
             # Set the interpolation type
@@ -3118,11 +4198,14 @@ def register_mcp_resources(mcp: FastMCP):
             result = timeline_item.AddKeyframe(property_name, frame, value, interpolation_map[interpolation_type])
             
             if result:
+                logger.info(f"Successfully set interpolation for {property_name} keyframe at frame {frame} to {interpolation_type}")
                 return f"Successfully set interpolation for {property_name} keyframe at frame {frame} to {interpolation_type}"
             else:
+                logger.error(f"Failed to set interpolation for {property_name} keyframe at frame {frame}")
                 return f"Failed to set interpolation for {property_name} keyframe at frame {frame}"
             
         except Exception as e:
+            logger.error(f"Error setting keyframe interpolation for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error setting keyframe interpolation: {str(e)}"
 
     @mcp.tool()
@@ -3130,27 +4213,39 @@ def register_mcp_resources(mcp: FastMCP):
         """Enable keyframe mode for a timeline item.
         
         Args:
-            timeline_item_id: The ID of the timeline item
-            keyframe_mode: Keyframe mode to enable. Options: 'All', 'Color', 'Sizing'
+            timeline_item_id: The ID of the timeline item.
+            keyframe_mode: Keyframe mode to enable. Options: 'All', 'Color', 'Sizing'. Defaults to 'All'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the keyframe mode was enabled.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to enable keyframes
+        logger.debug(f"Attempting to enable keyframe mode '{keyframe_mode}' for timeline item ID: {timeline_item_id}")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return "Error: No timeline currently active"
         
         # Validate keyframe mode
         valid_keyframe_modes = ['All', 'Color', 'Sizing']
         if keyframe_mode not in valid_keyframe_modes:
+            logger.error(f"Invalid keyframe mode '{keyframe_mode}'. Must be one of: {', '.join(valid_keyframe_modes)}")
             return f"Error: Invalid keyframe mode. Must be one of: {', '.join(valid_keyframe_modes)}"
         
         try:
@@ -3171,9 +4266,11 @@ def register_mcp_resources(mcp: FastMCP):
                     break
             
             if not timeline_item:
+                logger.error(f"Video timeline item with ID '{timeline_item_id}' not found")
                 return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
             
             if timeline_item.GetType() != "Video":
+                logger.error(f"Timeline item with ID '{timeline_item_id}' is not a video item")
                 return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
             
             # Set the keyframe mode
@@ -3186,11 +4283,14 @@ def register_mcp_resources(mcp: FastMCP):
             result = timeline_item.SetProperty("KeyframeMode", keyframe_mode_map[keyframe_mode])
             
             if result:
+                logger.info(f"Successfully enabled {keyframe_mode} keyframe mode for timeline item '{timeline_item.GetName()}'")
                 return f"Successfully enabled {keyframe_mode} keyframe mode for timeline item '{timeline_item.GetName()}'"
             else:
+                logger.error(f"Failed to enable {keyframe_mode} keyframe mode for timeline item '{timeline_item.GetName()}'")
                 return f"Failed to enable {keyframe_mode} keyframe mode for timeline item '{timeline_item.GetName()}'"
             
         except Exception as e:
+            logger.error(f"Error enabling keyframe mode for timeline item ID '{timeline_item_id}': {str(e)}")
             return f"Error enabling keyframe mode: {str(e)}"
 
     # ------------------
@@ -3199,16 +4299,26 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://color/presets")
     def get_color_presets() -> List[Dict[str, Any]]:
-        """Get all available color presets in the current project."""
+        """Get all available color presets in the current project.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing album names and their associated stills with details
+                                 (id, label, timecode, isGrabbed), or a list with an error/info dictionary if the operation fails.
+        """
+        # Log the attempt to fetch color presets
+        logger.debug("Fetching all color presets")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return [{"error": "Not connected to DaVinci Resolve"}]
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return [{"error": "Failed to get Project Manager"}]
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return [{"error": "No project currently open"}]
         
         # Switch to color page to access presets
@@ -3220,19 +4330,22 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return [{"error": "Failed to get gallery"}]
             
             # Get all albums
             albums = gallery.GetAlbums()
             if not albums:
+                logger.info("No albums found in gallery")
                 return [{"info": "No albums found in gallery"}]
             
             result = []
             for album in albums:
+                album_name = album.GetName()
                 # Get stills in the album
                 stills = album.GetStills()
                 album_info = {
-                    "name": album.GetName(),
+                    "name": album_name,
                     "stills": []
                 }
                 
@@ -3245,6 +4358,7 @@ def register_mcp_resources(mcp: FastMCP):
                             "isGrabbed": still.IsGrabbed()
                         }
                         album_info["stills"].append(still_info)
+                        logger.debug(f"Found still '{still_info['label']}' in album '{album_name}'")
                 
                 result.append(album_info)
             
@@ -3252,12 +4366,14 @@ def register_mcp_resources(mcp: FastMCP):
             if current_page != "color":
                 resolve.OpenPage(current_page)
                 
+            logger.info(f"Retrieved {len(result)} albums with color presets")
             return result
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error retrieving color presets: {str(e)}")
             return [{"error": f"Error retrieving color presets: {str(e)}"}]
 
     @mcp.tool()
@@ -3265,19 +4381,29 @@ def register_mcp_resources(mcp: FastMCP):
         """Save a color preset from the specified clip.
         
         Args:
-            clip_name: Name of the clip to save preset from (uses current clip if None)
-            preset_name: Name to give the preset (uses clip name if None)
-            album_name: Album to save the preset to (default: "DaVinci Resolve")
+            clip_name: Name of the clip to save preset from. Uses current clip if None.
+            preset_name: Name to give the preset. Uses clip name or generated name if None.
+            album_name: Album to save the preset to. Defaults to "DaVinci Resolve".
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the preset was saved.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to save a color preset
+        logger.debug(f"Attempting to save color preset (clip_name={clip_name}, preset_name={preset_name}, album_name={album_name})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3289,6 +4415,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get the current timeline
             current_timeline = current_project.GetCurrentTimeline()
             if not current_timeline:
+                logger.info("No timeline is currently open")
                 return "Error: No timeline is currently open"
             
             # Get the specific clip or current clip
@@ -3303,6 +4430,7 @@ def register_mcp_resources(mcp: FastMCP):
                         break
                 
                 if not target_clip:
+                    logger.error(f"Clip '{clip_name}' not found in the timeline")
                     return f"Error: Clip '{clip_name}' not found in the timeline"
                 
                 # Select the clip
@@ -3311,6 +4439,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return "Error: Failed to get gallery"
             
             # Get or create album
@@ -3327,6 +4456,7 @@ def register_mcp_resources(mcp: FastMCP):
                 # Create a new album if it doesn't exist
                 album = gallery.CreateAlbum(album_name)
                 if not album:
+                    logger.error(f"Failed to create album '{album_name}'")
                     return f"Error: Failed to create album '{album_name}'"
             
             # Set preset name if specified
@@ -3346,6 +4476,7 @@ def register_mcp_resources(mcp: FastMCP):
             result = gallery.GrabStill()
             
             if not result:
+                logger.error("Failed to grab still for the preset")
                 return "Error: Failed to grab still for the preset"
             
             # Get the still that was just created
@@ -3359,12 +4490,14 @@ def register_mcp_resources(mcp: FastMCP):
             if current_page != "color":
                 resolve.OpenPage(current_page)
             
+            logger.info(f"Successfully saved color preset '{final_preset_name}' to album '{album_name}'")
             return f"Successfully saved color preset '{final_preset_name}' to album '{album_name}'"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error saving color preset: {str(e)}")
             return f"Error saving color preset: {str(e)}"
 
     @mcp.tool()
@@ -3373,23 +4506,34 @@ def register_mcp_resources(mcp: FastMCP):
         """Apply a color preset to the specified clip.
         
         Args:
-            preset_id: ID of the preset to apply (if known)
-            preset_name: Name of the preset to apply (searches in album)
-            clip_name: Name of the clip to apply preset to (uses current clip if None)
-            album_name: Album containing the preset (default: "DaVinci Resolve")
+            preset_id: ID of the preset to apply. Optional if preset_name is provided.
+            preset_name: Name of the preset to apply. Optional if preset_id is provided.
+            clip_name: Name of the clip to apply preset to. Uses current clip if None.
+            album_name: Album containing the preset. Defaults to "DaVinci Resolve".
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the preset was applied.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to apply a color preset
+        logger.debug(f"Attempting to apply color preset (preset_id={preset_id}, preset_name={preset_name}, clip_name={clip_name}, album_name={album_name})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         if not preset_id and not preset_name:
+            logger.error("Must provide either preset_id or preset_name")
             return "Error: Must provide either preset_id or preset_name"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3401,6 +4545,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get the current timeline
             current_timeline = current_project.GetCurrentTimeline()
             if not current_timeline:
+                logger.info("No timeline is currently open")
                 return "Error: No timeline is currently open"
             
             # Get the specific clip or current clip
@@ -3415,6 +4560,7 @@ def register_mcp_resources(mcp: FastMCP):
                         break
                 
                 if not target_clip:
+                    logger.error(f"Clip '{clip_name}' not found in the timeline")
                     return f"Error: Clip '{clip_name}' not found in the timeline"
                 
                 # Select the clip
@@ -3423,6 +4569,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return "Error: Failed to get gallery"
             
             # Find the album
@@ -3436,11 +4583,13 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not album:
+                logger.error(f"Album '{album_name}' not found")
                 return f"Error: Album '{album_name}' not found"
             
             # Find the still to apply
             stills = album.GetStills()
             if not stills:
+                logger.error(f"No presets found in album '{album_name}'")
                 return f"Error: No presets found in album '{album_name}'"
             
             target_still = None
@@ -3460,6 +4609,7 @@ def register_mcp_resources(mcp: FastMCP):
             
             if not target_still:
                 search_term = preset_id if preset_id else preset_name
+                logger.error(f"Preset '{search_term}' not found in album '{album_name}'")
                 return f"Error: Preset '{search_term}' not found in album '{album_name}'"
             
             # Apply the preset
@@ -3470,14 +4620,17 @@ def register_mcp_resources(mcp: FastMCP):
                 resolve.OpenPage(current_page)
             
             if result:
+                logger.info(f"Successfully applied color preset to {'specified clip' if clip_name else 'current clip'}")
                 return f"Successfully applied color preset to {'specified clip' if clip_name else 'current clip'}"
             else:
+                logger.error(f"Failed to apply color preset")
                 return f"Failed to apply color preset"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error applying color preset: {str(e)}")
             return f"Error applying color preset: {str(e)}"
 
     @mcp.tool()
@@ -3486,22 +4639,33 @@ def register_mcp_resources(mcp: FastMCP):
         """Delete a color preset.
         
         Args:
-            preset_id: ID of the preset to delete (if known)
-            preset_name: Name of the preset to delete (searches in album)
-            album_name: Album containing the preset (default: "DaVinci Resolve")
+            preset_id: ID of the preset to delete. Optional if preset_name is provided.
+            preset_name: Name of the preset to delete. Optional if preset_id is provided.
+            album_name: Album containing the preset. Defaults to "DaVinci Resolve".
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the preset was deleted.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to delete a color preset
+        logger.debug(f"Attempting to delete color preset (preset_id={preset_id}, preset_name={preset_name}, album_name={album_name})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         if not preset_id and not preset_name:
+            logger.error("Must provide either preset_id or preset_name")
             return "Error: Must provide either preset_id or preset_name"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3513,6 +4677,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return "Error: Failed to get gallery"
             
             # Find the album
@@ -3526,11 +4691,13 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not album:
+                logger.error(f"Album '{album_name}' not found")
                 return f"Error: Album '{album_name}' not found"
             
             # Find the still to delete
             stills = album.GetStills()
             if not stills:
+                logger.error(f"No presets found in album '{album_name}'")
                 return f"Error: No presets found in album '{album_name}'"
             
             target_still = None
@@ -3550,6 +4717,7 @@ def register_mcp_resources(mcp: FastMCP):
             
             if not target_still:
                 search_term = preset_id if preset_id else preset_name
+                logger.error(f"Preset '{search_term}' not found in album '{album_name}'")
                 return f"Error: Preset '{search_term}' not found in album '{album_name}'"
             
             # Delete the preset
@@ -3560,14 +4728,17 @@ def register_mcp_resources(mcp: FastMCP):
                 resolve.OpenPage(current_page)
             
             if result:
+                logger.info(f"Successfully deleted color preset from album '{album_name}'")
                 return f"Successfully deleted color preset from album '{album_name}'"
             else:
+                logger.error(f"Failed to delete color preset")
                 return f"Failed to delete color preset"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error deleting color preset: {str(e)}")
             return f"Error deleting color preset: {str(e)}"
 
     @mcp.tool()
@@ -3575,17 +4746,27 @@ def register_mcp_resources(mcp: FastMCP):
         """Create a new album for color presets.
         
         Args:
-            album_name: Name for the new album
+            album_name: Name for the new album.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the album was created.
+                 - On failure: An error message describing the issue or indicating the album already exists.
         """
+        # Log the attempt to create a color preset album
+        logger.debug(f"Attempting to create color preset album '{album_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3597,6 +4778,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return "Error: Failed to get gallery"
             
             # Check if album already exists
@@ -3608,6 +4790,7 @@ def register_mcp_resources(mcp: FastMCP):
                         # Return to the original page if we switched
                         if current_page != "color":
                             resolve.OpenPage(current_page)
+                        logger.info(f"Album '{album_name}' already exists")
                         return f"Album '{album_name}' already exists"
             
             # Create a new album
@@ -3618,14 +4801,17 @@ def register_mcp_resources(mcp: FastMCP):
                 resolve.OpenPage(current_page)
             
             if album:
+                logger.info(f"Successfully created album '{album_name}'")
                 return f"Successfully created album '{album_name}'"
             else:
+                logger.error(f"Failed to create album '{album_name}'")
                 return f"Failed to create album '{album_name}'"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error creating album: {str(e)}")
             return f"Error creating album: {str(e)}"
 
     @mcp.tool()
@@ -3633,17 +4819,27 @@ def register_mcp_resources(mcp: FastMCP):
         """Delete a color preset album.
         
         Args:
-            album_name: Name of the album to delete
+            album_name: Name of the album to delete.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the album was deleted.
+                 - On failure: An error message describing the issue or indicating the album was not found.
         """
+        # Log the attempt to delete a color preset album
+        logger.debug(f"Attempting to delete color preset album '{album_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3655,6 +4851,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return "Error: Failed to get gallery"
             
             # Find the album
@@ -3671,6 +4868,7 @@ def register_mcp_resources(mcp: FastMCP):
                 # Return to the original page if we switched
                 if current_page != "color":
                     resolve.OpenPage(current_page)
+                logger.error(f"Album '{album_name}' not found")
                 return f"Error: Album '{album_name}' not found"
             
             # Delete the album
@@ -3681,14 +4879,17 @@ def register_mcp_resources(mcp: FastMCP):
                 resolve.OpenPage(current_page)
             
             if result:
+                logger.info(f"Successfully deleted album '{album_name}'")
                 return f"Successfully deleted album '{album_name}'"
             else:
+                logger.error(f"Failed to delete album '{album_name}'")
                 return f"Failed to delete album '{album_name}'"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error deleting album: {str(e)}")
             return f"Error deleting album: {str(e)}"
 
     @mcp.tool()
@@ -3699,20 +4900,30 @@ def register_mcp_resources(mcp: FastMCP):
         """Export a LUT from the current clip's grade.
         
         Args:
-            clip_name: Name of the clip to export grade from (uses current clip if None)
-            export_path: Path to save the LUT file (generated if None)
-            lut_format: Format of the LUT. Options: 'Cube', 'Davinci', '3dl', 'Panasonic'
-            lut_size: Size of the LUT. Options: '17Point', '33Point', '65Point'
+            clip_name: Name of the clip to export grade from. Uses current clip if None.
+            export_path: Path to save the LUT file. Generates a temporary path if None.
+            lut_format: Format of the LUT. Options: 'Cube', 'Davinci', '3dl', 'Panasonic'. Defaults to 'Cube'.
+            lut_size: Size of the LUT. Options: '17Point', '33Point', '65Point'. Defaults to '33Point'.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the LUT was exported with the file path.
+                 - On failure: An error message describing the issue.
         """
+        # Log the attempt to export a LUT
+        logger.debug(f"Attempting to export LUT (clip_name={clip_name}, export_path={export_path}, lut_format={lut_format}, lut_size={lut_size})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3724,6 +4935,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get the current timeline
             current_timeline = current_project.GetCurrentTimeline()
             if not current_timeline:
+                logger.info("No timeline is currently open")
                 return "Error: No timeline is currently open"
             
             # Get the specific clip or current clip
@@ -3738,6 +4950,7 @@ def register_mcp_resources(mcp: FastMCP):
                         break
                 
                 if not target_clip:
+                    logger.error(f"Clip '{clip_name}' not found in the timeline")
                     return f"Error: Clip '{clip_name}' not found in the timeline"
                 
                 # Select the clip
@@ -3762,11 +4975,13 @@ def register_mcp_resources(mcp: FastMCP):
             # Validate LUT format
             valid_formats = ['Cube', 'Davinci', '3dl', 'Panasonic']
             if lut_format not in valid_formats:
+                logger.error(f"Invalid LUT format '{lut_format}'. Must be one of: {', '.join(valid_formats)}")
                 return f"Error: Invalid LUT format. Must be one of: {', '.join(valid_formats)}"
             
             # Validate LUT size
             valid_sizes = ['17Point', '33Point', '65Point']
             if lut_size not in valid_sizes:
+                logger.error(f"Invalid LUT size '{lut_size}'. Must be one of: {', '.join(valid_sizes)}")
                 return f"Error: Invalid LUT size. Must be one of: {', '.join(valid_sizes)}"
             
             # Map format string to numeric value expected by DaVinci Resolve API
@@ -3787,6 +5002,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get current clip
             current_clip = current_timeline.GetCurrentVideoItem()
             if not current_clip:
+                logger.error("No clip is currently selected")
                 return "Error: No clip is currently selected"
             
             # Create a directory for the export path if it doesn't exist
@@ -3811,19 +5027,28 @@ def register_mcp_resources(mcp: FastMCP):
                 resolve.OpenPage(current_page)
             
             if result:
+                logger.info(f"Successfully exported LUT to '{export_path}' in {lut_format} format with {lut_size} size")
                 return f"Successfully exported LUT to '{export_path}' in {lut_format} format with {lut_size} size"
             else:
+                logger.error(f"Failed to export LUT")
                 return f"Failed to export LUT"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error exporting LUT: {str(e)}")
             return f"Error exporting LUT: {str(e)}"
 
     @mcp.resource("resolve://color/lut-formats")
     def get_lut_formats() -> Dict[str, Any]:
-        """Get available LUT export formats and sizes."""
+        """Get available LUT export formats and sizes.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing lists of supported LUT formats and sizes with their descriptions.
+        """
+        # Log the attempt to fetch LUT formats
+        logger.debug("Fetching available LUT formats and sizes")
         formats = {
             "formats": [
                 {
@@ -3862,6 +5087,7 @@ def register_mcp_resources(mcp: FastMCP):
                 }
             ]
         }
+        logger.info("Successfully retrieved LUT formats and sizes")
         return formats
 
     @mcp.tool()
@@ -3869,17 +5095,27 @@ def register_mcp_resources(mcp: FastMCP):
         """Export all PowerGrade presets as LUT files.
         
         Args:
-            export_dir: Directory to save the exported LUTs
+            export_dir: Directory to save the exported LUTs.
+        
+        Returns:
+            str: A message indicating the success or failure of the operation.
+                 - On success: A message confirming the number of LUTs exported.
+                 - On failure: An error message describing the issue or listing failed stills.
         """
+        # Log the attempt to export all PowerGrade LUTs
+        logger.debug(f"Attempting to export all PowerGrade LUTs to directory '{export_dir}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         # Switch to color page
@@ -3891,6 +5127,7 @@ def register_mcp_resources(mcp: FastMCP):
             # Get gallery
             gallery = current_project.GetGallery()
             if not gallery:
+                logger.error("Failed to get gallery")
                 return "Error: Failed to get gallery"
             
             # Get PowerGrade album
@@ -3904,11 +5141,13 @@ def register_mcp_resources(mcp: FastMCP):
                         break
             
             if not powergrade_album:
+                logger.error("PowerGrade album not found")
                 return "Error: PowerGrade album not found"
             
             # Get all stills in the PowerGrade album
             stills = powergrade_album.GetStills()
             if not stills:
+                logger.error("No stills found in PowerGrade album")
                 return "Error: No stills found in PowerGrade album"
             
             # Create export directory if it doesn't exist
@@ -3932,18 +5171,21 @@ def register_mcp_resources(mcp: FastMCP):
                 current_timeline = current_project.GetCurrentTimeline()
                 if not current_timeline:
                     failed_stills.append(f"{still_name} (no timeline open)")
+                    logger.warning(f"Failed to export LUT for still '{still_name}': no timeline open")
                     continue
 
                 # Apply the still to the current clip
                 current_clip = current_timeline.GetCurrentVideoItem()
                 if not current_clip:
                     failed_stills.append(f"{still_name} (no clip selected)")
+                    logger.warning(f"Failed to export LUT for still '{still_name}': no clip selected")
                     continue
                 
                 # Apply the grade from the still
                 applied = still.ApplyToClip()
                 if not applied:
                     failed_stills.append(f"{still_name} (could not apply grade)")
+                    logger.warning(f"Failed to export LUT for still '{still_name}': could not apply grade")
                     continue
                 
                 # Export as LUT
@@ -3951,22 +5193,27 @@ def register_mcp_resources(mcp: FastMCP):
                 
                 if result:
                     exported_count += 1
+                    logger.debug(f"Successfully exported LUT for still '{still_name}' to '{lut_path}'")
                 else:
                     failed_stills.append(f"{still_name} (export failed)")
+                    logger.warning(f"Failed to export LUT for still '{still_name}'")
             
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
             
             if failed_stills:
+                logger.info(f"Exported {exported_count} LUTs, failed to export {len(failed_stills)} stills")
                 return f"Exported {exported_count} LUTs to '{export_dir}'. Failed to export: {', '.join(failed_stills)}"
             else:
+                logger.info(f"Successfully exported all {exported_count} PowerGrade LUTs to '{export_dir}'")
                 return f"Successfully exported all {exported_count} PowerGrade LUTs to '{export_dir}'"
         
         except Exception as e:
             # Return to the original page if we switched
             if current_page != "color":
                 resolve.OpenPage(current_page)
+            logger.error(f"Error exporting PowerGrade LUTs: {str(e)}")
             return f"Error exporting PowerGrade LUTs: {str(e)}"
 
     # ------------------
@@ -3975,90 +5222,155 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://inspect/resolve")
     def inspect_resolve_object() -> Dict[str, Any]:
-        """Inspect the main resolve object and return its methods and properties."""
+        """Inspect the main Resolve object and return its methods and properties.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the methods and properties of the Resolve object,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to inspect the Resolve object
+        logger.debug("Inspecting main Resolve object")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
-        return inspect_object(resolve)
+        result = inspect_object(resolve)
+        logger.info("Successfully inspected Resolve object")
+        return result
 
     @mcp.resource("resolve://inspect/project-manager")
     def inspect_project_manager_object() -> Dict[str, Any]:
-        """Inspect the project manager object and return its methods and properties."""
+        """Inspect the Project Manager object and return its methods and properties.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the methods and properties of the Project Manager object,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to inspect the Project Manager object
+        logger.debug("Inspecting Project Manager object")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
-        return inspect_object(project_manager)
+        result = inspect_object(project_manager)
+        logger.info("Successfully inspected Project Manager object")
+        return result
 
     @mcp.resource("resolve://inspect/current-project")
     def inspect_current_project_object() -> Dict[str, Any]:
-        """Inspect the current project object and return its methods and properties."""
+        """Inspect the current Project object and return its methods and properties.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the methods and properties of the current Project object,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to inspect the current Project object
+        logger.debug("Inspecting current Project object")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return inspect_object(current_project)
+        result = inspect_object(current_project)
+        logger.info("Successfully inspected current Project object")
+        return result
 
     @mcp.resource("resolve://inspect/media-pool")
     def inspect_media_pool_object() -> Dict[str, Any]:
-        """Inspect the media pool object and return its methods and properties."""
+        """Inspect the Media Pool object and return its methods and properties.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the methods and properties of the Media Pool object,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to inspect the Media Pool object
+        logger.debug("Inspecting Media Pool object")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         media_pool = current_project.GetMediaPool()
         if not media_pool:
+            logger.error("Failed to get Media Pool")
             return {"error": "Failed to get Media Pool"}
         
-        return inspect_object(media_pool)
+        result = inspect_object(media_pool)
+        logger.info("Successfully inspected Media Pool object")
+        return result
 
     @mcp.resource("resolve://inspect/current-timeline")
     def inspect_current_timeline_object() -> Dict[str, Any]:
-        """Inspect the current timeline object and return its methods and properties."""
+        """Inspect the current Timeline object and return its methods and properties.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the methods and properties of the current Timeline object,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to inspect the current Timeline object
+        logger.debug("Inspecting current Timeline object")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
+            logger.info("No timeline currently active")
             return {"error": "No timeline currently active"}
         
-        return inspect_object(current_timeline)
+        result = inspect_object(current_timeline)
+        logger.info("Successfully inspected current Timeline object")
+        return result
 
     @mcp.tool()
     def object_help(object_type: str) -> str:
-        """
-        Get human-readable help for a DaVinci Resolve API object.
+        """Get human-readable help for a DaVinci Resolve API object.
         
         Args:
-            object_type: Type of object to get help for ('resolve', 'project_manager', 
-                        'project', 'media_pool', 'timeline', 'media_storage')
+            object_type: Type of object to get help for. Options: 'resolve', 'project_manager',
+                        'project', 'media_pool', 'timeline', 'media_storage'.
+        
+        Returns:
+            str: Human-readable help text describing the object's methods and properties,
+                 or an error message if the operation fails or the object type is invalid.
         """
+        # Log the attempt to get help for the specified object type
+        logger.debug(f"Generating help for object type '{object_type}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         # Map object type string to actual object
@@ -4087,23 +5399,33 @@ def register_mcp_resources(mcp: FastMCP):
         elif object_type == 'media_storage':
             obj = resolve.GetMediaStorage()
         else:
+            logger.error(f"Unknown object type '{object_type}'")
             return f"Error: Unknown object type '{object_type}'"
         
         if obj is None:
+            logger.error(f"Failed to get {object_type} object")
             return f"Error: Failed to get {object_type} object"
         
         # Generate and return help text
-        return print_object_help(obj)
+        result = print_object_help(obj)
+        logger.info(f"Successfully generated help for object type '{object_type}'")
+        return result
 
     @mcp.tool()
     def inspect_custom_object(object_path: str) -> Dict[str, Any]:
-        """
-        Inspect a custom DaVinci Resolve API object by path.
+        """Inspect a custom DaVinci Resolve API object by path.
         
         Args:
-            object_path: Path to the object using dot notation (e.g., 'resolve.GetMediaStorage()')
+            object_path: Path to the object using dot notation (e.g., 'resolve.GetMediaStorage()').
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the methods and properties of the specified object,
+                           or an error dictionary if the operation fails or the path is invalid.
         """
+        # Log the attempt to inspect a custom object
+        logger.debug(f"Inspecting custom object at path '{object_path}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         try:
@@ -4125,17 +5447,22 @@ def register_mcp_resources(mcp: FastMCP):
                     if hasattr(obj, method_name) and callable(getattr(obj, method_name)):
                         obj = getattr(obj, method_name)()
                     else:
+                        logger.error(f"Method '{method_name}' not found or not callable")
                         return {"error": f"Method '{method_name}' not found or not callable"}
                 else:
                     # It's an attribute access
                     if hasattr(obj, part):
                         obj = getattr(obj, part)
                     else:
+                        logger.error(f"Attribute '{part}' not found")
                         return {"error": f"Attribute '{part}' not found"}
             
             # Inspect the object we've retrieved
-            return inspect_object(obj)
+            result = inspect_object(obj)
+            logger.info(f"Successfully inspected custom object at path '{object_path}'")
+            return result
         except Exception as e:
+            logger.error(f"Error inspecting object at path '{object_path}': {str(e)}")
             return {"error": f"Error inspecting object: {str(e)}"}
 
     # ------------------
@@ -4144,74 +5471,110 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://layout-presets")
     def get_layout_presets() -> List[Dict[str, Any]]:
-        """Get all available layout presets for DaVinci Resolve."""
+        """Get all available layout presets for DaVinci Resolve.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing details of available UI layout presets,
+                                 or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch layout presets
+        logger.debug("Fetching all UI layout presets")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
-        return list_layout_presets(layout_type="ui")
+        result = list_layout_presets(layout_type="ui")
+        logger.info(f"Retrieved {len(result)} UI layout presets")
+        return result
 
     @mcp.tool()
     def save_layout_preset_tool(preset_name: str) -> str:
-        """
-        Save the current UI layout as a preset.
+        """Save the current UI layout as a preset.
         
         Args:
-            preset_name: Name for the saved preset
+            preset_name: Name for the saved preset.
+        
+        Returns:
+            str: A message indicating the success or failure of saving the UI layout preset.
         """
+        # Log the attempt to save a layout preset
+        logger.debug(f"Attempting to save UI layout preset '{preset_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = save_layout_preset(resolve, preset_name, layout_type="ui")
         if result:
+            logger.info(f"Successfully saved UI layout preset '{preset_name}'")
             return f"Successfully saved layout preset '{preset_name}'"
         else:
+            logger.error(f"Failed to save UI layout preset '{preset_name}'")
             return f"Failed to save layout preset '{preset_name}'"
 
     @mcp.tool()
     def load_layout_preset_tool(preset_name: str) -> str:
-        """
-        Load a UI layout preset.
+        """Load a UI layout preset.
         
         Args:
-            preset_name: Name of the preset to load
+            preset_name: Name of the preset to load.
+        
+        Returns:
+            str: A message indicating the success or failure of loading the UI layout preset.
         """
+        # Log the attempt to load a layout preset
+        logger.debug(f"Attempting to load UI layout preset '{preset_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = load_layout_preset(resolve, preset_name, layout_type="ui")
         if result:
+            logger.info(f"Successfully loaded UI layout preset '{preset_name}'")
             return f"Successfully loaded layout preset '{preset_name}'"
         else:
+            logger.error(f"Failed to load UI layout preset '{preset_name}'")
             return f"Failed to load layout preset '{preset_name}'"
 
     @mcp.tool()
     def export_layout_preset_tool(preset_name: str, export_path: str) -> str:
-        """
-        Export a layout preset to a file.
+        """Export a layout preset to a file.
         
         Args:
-            preset_name: Name of the preset to export
-            export_path: Path to export the preset file to
+            preset_name: Name of the preset to export.
+            export_path: Path to export the preset file to.
+        
+        Returns:
+            str: A message indicating the success or failure of exporting the UI layout preset.
         """
+        # Log the attempt to export a layout preset
+        logger.debug(f"Attempting to export UI layout preset '{preset_name}' to '{export_path}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = export_layout_preset(preset_name, export_path, layout_type="ui")
         if result:
+            logger.info(f"Successfully exported UI layout preset '{preset_name}' to '{export_path}'")
             return f"Successfully exported layout preset '{preset_name}' to {export_path}"
         else:
+            logger.error(f"Failed to export UI layout preset '{preset_name}'")
             return f"Failed to export layout preset '{preset_name}'"
 
     @mcp.tool()
     def import_layout_preset_tool(import_path: str, preset_name: str = None) -> str:
-        """
-        Import a layout preset from a file.
+        """Import a layout preset from a file.
         
         Args:
-            import_path: Path to the preset file to import
-            preset_name: Name to save the imported preset as (uses filename if None)
+            import_path: Path to the preset file to import.
+            preset_name: Name to save the imported preset as. Uses filename if None.
+        
+        Returns:
+            str: A message indicating the success or failure of importing the UI layout preset.
         """
+        # Log the attempt to import a layout preset
+        logger.debug(f"Attempting to import UI layout preset from '{import_path}' as '{preset_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = import_layout_preset(import_path, preset_name, layout_type="ui")
@@ -4220,100 +5583,147 @@ def register_mcp_resources(mcp: FastMCP):
             preset_name = os.path.splitext(os.path.basename(import_path))[0]
             
         if result:
+            logger.info(f"Successfully imported UI layout preset as '{preset_name}'")
             return f"Successfully imported layout preset as '{preset_name}'"
         else:
+            logger.error(f"Failed to import UI layout preset from '{import_path}'")
             return f"Failed to import layout preset from {import_path}"
 
     @mcp.tool()
     def delete_layout_preset_tool(preset_name: str) -> str:
-        """
-        Delete a layout preset.
+        """Delete a layout preset.
         
         Args:
-            preset_name: Name of the preset to delete
+            preset_name: Name of the preset to delete.
+        
+        Returns:
+            str: A message indicating the success or failure of deleting the UI layout preset.
         """
+        # Log the attempt to delete a layout preset
+        logger.debug(f"Attempting to delete UI layout preset '{preset_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = delete_layout_preset(preset_name, layout_type="ui")
         if result:
+            logger.info(f"Successfully deleted UI layout preset '{preset_name}'")
             return f"Successfully deleted layout preset '{preset_name}'"
         else:
+            logger.error(f"Failed to delete UI layout preset '{preset_name}'")
             return f"Failed to delete layout preset '{preset_name}'"
-
-    # ------------------
-    # App Control
-    # ------------------
 
     @mcp.resource("resolve://app/state")
     def get_app_state_endpoint() -> Dict[str, Any]:
-        """Get DaVinci Resolve application state information."""
+        """Get DaVinci Resolve application state information.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the current application state information,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch application state
+        logger.debug("Fetching DaVinci Resolve application state")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "connected": False}
         
-        return get_app_state(resolve)
+        result = get_app_state(resolve)
+        logger.info("Successfully retrieved DaVinci Resolve application state")
+        return result
 
     @mcp.tool()
     def quit_app(force: bool = False, save_project: bool = True) -> str:
-        """
-        Quit DaVinci Resolve application.
+        """Quit DaVinci Resolve application.
         
         Args:
-            force: Whether to force quit even if unsaved changes (potentially dangerous)
-            save_project: Whether to save the project before quitting
+            force: Whether to force quit even if there are unsaved changes (potentially dangerous). Defaults to False.
+            save_project: Whether to save the project before quitting. Defaults to True.
+        
+        Returns:
+            str: A message indicating the success or failure of the quit operation.
         """
+        # Log the attempt to quit the application
+        logger.debug(f"Attempting to quit DaVinci Resolve (force={force}, save_project={save_project})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = quit_resolve_app(resolve, force, save_project)
         
         if result:
+            logger.info("DaVinci Resolve quit command sent successfully")
             return "DaVinci Resolve quit command sent successfully"
         else:
+            logger.error("Failed to quit DaVinci Resolve")
             return "Failed to quit DaVinci Resolve"
 
     @mcp.tool()
     def restart_app(wait_seconds: int = 5) -> str:
-        """
-        Restart DaVinci Resolve application.
+        """Restart DaVinci Resolve application.
         
         Args:
-            wait_seconds: Seconds to wait between quit and restart
+            wait_seconds: Seconds to wait between quit and restart. Defaults to 5.
+        
+        Returns:
+            str: A message indicating the success or failure of the restart operation.
         """
+        # Log the attempt to restart the application
+        logger.debug(f"Attempting to restart DaVinci Resolve with {wait_seconds} seconds wait")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = restart_resolve_app(resolve, wait_seconds)
         
         if result:
+            logger.info("DaVinci Resolve restart initiated successfully")
             return "DaVinci Resolve restart initiated successfully"
         else:
+            logger.error("Failed to restart DaVinci Resolve")
             return "Failed to restart DaVinci Resolve"
 
     @mcp.tool()
     def open_settings() -> str:
-        """Open the Project Settings dialog in DaVinci Resolve."""
+        """Open the Project Settings dialog in DaVinci Resolve.
+        
+        Returns:
+            str: A message indicating the success or failure of opening the Project Settings dialog.
+        """
+        # Log the attempt to open project settings
+        logger.debug("Attempting to open Project Settings dialog")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = open_project_settings(resolve)
         
         if result:
+            logger.info("Project Settings dialog opened successfully")
             return "Project Settings dialog opened successfully"
         else:
+            logger.error("Failed to open Project Settings dialog")
             return "Failed to open Project Settings dialog"
 
     @mcp.tool()
     def open_app_preferences() -> str:
-        """Open the Preferences dialog in DaVinci Resolve."""
+        """Open the Preferences dialog in DaVinci Resolve.
+        
+        Returns:
+            str: A message indicating the success or failure of opening the Preferences dialog.
+        """
+        # Log the attempt to open preferences
+        logger.debug("Attempting to open Preferences dialog")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         result = open_preferences(resolve)
         
         if result:
+            logger.info("Preferences dialog opened successfully")
             return "Preferences dialog opened successfully"
         else:
+            logger.error("Failed to open Preferences dialog")
             return "Failed to open Preferences dialog"
 
     # ------------------
@@ -4322,89 +5732,171 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://cloud/projects")
     def get_cloud_projects() -> Dict[str, Any]:
-        """Get list of available cloud projects."""
+        """Get list of available cloud projects.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the list of available cloud projects,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch cloud projects
+        logger.debug("Fetching list of available cloud projects")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return get_cloud_project_list(resolve)
+        result = get_cloud_project_list(resolve)
+        logger.info(f"Retrieved cloud projects list with success: {result.get('success', False)}")
+        return result
 
     @mcp.tool()
     def create_cloud_project_tool(project_name: str, folder_path: str = None) -> Dict[str, Any]:
         """Create a new cloud project.
         
         Args:
-            project_name: Name for the new cloud project
-            folder_path: Optional path for the cloud project folder
+            project_name: Name for the new cloud project.
+            folder_path: Optional path for the cloud project folder.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the created cloud project,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to create a cloud project
+        logger.debug(f"Attempting to create cloud project '{project_name}' with folder path '{folder_path}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return create_cloud_project(resolve, project_name, folder_path)
+        result = create_cloud_project(resolve, project_name, folder_path)
+        if result.get("success", False):
+            logger.info(f"Successfully created cloud project '{project_name}'")
+        else:
+            logger.error(f"Failed to create cloud project '{project_name}': {result.get('error', 'Unknown error')}")
+        return result
 
     @mcp.tool()
     def import_cloud_project_tool(cloud_id: str, project_name: str = None) -> Dict[str, Any]:
         """Import a project from DaVinci Resolve cloud.
         
         Args:
-            cloud_id: Cloud ID or reference of the project to import
-            project_name: Optional custom name for the imported project (uses original name if None)
+            cloud_id: Cloud ID or reference of the project to import.
+            project_name: Optional custom name for the imported project. Uses original name if None.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the imported cloud project,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to import a cloud project
+        logger.debug(f"Attempting to import cloud project with ID '{cloud_id}' as '{project_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return import_cloud_project(resolve, cloud_id, project_name)
+        result = import_cloud_project(resolve, cloud_id, project_name)
+        if result.get("success", False):
+            logger.info(f"Successfully imported cloud project with ID '{cloud_id}'")
+        else:
+            logger.error(f"Failed to import cloud project with ID '{cloud_id}': {result.get('error', 'Unknown error')}")
+        return result
 
     @mcp.tool()
     def restore_cloud_project_tool(cloud_id: str, project_name: str = None) -> Dict[str, Any]:
         """Restore a project from DaVinci Resolve cloud.
         
         Args:
-            cloud_id: Cloud ID or reference of the project to restore
-            project_name: Optional custom name for the restored project (uses original name if None)
+            cloud_id: Cloud ID or reference of the project to restore.
+            project_name: Optional custom name for the restored project. Uses original name if None.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the restored cloud project,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to restore a cloud project
+        logger.debug(f"Attempting to restore cloud project with ID '{cloud_id}' as '{project_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return restore_cloud_project(resolve, cloud_id, project_name)
+        result = restore_cloud_project(resolve, cloud_id, project_name)
+        if result.get("success", False):
+            logger.info(f"Successfully restored cloud project with ID '{cloud_id}'")
+        else:
+            logger.error(f"Failed to restore cloud project with ID '{cloud_id}': {result.get('error', 'Unknown error')}")
+        return result
 
     @mcp.tool()
     def export_project_to_cloud_tool(project_name: str = None) -> Dict[str, Any]:
         """Export current or specified project to DaVinci Resolve cloud.
         
         Args:
-            project_name: Optional name of project to export (uses current project if None)
+            project_name: Optional name of project to export. Uses current project if None.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the exported cloud project,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to export a project to the cloud
+        logger.debug(f"Attempting to export project '{project_name}' to DaVinci Resolve cloud")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return export_project_to_cloud(resolve, project_name)
+        result = export_project_to_cloud(resolve, project_name)
+        if result.get("success", False):
+            logger.info(f"Successfully exported project '{project_name}' to cloud")
+        else:
+            logger.error(f"Failed to export project '{project_name}' to cloud: {result.get('error', 'Unknown error')}")
+        return result
 
     @mcp.tool()
     def add_user_to_cloud_project_tool(cloud_id: str, user_email: str, permissions: str = "viewer") -> Dict[str, Any]:
         """Add a user to a cloud project with specified permissions.
         
         Args:
-            cloud_id: Cloud ID of the project
-            user_email: Email of the user to add
-            permissions: Permission level (viewer, editor, admin)
+            cloud_id: Cloud ID of the project.
+            user_email: Email of the user to add.
+            permissions: Permission level for the user. Options: 'viewer', 'editor', 'admin'. Defaults to 'viewer'.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the user addition operation,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to add a user to a cloud project
+        logger.debug(f"Attempting to add user '{user_email}' to cloud project '{cloud_id}' with permissions '{permissions}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return add_user_to_cloud_project(resolve, cloud_id, user_email, permissions)
+        result = add_user_to_cloud_project(resolve, cloud_id, user_email, permissions)
+        if result.get("success", False):
+            logger.info(f"Successfully added user '{user_email}' to cloud project '{cloud_id}'")
+        else:
+            logger.error(f"Failed to add user '{user_email}' to cloud project '{cloud_id}': {result.get('error', 'Unknown error')}")
+        return result
 
     @mcp.tool()
     def remove_user_from_cloud_project_tool(cloud_id: str, user_email: str) -> Dict[str, Any]:
         """Remove a user from a cloud project.
         
         Args:
-            cloud_id: Cloud ID of the project
-            user_email: Email of the user to remove
+            cloud_id: Cloud ID of the project.
+            user_email: Email of the user to remove.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the user removal operation,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to remove a user from a cloud project
+        logger.debug(f"Attempting to remove user '{user_email}' from cloud project '{cloud_id}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve", "success": False}
         
-        return remove_user_from_cloud_project(resolve, cloud_id, user_email)
+        result = remove_user_from_cloud_project(resolve, cloud_id, user_email)
+        if result.get("success", False):
+            logger.info(f"Successfully removed user '{user_email}' from cloud project '{cloud_id}'")
+        else:
+            logger.error(f"Failed to remove user '{user_email}' from cloud project '{cloud_id}': {result.get('error', 'Unknown error')}")
+        return result
 
     # ------------------
     # Project Properties
@@ -4412,39 +5904,61 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://project/properties")
     def get_project_properties_endpoint() -> Dict[str, Any]:
-        """Get all project properties for the current project."""
+        """Get all project properties for the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing all properties of the current project,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch project properties
+        logger.debug("Fetching all project properties")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return get_all_project_properties(current_project)
+        result = get_all_project_properties(current_project)
+        logger.info("Successfully retrieved project properties")
+        return result
 
     @mcp.resource("resolve://project/property/{property_name}")
     def get_project_property_endpoint(property_name: str) -> Dict[str, Any]:
         """Get a specific project property value.
         
         Args:
-            property_name: Name of the property to get
+            property_name: Name of the property to retrieve.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the specified project property value,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to fetch a specific project property
+        logger.debug(f"Fetching project property '{property_name}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
         value = get_project_property(current_project, property_name)
+        logger.info(f"Successfully retrieved project property '{property_name}'")
         return {property_name: value}
 
     @mcp.tool()
@@ -4452,105 +5966,157 @@ def register_mcp_resources(mcp: FastMCP):
         """Set a project property value.
         
         Args:
-            property_name: Name of the property to set
-            property_value: Value to set for the property
+            property_name: Name of the property to set.
+            property_value: Value to set for the property.
+        
+        Returns:
+            str: A message indicating the success or failure of setting the project property.
         """
+        # Log the attempt to set a project property
+        logger.debug(f"Attempting to set project property '{property_name}' to '{property_value}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         result = set_project_property(current_project, property_name, property_value)
         
         if result:
+            logger.info(f"Successfully set project property '{property_name}' to '{property_value}'")
             return f"Successfully set project property '{property_name}' to '{property_value}'"
         else:
+            logger.error(f"Failed to set project property '{property_name}'")
             return f"Failed to set project property '{property_name}'"
 
     @mcp.resource("resolve://project/timeline-format")
     def get_timeline_format() -> Dict[str, Any]:
-        """Get timeline format settings for the current project."""
+        """Get timeline format settings for the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the timeline format settings (resolution, frame rate, interlaced status),
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch timeline format settings
+        logger.debug("Fetching timeline format settings")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return get_timeline_format_settings(current_project)
+        result = get_timeline_format_settings(current_project)
+        logger.info("Successfully retrieved timeline format settings")
+        return result
 
     @mcp.tool()
     def set_timeline_format_tool(width: int, height: int, frame_rate: float, interlaced: bool = False) -> str:
         """Set timeline format (resolution and frame rate).
         
         Args:
-            width: Timeline width in pixels
-            height: Timeline height in pixels
-            frame_rate: Timeline frame rate
-            interlaced: Whether the timeline should use interlaced processing
+            width: Timeline width in pixels.
+            height: Timeline height in pixels.
+            frame_rate: Timeline frame rate.
+            interlaced: Whether the timeline should use interlaced processing. Defaults to False.
+        
+        Returns:
+            str: A message indicating the success or failure of setting the timeline format.
         """
+        # Log the attempt to set timeline format
+        logger.debug(f"Attempting to set timeline format to {width}x{height} at {frame_rate} fps (interlaced={interlaced})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         result = set_timeline_format(current_project, width, height, frame_rate, interlaced)
         
         if result:
             interlace_status = "interlaced" if interlaced else "progressive"
+            logger.info(f"Successfully set timeline format to {width}x{height} at {frame_rate} fps ({interlace_status})")
             return f"Successfully set timeline format to {width}x{height} at {frame_rate} fps ({interlace_status})"
         else:
+            logger.error("Failed to set timeline format")
             return "Failed to set timeline format"
 
     @mcp.resource("resolve://project/superscale")
     def get_superscale_settings_endpoint() -> Dict[str, Any]:
-        """Get SuperScale settings for the current project."""
+        """Get SuperScale settings for the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the SuperScale settings (enabled status and quality),
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch SuperScale settings
+        logger.debug("Fetching SuperScale settings")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return get_superscale_settings(current_project)
+        result = get_superscale_settings(current_project)
+        logger.info("Successfully retrieved SuperScale settings")
+        return result
 
     @mcp.tool()
     def set_superscale_settings_tool(enabled: bool, quality: int = 0) -> str:
         """Set SuperScale settings for the current project.
         
         Args:
-            enabled: Whether SuperScale is enabled
-            quality: SuperScale quality (0=Auto, 1=Better Quality, 2=Smoother)
+            enabled: Whether SuperScale is enabled.
+            quality: SuperScale quality setting. Options: 0 (Auto), 1 (Better Quality), 2 (Smoother). Defaults to 0.
+        
+        Returns:
+            str: A message indicating the success or failure of setting the SuperScale settings.
         """
+        # Log the attempt to set SuperScale settings
+        logger.debug(f"Attempting to set SuperScale settings (enabled={enabled}, quality={quality})")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         quality_names = {
@@ -4564,49 +6130,73 @@ def register_mcp_resources(mcp: FastMCP):
         if result:
             status = "enabled" if enabled else "disabled"
             quality_name = quality_names.get(quality, "Unknown")
+            logger.info(f"Successfully {status} SuperScale with quality set to {quality_name}")
             return f"Successfully {status} SuperScale with quality set to {quality_name}"
         else:
+            logger.error("Failed to set SuperScale settings")
             return "Failed to set SuperScale settings"
 
     @mcp.resource("resolve://project/color-settings")
     def get_color_settings_endpoint() -> Dict[str, Any]:
-        """Get color science and color space settings for the current project."""
+        """Get color science and color space settings for the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the color science and color space settings,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch color settings
+        logger.debug("Fetching color science and color space settings")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return get_color_settings(current_project)
+        result = get_color_settings(current_project)
+        logger.info("Successfully retrieved color settings")
+        return result
 
     @mcp.tool()
     def set_color_science_mode_tool(mode: str) -> str:
         """Set color science mode for the current project.
         
         Args:
-            mode: Color science mode ('YRGB', 'YRGB Color Managed', 'ACEScct', or numeric value)
+            mode: Color science mode to set. Options: 'YRGB', 'YRGB Color Managed', 'ACEScct', or numeric value.
+        
+        Returns:
+            str: A message indicating the success or failure of setting the color science mode.
         """
+        # Log the attempt to set color science mode
+        logger.debug(f"Attempting to set color science mode to '{mode}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         result = set_color_science_mode(current_project, mode)
         
         if result:
+            logger.info(f"Successfully set color science mode to '{mode}'")
             return f"Successfully set color science mode to '{mode}'"
         else:
+            logger.error(f"Failed to set color science mode to '{mode}'")
             return f"Failed to set color science mode to '{mode}'"
 
     @mcp.tool()
@@ -4614,61 +6204,96 @@ def register_mcp_resources(mcp: FastMCP):
         """Set timeline color space and gamma.
         
         Args:
-            color_space: Timeline color space (e.g., 'Rec.709', 'DCI-P3 D65', 'Rec.2020')
-            gamma: Timeline gamma (e.g., 'Rec.709 Gamma', 'Gamma 2.4')
+            color_space: Timeline color space to set (e.g., 'Rec.709', 'DCI-P3 D65', 'Rec.2020').
+            gamma: Optional timeline gamma to set (e.g., 'Rec.709 Gamma', 'Gamma 2.4').
+        
+        Returns:
+            str: A message indicating the success or failure of setting the timeline color space and gamma.
         """
+        # Log the attempt to set color space and gamma
+        logger.debug(f"Attempting to set timeline color space to '{color_space}' with gamma '{gamma}'")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return "Error: Failed to get Project Manager"
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return "Error: No project currently open"
         
         result = set_color_space(current_project, color_space, gamma)
         
         if result:
             if gamma:
+                logger.info(f"Successfully set timeline color space to '{color_space}' with gamma '{gamma}'")
                 return f"Successfully set timeline color space to '{color_space}' with gamma '{gamma}'"
             else:
+                logger.info(f"Successfully set timeline color space to '{color_space}'")
                 return f"Successfully set timeline color space to '{color_space}'"
         else:
+            logger.error("Failed to set timeline color space")
             return "Failed to set timeline color space"
 
     @mcp.resource("resolve://project/metadata")
     def get_project_metadata_endpoint() -> Dict[str, Any]:
-        """Get metadata for the current project."""
+        """Get metadata for the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the metadata of the current project,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch project metadata
+        logger.debug("Fetching project metadata")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return get_project_metadata(current_project)
+        result = get_project_metadata(current_project)
+        logger.info("Successfully retrieved project metadata")
+        return result
 
     @mcp.resource("resolve://project/info")
     def get_project_info_endpoint() -> Dict[str, Any]:
-        """Get comprehensive information about the current project."""
+        """Get comprehensive information about the current project.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing comprehensive information about the current project,
+                           or an error dictionary if the operation fails.
+        """
+        # Log the attempt to fetch project info
+        logger.debug("Fetching comprehensive project information")
         if resolve is None:
+            logger.error("Not connected to DaVinci Resolve")
             return {"error": "Not connected to DaVinci Resolve"}
         
         project_manager = resolve.GetProjectManager()
         if not project_manager:
+            logger.error("Failed to get Project Manager")
             return {"error": "Failed to get Project Manager"}
         
         current_project = project_manager.GetCurrentProject()
         if not current_project:
+            logger.info("No project currently open")
             return {"error": "No project currently open"}
         
-        return get_project_info(current_project)
+        result = get_project_info(current_project)
+        logger.info("Successfully retrieved comprehensive project information")
+        return result
 
     # ------------------
     # AI Agent Tools
@@ -4676,26 +6301,24 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.tool()
     async def agent_process_request(request: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        Process a natural language request using the AI agent.
+        """Process a natural language request using the AI agent.
         
-        The agent will analyze your request, create a plan, and execute it automatically.
-        It can handle complex tasks like:
-        - Creating and managing projects and timelines
-        - Importing and organizing media
-        - Applying color grades and effects
-        - Analyzing video content
-        - And much more!
+        The agent analyzes the request, creates a plan, and executes it automatically.
+        It can handle complex tasks such as creating and managing projects, importing media,
+        applying color grades, and analyzing video content.
         
         Args:
-            request: Natural language description of what you want to do
-            context: Optional additional context for the request
-            
+            request: Natural language description of the task to perform.
+            context: Optional additional context for the request.
+        
         Returns:
-            Dict with execution results and actions taken
+            Dict[str, Any]: A dictionary containing execution results and actions taken,
+                           or an error dictionary if the operation fails.
         """
+        # Log the attempt to process the agent request
         logger.info(f"Processing agent request: {request}, context: {context}")
         if agent is None:
+            logger.error("AI Agent not initialized. Please check DaVinci Resolve connection.")
             return {
                 "success": False,
                 "error": "AI Agent not initialized. Please check DaVinci Resolve connection."
@@ -4703,6 +6326,7 @@ def register_mcp_resources(mcp: FastMCP):
         
         try:
             result = await agent.process_request(request, context)
+            logger.info(f"Successfully processed agent request: {request}")
             return result
         except Exception as e:
             logger.error(f"Error processing agent request: {str(e)}")
@@ -4713,25 +6337,27 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.tool()
     async def agent_analyze_video(video_path: str, analysis_type: str = "general") -> Dict[str, Any]:
-        """
-        Analyze video content using AI vision models.
+        """Analyze video content using AI vision models.
         
-        Analysis types:
-        - general: Overall content description and quality metrics
-        - color: Color analysis including dominant colors, temperature, brightness
-        - composition: Rule of thirds, leading lines, focal points
-        - motion: Motion intensity, camera movement, shake detection
-        - scene: Scene detection and classification
+        Supported analysis types:
+        - general: Overall content description and quality metrics.
+        - color: Color analysis including dominant colors, temperature, brightness.
+        - composition: Rule of thirds, leading lines, focal points.
+        - motion: Motion intensity, camera movement, shake detection.
+        - scene: Scene detection and classification.
         
         Args:
-            video_path: Path to video file or "current_timeline" for current timeline
-            analysis_type: Type of analysis to perform
-            
+            video_path: Path to the video file or "current_timeline" for the current timeline.
+            analysis_type: Type of analysis to perform. Defaults to "general".
+        
         Returns:
-            Analysis results based on the requested type
+            Dict[str, Any]: A dictionary containing analysis results based on the requested type,
+                           or an error dictionary if the operation fails.
         """
-        logger.info("Starting video analysis, video_path: %s, analysis_type: %s", video_path, analysis_type)
+        # Log the attempt to analyze video
+        logger.info(f"Starting video analysis, video_path: {video_path}, analysis_type: {analysis_type}")
         if agent is None:
+            logger.error("AI Agent not initialized. Please check DaVinci Resolve connection.")
             return {
                 "success": False,
                 "error": "AI Agent not initialized. Please check DaVinci Resolve connection."
@@ -4739,6 +6365,7 @@ def register_mcp_resources(mcp: FastMCP):
         
         try:
             result = await agent.analyze_video(video_path, analysis_type)
+            logger.info(f"Successfully analyzed video: {video_path} with type: {analysis_type}")
             return result
         except Exception as e:
             logger.error(f"Error analyzing video: {str(e)}")
@@ -4749,23 +6376,26 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.tool()
     async def agent_get_documentation(topic: str) -> str:
-        """
-        Get DaVinci Resolve documentation on a specific topic.
+        """Get DaVinci Resolve documentation on a specific topic.
         
-        The agent has a built-in knowledge base about DaVinci Resolve operations.
+        The agent provides access to a built-in knowledge base about DaVinci Resolve operations.
         
         Args:
-            topic: The topic or command to get documentation for
-            
+            topic: The topic or command to retrieve documentation for.
+        
         Returns:
-            Relevant documentation and examples
+            str: Documentation and examples for the specified topic,
+                 or an error message if the operation fails.
         """
+        # Log the attempt to fetch documentation
         logger.info(f"Getting documentation for topic: {topic}")
         if agent is None:
+            logger.error("AI Agent not initialized. Please check DaVinci Resolve connection.")
             return "AI Agent not initialized. Please check DaVinci Resolve connection."
         
         try:
             result = await agent.get_documentation(topic)
+            logger.info(f"Successfully retrieved documentation for topic: {topic}")
             return result
         except Exception as e:
             logger.error(f"Error getting documentation: {str(e)}")
@@ -4773,21 +6403,23 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.tool()
     async def agent_suggest_next_actions() -> List[str]:
-        """
-        Get AI-suggested next actions based on current context.
+        """Get AI-suggested next actions based on current project context.
         
-        The agent analyzes the current state of your project and suggests
-        logical next steps you might want to take.
+        The agent analyzes the current state of the project and suggests logical next steps.
         
         Returns:
-            List of suggested actions
+            List[str]: A list of suggested actions,
+                      or a list containing an error message if the operation fails.
         """
+        # Log the attempt to suggest next actions
         logger.info("Getting AI-suggested next actions")
         if agent is None:
+            logger.error("AI Agent not initialized. Please check DaVinci Resolve connection.")
             return ["AI Agent not initialized. Please check DaVinci Resolve connection."]
         
         try:
             result = await agent.suggest_next_actions()
+            logger.info(f"Successfully retrieved {len(result)} suggested actions")
             return result
         except Exception as e:
             logger.error(f"Error getting suggestions: {str(e)}")
@@ -4795,23 +6427,26 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.tool()
     async def agent_learn_from_feedback(task_id: str, feedback: str, success: bool) -> str:
-        """
-        Provide feedback to help the AI agent learn and improve.
+        """Provide feedback to help the AI agent learn and improve.
         
         Args:
-            task_id: The ID of the task (from agent_process_request result)
-            feedback: Your feedback about what worked or didn't work
-            success: Whether the task was ultimately successful
-            
+            task_id: The ID of the task from the agent_process_request result.
+            feedback: Feedback about what worked or didn't work.
+            success: Whether the task was ultimately successful.
+        
         Returns:
-            Confirmation message
+            str: A confirmation message indicating feedback was recorded,
+                 or an error message if the operation fails.
         """
+        # Log the attempt to record feedback
         logger.info(f"Recording feedback for task {task_id}, success: {success}, feedback: {feedback}")
         if agent is None:
+            logger.error("AI Agent not initialized. Please check DaVinci Resolve connection.")
             return "AI Agent not initialized. Please check DaVinci Resolve connection."
         
         try:
             await agent.learn_from_feedback(task_id, feedback, success)
+            logger.info(f"Feedback recorded for task {task_id}")
             return "Feedback recorded. Thank you for helping improve the agent!"
         except Exception as e:
             logger.error(f"Error recording feedback: {str(e)}")
@@ -4819,8 +6454,16 @@ def register_mcp_resources(mcp: FastMCP):
 
     @mcp.resource("resolve://agent/state")
     def get_agent_state() -> Dict[str, Any]:
-        """Get the current state and statistics of the AI agent."""
+        """Get the current state and statistics of the AI agent.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing the AI agent's state and statistics,
+                           including memory statistics, or an error dictionary if the agent is not initialized.
+        """
+        # Log the attempt to fetch agent state
+        logger.info("Fetching AI agent state and statistics")
         if agent is None:
+            logger.error("AI Agent not initialized")
             return {
                 "initialized": False,
                 "error": "AI Agent not initialized"
@@ -4829,34 +6472,55 @@ def register_mcp_resources(mcp: FastMCP):
         stats = agent.state.get_statistics()
         stats["initialized"] = True
         stats["memory_stats"] = agent.memory.get_statistics()
-        
+        logger.info("Successfully retrieved AI agent state and statistics")
         return stats
 
     @mcp.resource("resolve://agent/current-task")
     def get_agent_current_task() -> Dict[str, Any]:
-        """Get information about the task currently being executed by the agent."""
+        """Get information about the task currently being executed by the agent.
+        
+        Returns:
+            Dict[str, Any]: A dictionary containing details of the current task,
+                           or a message indicating no task is being executed,
+                           or an error dictionary if the agent is not initialized.
+        """
+        # Log the attempt to fetch current task
+        logger.info("Fetching current task information from AI agent")
         if agent is None:
+            logger.error("AI Agent not initialized")
             return {
                 "error": "AI Agent not initialized"
             }
         
         current_task = agent.state.get_current_task()
         if current_task:
+            logger.info("Successfully retrieved current task information")
             return current_task
         else:
+            logger.info("No task currently being executed")
             return {
                 "message": "No task currently being executed"
             }
 
     @mcp.resource("resolve://agent/task-history")
     def get_agent_task_history() -> List[Dict[str, Any]]:
-        """Get recent task history from the AI agent."""
+        """Get recent task history from the AI agent.
+        
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries containing details of recent tasks (up to 20),
+                                 or a list with an error dictionary if the agent is not initialized.
+        """
+        # Log the attempt to fetch task history
+        logger.info("Fetching recent task history from AI agent")
         if agent is None:
+            logger.error("AI Agent not initialized")
             return [{
                 "error": "AI Agent not initialized"
             }]
         
-        return agent.state.get_task_history(limit=20)
+        result = agent.state.get_task_history(limit=20)
+        logger.info(f"Successfully retrieved task history with {len(result)} entries")
+        return result
 
 # Start the server
 if __name__ == "__main__":
