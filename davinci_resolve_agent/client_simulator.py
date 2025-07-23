@@ -1,3 +1,4 @@
+# file: client_simulator.py
 """
 MIT License
 
@@ -71,8 +72,8 @@ class ClientSimulator:
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
             async with aiohttp.ClientSession() as session:
-                logger.debug(f"Sending RPC request: {json.dumps(request, indent=2)}")
-                logger.print(f"Sending request:\n{json.dumps(request, indent=2)}")
+                logger.debug(f"Sending RPC request: {json.dumps(request, indent=2, ensure_ascii=False)}")
+                logger.print(f"Sending request:\n{json.dumps(request, indent=2, ensure_ascii=False)}")
                 async with session.post(self.rpc_url, json=request, headers=headers, timeout=self.timeout) as response:
                     logger.info(f"RPC response status: {response.status}")
                     if response.status != 200:
@@ -80,8 +81,8 @@ class ClientSimulator:
                         logger.error(error_msg)
                         return {"error": error_msg}
                     result = await response.json()
-                    logger.debug(f"RPC response: {json.dumps(result, indent=2)}")
-                    logger.print(f"Received response:\n{json.dumps(result, indent=2)}")
+                    logger.debug(f"RPC response: {json.dumps(result, indent=2, ensure_ascii=False)}")
+                    logger.print(f"Received response:\n{json.dumps(result, indent=2, ensure_ascii=False)}")
                     return result
         except asyncio.TimeoutError:
             error_msg = f"RPC request timed out after {self.timeout.total} seconds"
@@ -107,8 +108,8 @@ class ClientSimulator:
         try:
             async with aiohttp.ClientSession() as session:
                 logger.info(f"Sending stream RPC request with ID {self.request_id}")
-                logger.debug(f"Request details: {json.dumps(request, indent=2)}")
-                logger.print(f"Sending stream request:\n{json.dumps(request, indent=2)}")
+                logger.debug(f"Request details: {json.dumps(request, indent=2, ensure_ascii=False)}")
+                logger.print(f"Sending stream request:\n{json.dumps(request, indent=2, ensure_ascii=False)}")
                 async with session.post(self.stream_url, json=request, headers=headers, timeout=self.timeout) as response:
                     logger.info(f"Received stream response: status={response.status}, headers={response.headers}")
                     if response.status != 200:
@@ -122,7 +123,7 @@ class ClientSimulator:
                     if "application/json" in content_type:
                         try:
                             result = await response.json()
-                            logger.info(f"Received JSON response: {json.dumps(result, indent=2)}")
+                            logger.info(f"Received JSON response: {json.dumps(result, indent=2, ensure_ascii=False)}")
                             yield result
                             return
                         except json.JSONDecodeError as e:
@@ -166,13 +167,13 @@ class ClientSimulator:
                                                     result["result"] = {**result.get("result", {}), **part_result.get("result", {})}
                                                 if "error" in part_result:
                                                     result["error"] = part_result["error"]
-                                            logger.info(f"Parsed stream event part {i+1}: {json.dumps(part_result, indent=2)}")
+                                            logger.info(f"Parsed stream event part {i+1}: {json.dumps(part_result, indent=2, ensure_ascii=False)}")
                                         except json.JSONDecodeError as e:
                                             logger.error(f"Invalid stream event data: {part}, error: {str(e)}")
                                             yield {"error": {"message": f"Invalid stream event data: {part}, error: {str(e)}"}}
                                             continue
                                     if result:
-                                        logger.info(f"Combined stream event: {json.dumps(result, indent=2)}")
+                                        logger.info(f"Combined stream event: {json.dumps(result, indent=2, ensure_ascii=False)}")
                                         if "result" in result and result["result"].get("type") == "stream_complete":
                                             logger.info("Received stream end signal")
                                             return
@@ -231,7 +232,7 @@ class ClientSimulator:
         logger.info(f"Starting stream query processing: {query}")
         async for event in self.send_stream_request("process_query_stream", params):
             logger.info(f"Yielding stream event for query: {query}")
-            logger.debug(f"Event details: {json.dumps(event, indent=2)}")
+            logger.debug(f"Event details: {json.dumps(event, indent=2, ensure_ascii=False)}")
             yield event
         logger.info(f"Stream query processing completed: {query}")
 
@@ -378,18 +379,27 @@ class ClientSimulator:
 
     def _print_response(self, response: Dict, success_msg: str = None) -> None:
         try:
-            logger.info(f"Processing non-stream response")
-            logger.debug(f"Response details: {json.dumps(response, indent=2)}")
+            logger.info("Processing non-stream response")
+            logger.debug(f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}")
+            
             if "result" in response:
                 result = response["result"]
                 if "error" in result:
-                    logger.print(colored(f"Error: {result['error']}", "red"))
+                    msg = result["error"]
+                    decoded_msg = msg.encode().decode('unicode_escape')
+                    logger.print(colored(f"Error: {decoded_msg}", "red"))
                 else:
-                    logger.print(colored(success_msg or result["response"], "green"))
-                    if result.get("complete", False):
-                        logger.print("Task completed. Start a new query or type 'end session'.")
+                    msg = success_msg or result.get("response", "Operation successful")
+                    decoded_msg = msg.encode().decode('unicode_escape')
+                    logger.print(colored(decoded_msg, "green"))
+
+                if result.get("complete", False):
+                    logger.print("Task completed. Start a new query or type 'end session'.")
             else:
-                logger.print(colored(f"RPC Error: {response.get('error', 'Unknown error')}", "red"))
+                msg = response.get("error", "Unknown error")
+                decoded_msg = msg.encode().decode('unicode_escape')
+                logger.print(colored(f"RPC Error: {decoded_msg}", "red"))
+
         except json.JSONDecodeError as e:
             logger.error(f"Failed to decode JSON response: {str(e)}")
             logger.print(colored(f"Error decoding response: {str(e)}", "red"))
@@ -399,10 +409,11 @@ class ClientSimulator:
         finally:
             logger.info("Response processing completed")
 
+
     def _print_stream_response(self, response: Dict) -> None:
         try:
             logger.info(f"Processing stream response")
-            # logger.debug(f"Response details: {json.dumps(response, indent=2)}")
+            # logger.debug(f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}")
             
             # Check if the response is a JSON-RPC error response
             if "jsonrpc" in response and "error" in response:
@@ -412,7 +423,7 @@ class ClientSimulator:
                 logger.error(f"JSON-RPC error (ID: {request_id}): {error_message}")
                 logger.print(colored(f"Error (Request ID: {request_id}): {error_message}", "red"))
                 # Suggest starting a new session if the error is about an invalid session
-                if "无效的会话" in error_message or "No active session" in error_message:
+                if "Invalid session" in error_message or "No active session" in error_message:
                     logger.print(colored("Please use 'start session' to begin a new session.", "yellow"))
                 return
 
@@ -422,18 +433,27 @@ class ClientSimulator:
                 event_type = result.get("type", "unknown")
                 content = result.get("content")
                 try:
-                    parsed_content = json.loads(content) if isinstance(content, str) else content
-                    if isinstance(parsed_content, dict) and "results" in parsed_content:
-                        for item in parsed_content.get("results", []):
-                            if "result" in item and "content" in item["result"]:
-                                try:
-                                    item["result"]["content"] = json.loads(item["result"]["content"])
-                                except json.JSONDecodeError:
-                                    pass
-                    content_display = json.dumps(parsed_content, indent=2, ensure_ascii=False)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Failed to decode JSON content: {content} e: {str(e)}")
-                    content_display = content
+                    # Parse content if it's JSON, otherwise use as-is
+                    if isinstance(content, str):
+                        try:
+                            parsed_content = json.loads(content)
+                            if isinstance(parsed_content, dict) and "results" in parsed_content:
+                                for item in parsed_content.get("results", []):
+                                    if "result" in item and "content" in item["result"]:
+                                        try:
+                                            item["result"]["content"] = json.loads(item["result"]["content"])
+                                        except json.JSONDecodeError:
+                                            pass
+                            content_display = json.dumps(parsed_content, indent=2, ensure_ascii=False)
+                        except json.JSONDecodeError:
+                            # If not JSON, use raw string and replace \n with actual newlines
+                            content_display = content.replace("\\n", "\n").replace("\\t", "\t")
+                    else:
+                        content_display = str(content)
+                except Exception as e:
+                    logger.error(f"Failed to process content: {str(e)}")
+                    content_display = str(content) if content else "No content"
+
                 if event_type == "message":
                     logger.print(colored(f"[Message] {content_display}", "blue"))
                 elif event_type == "data":
@@ -441,9 +461,15 @@ class ClientSimulator:
                 elif event_type == "run_item":
                     logger.print(colored(f"[RunItem] {content_display}", "yellow"))
                 elif event_type == "agent_updated":
-                    logger.print(colored(f"[Agent] {content}", "magenta"))
+                    logger.print(colored(f"[Agent] {content_display}", "magenta"))
                 elif event_type == "final":
-                    logger.print(colored(f"[Final] {json.dumps(result['response'], indent=2)}", "green"))
+                    # Display raw content with newlines instead of JSON format
+                    final_content = result.get("response", content_display)
+                    if isinstance(final_content, str):
+                        final_display = final_content.replace("\\n", "\n").replace("\\t", "\t")
+                    else:
+                        final_display = str(final_content)
+                    logger.print(colored(f"[Final] {final_display}", "green"))
                 elif event_type == "stream_complete":
                     logger.print(colored("[Stream Complete]", "green"))
                 if result.get("complete", False):
