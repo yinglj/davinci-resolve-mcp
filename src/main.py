@@ -82,9 +82,7 @@ def run_server(debug=False, port=8020, mode="streamable-http"):
         return 1
     
     # Run the server with the specified mode
-    logger.info(f"Starting DaVinci Resolve MCP Server in {mode} mode...")
-    mcp.run(transport=mode, mount_path="/mcp" if mode == "streamable-http" else None)
-
+    logger.print(f"Starting DaVinci Resolve MCP Server in {mode} mode...")
     # Log IP addresses for streamable-http mode
     if mode == "streamable-http":
         ip_list = get_all_ip_addresses()
@@ -92,8 +90,10 @@ def run_server(debug=False, port=8020, mode="streamable-http"):
             logger.error(ip_list)
         else:
             for interface, ip in ip_list:
-                logger.info(f"http://{ip}:{port}/mcp")
+                logger.print(f"http://{ip}:{port}/mcp")
     
+    mcp.run(transport=mode, mount_path="/mcp" if mode == "streamable-http" else None)
+
     return 0
 
 def main():

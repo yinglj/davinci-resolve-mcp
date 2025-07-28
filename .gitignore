@@ -95,4 +95,7 @@ logs/*
 *_backup/
 
 # Cursor
-.cursor/ 
+.cursor/
+
+tmp/
+knowledge/

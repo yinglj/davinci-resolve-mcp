@@ -10,10 +10,15 @@ from mcp_agents import create_multi_agent, run_multimcp_agent, run_multimcp_agen
 from anyio import ClosedResourceError
 import io
 from contextlib import redirect_stdout
-from configure import load_server_config
+from configure import load_server_config, load_knowledge_config, load_embedder_config, get_llm_preference
 from agno.tools.mcp import MultiMCPTools
 from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
+from agno.vectordb.lancedb import LanceDb
+from agno.knowledge.pdf_bytes import PDFBytesKnowledgeBase
+from agno.embedder.ollama import OllamaEmbedder
+from agno.embedder.openai import OpenAIEmbedder
+import pyarrow as pa
 
 logger.debug("Loading query_processor module")
 
@@ -22,17 +27,95 @@ class QueryProcessor:
         logger.debug("Initializing QueryProcessor")
         self.agent = None
         self.sessions: Dict[str, Dict] = {}
+        self.vector_db = None
+        self.knowledge_base = None
+        self.server_name = None  # Add to track the active server
 
-    async def initialize(self) -> None:
-        logger.info("Starting initialization of QueryProcessor")
+    async def initialize(self, server_name: str = "Davinci_resolve") -> None:
+        """
+        Initialize QueryProcessor with a specific server configuration.
+
+        Args:
+            server_name (str): The name of the server to initialize for.
+        """
+        self.server_name = server_name
+        logger.info(f"Starting initialization of QueryProcessor for server: {server_name}")
         try:
+            # Load embedder configuration
+            embedder_type, embedder_model, dimensions = load_embedder_config(server_name)
+            if embedder_type == "ollama":
+                embedder = OllamaEmbedder(id=embedder_model, dimensions=dimensions)
+            elif embedder_type == "openai":
+                embedder = OpenAIEmbedder(model=embedder_model, dimensions=dimensions)
+            else:
+                logger.error(f"Unsupported embedder type {embedder_type} for server {server_name}, using default Ollama")
+                embedder = OllamaEmbedder(id=embedder_model, dimensions=dimensions)
+
+            self.vector_db = LanceDb(
+                table_name="knowledge_base",
+                uri="tmp/lancedb",
+                embedder=embedder,
+            )
+            logger.info(f"LanceDb initialized successfully with embedder: type={embedder_type}, model={embedder_model}, dimensions={dimensions}")
+
+            # Load knowledge files specific to the server
+            knowledge_files = load_knowledge_config(server_name)
+            logger.info(f"Loaded knowledge files for {server_name}: {knowledge_files}")
+            if not knowledge_files:
+                logger.warning(f"No knowledge files loaded for {server_name}, proceeding without knowledge base")
+            else:
+                knowledge_docs = []
+                for file_path in knowledge_files:
+                    if file_path.endswith(('.pdf', '.PDF')):
+                        # Handle PDF files
+                        with open(file_path, "rb") as f:
+                            pdf_bytes = f.read()
+                        knowledge_docs.append(pdf_bytes)
+                    elif file_path.endswith(('.md', '.txt')):
+                        # Handle Markdown and Text files
+                        with open(file_path, "r", encoding="utf-8") as f:
+                            text = f.read()
+                        knowledge_docs.append(text)  # Simplified for now
+                    else:
+                        logger.warning(f"Unsupported file type: {file_path}")
+
+                if knowledge_docs:
+                    logger.info(f"Loaded {len(knowledge_docs)} documents from knowledge files for {server_name}")
+                    self.knowledge_base = PDFBytesKnowledgeBase(
+                        pdfs=[doc for doc in knowledge_docs if isinstance(doc, bytes)],
+                        vector_db=self.vector_db,
+                    )
+                    logger.info("Knowledge base initialized with PDF bytes")
+                    try:
+                        await self.knowledge_base.aload(recreate=False)
+                        logger.info(f"Knowledge base loaded with {len(knowledge_docs)} documents for {server_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to load knowledge base for {server_name}: {str(e)}. Attempting to recreate...")
+                        await self.knowledge_base.aload(recreate=True)
+                        logger.info(f"Knowledge base recreated and loaded successfully for {server_name}")
+
+            # Initialize multi-agent
             self.agent = await create_multi_agent()
             if not self.agent:
-                logger.warning("No valid agent found, query functionality may be limited")
+                logger.warning(f"No valid agent found for {server_name}, query functionality may be limited")
             else:
-                logger.info(f"QueryProcessor initialization successful, agent: {self.agent.name}")
+                logger.info(f"QueryProcessor initialization successful for {server_name}, agent: {self.agent.name}")
+                if self.knowledge_base:
+                    self.agent.knowledge = self.knowledge_base
+                    self.agent.search_knowledge = True
+                    logger.info(f"Agent configured with knowledge base for {server_name}")
+
+            # Set model based on LLM preference
+            llm_preference = get_llm_preference()
+            if llm_preference == "ollama" and isinstance(self.agent.model, Ollama):
+                logger.info(f"Using Ollama model for {server_name} as per configuration")
+            elif llm_preference == "openai" and isinstance(self.agent.model, OpenAIChat):
+                logger.info(f"Using OpenAI model for {server_name} as per configuration")
+            else:
+                logger.warning(f"LLM preference {llm_preference} does not match agent model, using default Ollama")
+                self.agent.model = Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest")
         except Exception as e:
-            logger.error(f"QueryProcessor initialization failed: {str(e)}")
+            logger.error(f"QueryProcessor initialization failed for {server_name}: {str(e)}")
             self.agent = None
             raise
 
@@ -43,25 +126,25 @@ class QueryProcessor:
             "context": {"history": []},
             "starting_agent": self.agent,
         }
-        logger.info(f"Starting session: {session_id}")
+        logger.info(f"Starting session: {session_id} for server {self.server_name}")
         return session_id
 
     def is_session_valid(self, session_id: str) -> bool:
         valid = session_id in self.sessions
-        logger.info(f"Session validation {session_id}: {'valid' if valid else 'invalid'}")
+        logger.info(f"Session validation {session_id} for server {self.server_name}: {'valid' if valid else 'invalid'}")
         return valid
 
     async def process_query(self, session_id: str, query: str) -> Dict[str, object]:
         if session_id not in self.sessions:
-            logger.error(f"Session does not exist: {session_id}")
+            logger.error(f"Session does not exist: {session_id} for server {self.server_name}")
             return {"error": "Session does not exist", "session_id": session_id}
         if not self.agent:
-            logger.error("Agent not initialized")
+            logger.error(f"Agent not initialized for server {self.server_name}")
             return {"error": "Agent not initialized", "session_id": session_id}
         session = self.sessions[session_id]
         session["history"].append({"query": query})
         session["context"]["history"].append({"query": query})
-        logger.info(f"Processing non-streaming query: {query}, session: {session_id}")
+        logger.info(f"Processing non-streaming query: {query}, session: {session_id} for server {self.server_name}")
 
         try:
             response = await run_multimcp_agent(query, stream=True)
@@ -71,35 +154,35 @@ class QueryProcessor:
                 "complete": True
             }
         except asyncio.CancelledError as e:
-            logger.error(f"Non-streaming query cancelled, session {session_id}: {str(e)}")
+            logger.error(f"Non-streaming query cancelled, session {session_id} for server {self.server_name}: {str(e)}")
             return {"error": f"Query cancelled: {str(e)}", "session_id": session_id}
         except Exception as e:
             if isinstance(e, ClosedResourceError):
-                logger.info(f"Detected ClosedResourceError, attempting reinitialization, session {session_id}")
+                logger.info(f"Detected ClosedResourceError, attempting reinitialization, session {session_id} for server {self.server_name}")
                 try:
                     await self.reinitialize()
                     return {"error": "Server resources closed, attempted reinitialization, please retry query", "session_id": session_id}
                 except Exception as reinit_e:
-                    logger.error(f"Reinitialization failed: {str(reinit_e)}")
+                    logger.error(f"Reinitialization failed for server {self.server_name}: {str(reinit_e)}")
                     return {"error": f"Reinitialization failed: {str(reinit_e)}", "session_id": session_id}
-            logger.error(f"Query processing error, session {session_id}: type={type(e).__name__}, message={str(e)}")
+            logger.error(f"Query processing error, session {session_id} for server {self.server_name}: type={type(e).__name__}, message={str(e)}")
             return {"error": f"Query processing failed: {str(e) or 'Unknown error'}", "session_id": session_id}
 
     async def reinitialize(self) -> None:
-        logger.info("Start reinitialization of QueryProcessor")
+        logger.info(f"Start reinitialization of QueryProcessor for server {self.server_name}")
         try:
             self.agent = None
-            self.agent = await create_multi_agent()
-            if not self.agent:
-                logger.warning("Reinitialization failed: no valid agent")
+            self.vector_db = None
+            self.knowledge_base = None
+            await self.initialize(self.server_name)
             for session in self.sessions.values():
                 session["starting_agent"] = self.agent
-            logger.info(f"QueryProcessor reinitialization succeeded, agent: {self.agent.name if self.agent else 'none'}")
+            logger.info(f"QueryProcessor reinitialization succeeded for server {self.server_name}, agent: {self.agent.name if self.agent else 'none'}")
         except asyncio.CancelledError:
-            logger.warning("QueryProcessor was reinitialization cancelled")
+            logger.warning(f"QueryProcessor reinitialization cancelled for server {self.server_name}")
             raise
         except Exception as e:
-            logger.error(f"QueryProcessor reinitialization failed: {str(e)}")
+            logger.error(f"QueryProcessor reinitialization failed for server {self.server_name}: {str(e)}")
             self.agent = None
             raise
 
@@ -109,7 +192,7 @@ class QueryProcessor:
             "error": {"code": code, "message": message},
             "id": request_id
         }
-        logger.error(f"Generate streaming error response: {message}")
+        logger.error(f"Generate streaming error response: {message} for server {self.server_name}")
         return error_response
 
     async def _yield_success_response(
@@ -134,12 +217,12 @@ class QueryProcessor:
             "result": result,
             "id": request_id
         }
-        logger.info(f"Successfully generated streaming success response, type: {event_type}, complete: {complete}")
+        logger.info(f"Successfully generated streaming success response, type: {event_type}, complete: {complete} for server {self.server_name}")
         return response
 
     async def process_query_stream(self, session_id: str, query: str, request_id: Optional[int] = None) -> AsyncGenerator[Dict, None]:
         if session_id not in self.sessions:
-            logger.error(f"Stream session does not exist: {session_id}")
+            logger.error(f"Stream session does not exist: {session_id} for server {self.server_name}")
             yield await self._yield_error_response(
                 code=-32600,
                 message=f"Invalid session: {session_id}. Please call start_session to create a new session",
@@ -150,7 +233,7 @@ class QueryProcessor:
         # Load server configurations
         server_configs = load_server_config()
         if not server_configs:
-            logger.warning("There are no valid server configurations available for MultiMCPTools")
+            logger.warning(f"There are no valid server configurations available for MultiMCPTools for server {self.server_name}")
             yield await self._yield_error_response(
                 code=-32603,
                 message="There are no valid server configurations available for MultiMCPTools",
@@ -175,11 +258,11 @@ class QueryProcessor:
                 else:
                     commands.append(" ".join([command] + args))
             except Exception as e:
-                logger.error(f"failed to process server config {name}: {str(e)}")
+                logger.error(f"failed to process server config {name} for server {self.server_name}: {str(e)}")
                 continue
 
         if not commands and not urls:
-            logger.warning("There are no valid server configurations available for MultiMCPTools")
+            logger.warning(f"There are no valid server configurations available for MultiMCPTools for server {self.server_name}")
             yield await self._yield_error_response(
                 code=-32603,
                 message="There are no valid server configurations available for MultiMCPTools",
@@ -198,13 +281,14 @@ class QueryProcessor:
             ) as mcp_tools:
                 agent = Agent(
                     name="MultiMCPAgent",
-                    instructions="You are a Davinci Resolve agent. Use the MCP tools to complete the user's queries.",
+                    instructions=f"You are a {self.server_name} agent. Use the MCP tools and knowledge base to complete the user's queries.",
                     tools=[mcp_tools],
-                    # model=OpenAIChat(id="gpt-4o"),
-                    model=Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest"),
+                    model=Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest"),  # Consistent with ollama preference
                     markdown=True,
                     add_datetime_to_instructions=True,
                     show_tool_calls=True,
+                    knowledge=self.knowledge_base if self.knowledge_base else None,
+                    search_knowledge=bool(self.knowledge_base),
                 )
                 # Start streaming and iterate over the response
                 run_response = await agent.arun(query, stream=True, markdown=True, stream_intermediate_steps=False)
@@ -225,7 +309,6 @@ class QueryProcessor:
 
                 # After all chunks are processed, send the final response
                 if final_output:
-
                     self.sessions[session_id]["history"].append({"response": final_output.strip()})
                     self.sessions[session_id]["context"]["history"].append({"response": final_output.strip()})
                     yield await self._yield_success_response(
@@ -235,16 +318,16 @@ class QueryProcessor:
                         complete=True,
                         request_id=request_id
                     )
-                    logger.info(f"Stream query succeeded, session {session_id}")
+                    logger.info(f"Stream query succeeded, session {session_id} for server {self.server_name}")
                 else:
-                    logger.warning(f"Stream query produced no output, session {session_id}")
+                    logger.warning(f"Stream query produced no output, session {session_id} for server {self.server_name}")
                     yield await self._yield_error_response(
                         code=-32603,
                         message="Stream query produced no valid output",
                         request_id=request_id
                     )
         except Exception as e:
-            logger.error(f"Stream query error, session {session_id}: {str(e)}\n{traceback.format_exc()}")
+            logger.error(f"Stream query error, session {session_id} for server {self.server_name}: {str(e)}\n{traceback.format_exc()}")
             yield await self._yield_error_response(
                 code=-32603,
                 message=f"Stream query failed: {str(e)}",
@@ -254,13 +337,15 @@ class QueryProcessor:
     def end_session(self, session_id: str) -> Dict[str, str]:
         if session_id in self.sessions:
             del self.sessions[session_id]
-            logger.info(f"Session ended: {session_id}")
+            logger.info(f"Session ended: {session_id} for server {self.server_name}")
             return {"response": "Session ended", "session_id": session_id}
-        logger.error(f"Session does not exist: {session_id}")
+        logger.error(f"Session does not exist: {session_id} for server {self.server_name}")
         return {"error": "Session does not exist", "session_id": session_id}
 
     async def cleanup(self) -> None:
-        logger.info("Start cleanup of QueryProcessor")
+        logger.info(f"Start cleanup of QueryProcessor for server {self.server_name}")
         self.sessions.clear()
         self.agent = None
-        logger.info("QueryProcessor cleanup completed")
+        self.vector_db = None
+        self.knowledge_base = None
+        logger.info(f"QueryProcessor cleanup completed for server {self.server_name}")

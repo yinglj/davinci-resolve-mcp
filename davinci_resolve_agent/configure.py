@@ -1,7 +1,7 @@
 # file: configure.py
 import json
 import os
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from logger import logger
 
 class ConfigError(Exception):
@@ -116,3 +116,92 @@ def get_llm_preference() -> str:
         return default_preference
     logger.info(f"Loaded LLM preference from config: {llm_preference}")
     return llm_preference
+
+def load_knowledge_config(server_name: str = None, config_path: str = "mcp_config.json") -> List[str]:
+    """
+    Load knowledge files from mcp_config.json, optionally filtered by server name.
+
+    Args:
+        server_name (str, optional): The name of the server to load knowledge files for.
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        List[str]: List of valid file paths.
+    """
+    if not os.path.exists(config_path):
+        logger.error(f"Knowledge configuration file {config_path} not found")
+        return []
+    try:
+        with open(config_path, "r") as f:
+            config = json.load(f)
+        knowledge_files = []
+        if server_name:
+            mcp_servers = config.get("mcpServers", {})
+            server_config = mcp_servers.get(server_name, {})
+            knowledge_files = server_config.get("knowledgeFiles", [])
+        else:
+            knowledge_files = config.get("knowledgeFiles", [])
+        if not isinstance(knowledge_files, list):
+            logger.error(f"Invalid knowledgeFiles format in {config_path}: expected a list, got {type(knowledge_files)}")
+            return []
+        valid_files = []
+        base_dir = os.path.dirname(config_path)
+        for file_path in knowledge_files:
+            full_path = os.path.join(base_dir, file_path)
+            if os.path.exists(full_path):
+                valid_files.append(full_path)
+            else:
+                logger.warning(f"Knowledge file not found: {full_path}")
+        if not valid_files:
+            logger.warning(f"No valid knowledge files found in {config_path} for server {server_name or 'global'}")
+        return valid_files
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse {config_path}: {str(e)}")
+        return []
+    except Exception as e:
+        logger.exception(f"Error loading knowledge configuration from {config_path}")
+        return []
+
+def load_embedder_config(server_name: str, config_path: str = "mcp_config.json") -> Tuple[str, str, int]:
+    """
+    Load embedder configuration from mcp_config.json for a specific server.
+
+    Args:
+        server_name (str): The name of the server to load embedder config for.
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        Tuple[str, str, int]: Tuple of (type, model, dimensions) for the embedder.
+
+    Raises:
+        ConfigError: If embedder configuration is invalid or missing.
+    """
+    config = _load_config(config_path)
+    if config is None:
+        logger.error(f"Failed to load config for embedder of server {server_name}")
+        raise ConfigError("Configuration file not found or invalid")
+    
+    mcp_servers = config.get("mcpServers", {})
+    server_config = mcp_servers.get(server_name, {})
+    embedder_config = server_config.get("embedder", {})
+    
+    if not isinstance(embedder_config, dict):
+        logger.error(f"Invalid embedder configuration for server {server_name}: expected a dict, got {type(embedder_config)}")
+        raise ConfigError(f"Invalid embedder configuration for server {server_name}")
+    
+    embedder_type = embedder_config.get("type", "ollama")  # Default to ollama
+    embedder_model = embedder_config.get("model", "hf.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF:Q4_K_M")
+    dimensions = embedder_config.get("dimensions", 2048)
+    
+    if not isinstance(embedder_type, str) or embedder_type not in ["ollama", "openai"]:
+        logger.error(f"Invalid embedder type for server {server_name}: {embedder_type}, using default 'ollama'")
+        embedder_type = "ollama"
+    if not isinstance(embedder_model, str) or not embedder_model:
+        logger.error(f"Invalid embedder model for server {server_name}: {embedder_model}")
+        raise ConfigError(f"Invalid embedder model for server {server_name}")
+    if not isinstance(dimensions, int) or dimensions <= 0:
+        logger.error(f"Invalid embedder dimensions for server {server_name}: {dimensions}")
+        raise ConfigError(f"Invalid embedder dimensions for server {server_name}")
+    
+    logger.info(f"Loaded embedder config for server {server_name}: type={embedder_type}, model={embedder_model}, dimensions={dimensions}")
+    return embedder_type, embedder_model, dimensions

@@ -33,4 +33,6 @@ dependencies = [
     "pyfiglet>=1.0.3",
     "termcolor>=3.1.0",
     "prompt-toolkit>=3.0.51",
+    "lancedb>=0.24.1",
+    "pypdf>=5.8.0",
 ]

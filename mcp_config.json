@@ -3,7 +3,15 @@
     "Davinci_resolve": {
         "command": "streamable-http", 
         "args": ["http://localhost:8020/mcp"], 
-        "timeout": 15
+        "timeout": 15,
+        "knowledgeFiles": [
+            "davinci_resolve_agent/knowledge/Resolve Manual.pdf"
+        ],
+        "embedder": {
+            "type": "ollama",
+            "model": "hf.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF:Q4_K_M",
+            "dimensions": 2048
+        }
     },
     "get_local_time": {
         "command": "uvx",
