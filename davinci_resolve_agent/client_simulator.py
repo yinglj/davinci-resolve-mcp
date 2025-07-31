@@ -386,18 +386,27 @@ class ClientSimulator:
                 result = response["result"]
                 if "error" in result:
                     msg = result["error"]
-                    decoded_msg = msg.encode().decode('unicode_escape')
+                    if isinstance(msg, str):
+                        decoded_msg = msg.encode().decode('unicode_escape')
+                    else:
+                        decoded_msg = ""
                     logger.print(colored(f"Error: {decoded_msg}", "red"))
                 else:
                     msg = success_msg or result.get("response", "Operation successful")
-                    decoded_msg = msg.encode().decode('unicode_escape')
+                    if isinstance(msg, str):
+                        decoded_msg = msg.encode().decode('unicode_escape')
+                    else:
+                        decoded_msg = ""
                     logger.print(colored(decoded_msg, "green"))
 
                 if result.get("complete", False):
                     logger.print("Task completed. Start a new query or type 'end session'.")
             else:
                 msg = response.get("error", "Unknown error")
-                decoded_msg = msg.encode().decode('unicode_escape')
+                if isinstance(msg, str):
+                    decoded_msg = msg.encode().decode('unicode_escape')
+                else:
+                    decoded_msg = ""
                 logger.print(colored(f"RPC Error: {decoded_msg}", "red"))
 
         except json.JSONDecodeError as e:
