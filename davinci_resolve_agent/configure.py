@@ -5,9 +5,21 @@ from typing import List, Dict, Any, Optional, Tuple
 from logger import logger
 
 class ConfigError(Exception):
+    """
+    Custom exception for configuration errors.
+    """
     pass
 
 def _load_config(config_path: str = "mcp_config.json") -> Optional[Dict[str, Any]]:
+    """
+    Load the configuration file.
+
+    Args:
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        Optional[Dict[str, Any]]: The configuration dictionary or None if loading fails.
+    """
     if not os.path.exists(config_path):
         logger.error(f"Configuration file {config_path} not found")
         return None
@@ -26,13 +38,25 @@ def _load_config(config_path: str = "mcp_config.json") -> Optional[Dict[str, Any
         return None
 
 def load_environment() -> None:
+    """
+    Placeholder for loading environment variables (if needed).
+    """
     pass
 
-def load_server_config() -> List[Dict[str, Any]]:
-    config = _load_config()
+def load_server_config(config_path: str = "mcp_config.json") -> List[Dict[str, Any]]:
+    """
+    Load server configurations from mcp_config.json.
+
+    Args:
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        List[Dict[str, Any]]: List of server configuration dictionaries.
+    """
+    config = _load_config(config_path)
     if config is None:
         return []
-    mcp_servers = config.get("mcpServers")
+    mcp_servers = config.get("mcpServers", {})
     if not isinstance(mcp_servers, dict):
         logger.error(f"Invalid mcpServers format: expected a dict, got {type(mcp_servers)}")
         return []
@@ -60,8 +84,17 @@ def load_server_config() -> List[Dict[str, Any]]:
         return []
     return servers
 
-def load_api_keys() -> Dict[str, str]:
-    config = _load_config()
+def load_api_keys(config_path: str = "mcp_config.json") -> Dict[str, str]:
+    """
+    Load API keys from mcp_config.json.
+
+    Args:
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        Dict[str, str]: Dictionary of API keys mapped to user identifiers.
+    """
+    config = _load_config(config_path)
     if config is None:
         return {}
     api_keys = config.get("apiKeys", {})
@@ -76,9 +109,18 @@ def load_api_keys() -> Dict[str, str]:
         logger.warning("No API keys found")
     return api_keys
 
-def load_timeout() -> float:
+def load_timeout(config_path: str = "mcp_config.json") -> float:
+    """
+    Load global timeout from mcp_config.json.
+
+    Args:
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        float: Global timeout value in seconds.
+    """
     default_timeout = 10.0
-    config = _load_config()
+    config = _load_config(config_path)
     if config is None:
         logger.info(f"Using default timeout: {default_timeout} seconds")
         return default_timeout
@@ -89,9 +131,19 @@ def load_timeout() -> float:
     logger.info(f"Loaded timeout from config: {timeout} seconds")
     return float(timeout)
 
-def load_server_timeout(server_name: str) -> float:
+def load_server_timeout(server_name: str, config_path: str = "mcp_config.json") -> float:
+    """
+    Load server-specific timeout from mcp_config.json.
+
+    Args:
+        server_name (str): The name of the server.
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        float: Server-specific timeout value in seconds.
+    """
     default_timeout = 10.0
-    config = _load_config()
+    config = _load_config(config_path)
     if config is None:
         logger.debug(f"Using default timeout for server {server_name}: {default_timeout} seconds")
         return default_timeout
@@ -104,18 +156,59 @@ def load_server_timeout(server_name: str) -> float:
     logger.debug(f"Loaded timeout for server {server_name}: {timeout} seconds")
     return float(timeout)
 
-def get_llm_preference() -> str:
-    default_preference = "openai"
-    config = _load_config()
+def get_llm_config(server_name: str = None, config_path: str = "mcp_config.json") -> Tuple[str, str]:
+    """
+    Load LLM configuration from mcp_config.json, prioritizing server-specific settings.
+
+    Args:
+        server_name (str, optional): The name of the server to load LLM config for.
+        config_path (str): Path to the configuration file.
+
+    Returns:
+        Tuple[str, str]: Tuple of (type, model) for the LLM.
+
+    Raises:
+        ConfigError: If LLM configuration is invalid or missing.
+    """
+    default_type = "ollama"
+    default_model = "hf.co/Qwen/Qwen3-0.6B-GGUF:latest"
+    
+    config = _load_config(config_path)
     if config is None:
-        logger.info(f"Using default LLM preference: {default_preference}")
-        return default_preference
-    llm_preference = config.get("llm_preference", default_preference)
-    if not isinstance(llm_preference, str) or not llm_preference:
-        logger.warning(f"Invalid llm_preference value in config: {llm_preference}, using default: {default_preference}")
-        return default_preference
-    logger.info(f"Loaded LLM preference from config: {llm_preference}")
-    return llm_preference
+        logger.info(f"Using default LLM config: type={default_type}, model={default_model}")
+        return default_type, default_model
+
+    # Check server-specific LLM config
+    if server_name:
+        mcp_servers = config.get("mcpServers", {})
+        server_config = mcp_servers.get(server_name, {})
+        llm_config = server_config.get("llm", {})
+        if llm_config:
+            llm_type = llm_config.get("type", default_type)
+            llm_model = llm_config.get("model", default_model)
+            if not isinstance(llm_type, str) or llm_type not in ["ollama", "openai"]:
+                logger.error(f"Invalid LLM type for server {server_name}: {llm_type}, using default: {default_type}")
+                llm_type = default_type
+            if not isinstance(llm_model, str) or not llm_model:
+                logger.error(f"Invalid LLM model for server {server_name}: {llm_model}")
+                raise ConfigError(f"Invalid LLM model for server {server_name}")
+            logger.info(f"Loaded server-specific LLM config for {server_name}: type={llm_type}, model={llm_model}")
+            return llm_type, llm_model
+
+    # Fallback to global LLM config
+    llm_config = config.get("llm", {})
+    llm_type = llm_config.get("type", default_type)
+    llm_model = llm_config.get("model", default_model)
+    
+    if not isinstance(llm_type, str) or llm_type not in ["ollama", "openai"]:
+        logger.error(f"Invalid global LLM type: {llm_type}, using default: {default_type}")
+        llm_type = default_type
+    if not isinstance(llm_model, str) or not llm_model:
+        logger.error(f"Invalid global LLM model: {llm_model}, using default: {default_model}")
+        llm_model = default_model
+    
+    logger.info(f"Loaded global LLM config: type={llm_type}, model={llm_model}")
+    return llm_type, llm_model
 
 def load_knowledge_config(server_name: str = None, config_path: str = "mcp_config.json") -> List[str]:
     """
@@ -128,39 +221,30 @@ def load_knowledge_config(server_name: str = None, config_path: str = "mcp_confi
     Returns:
         List[str]: List of valid file paths.
     """
-    if not os.path.exists(config_path):
-        logger.error(f"Knowledge configuration file {config_path} not found")
+    config = _load_config(config_path)
+    if config is None:
         return []
-    try:
-        with open(config_path, "r") as f:
-            config = json.load(f)
-        knowledge_files = []
-        if server_name:
-            mcp_servers = config.get("mcpServers", {})
-            server_config = mcp_servers.get(server_name, {})
-            knowledge_files = server_config.get("knowledgeFiles", [])
+    knowledge_files = []
+    if server_name:
+        mcp_servers = config.get("mcpServers", {})
+        server_config = mcp_servers.get(server_name, {})
+        knowledge_files = server_config.get("knowledgeFiles", [])
+    else:
+        knowledge_files = config.get("knowledgeFiles", [])
+    if not isinstance(knowledge_files, list):
+        logger.error(f"Invalid knowledgeFiles format in {config_path}: expected a list, got {type(knowledge_files)}")
+        return []
+    valid_files = []
+    base_dir = os.path.dirname(config_path)
+    for file_path in knowledge_files:
+        full_path = os.path.join(base_dir, file_path)
+        if os.path.exists(full_path):
+            valid_files.append(full_path)
         else:
-            knowledge_files = config.get("knowledgeFiles", [])
-        if not isinstance(knowledge_files, list):
-            logger.error(f"Invalid knowledgeFiles format in {config_path}: expected a list, got {type(knowledge_files)}")
-            return []
-        valid_files = []
-        base_dir = os.path.dirname(config_path)
-        for file_path in knowledge_files:
-            full_path = os.path.join(base_dir, file_path)
-            if os.path.exists(full_path):
-                valid_files.append(full_path)
-            else:
-                logger.warning(f"Knowledge file not found: {full_path}")
-        if not valid_files:
-            logger.warning(f"No valid knowledge files found in {config_path} for server {server_name or 'global'}")
-        return valid_files
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse {config_path}: {str(e)}")
-        return []
-    except Exception as e:
-        logger.exception(f"Error loading knowledge configuration from {config_path}")
-        return []
+            logger.warning(f"Knowledge file not found: {full_path}")
+    if not valid_files:
+        logger.warning(f"No valid knowledge files found in {config_path} for server {server_name or 'global'}")
+    return valid_files
 
 def load_embedder_config(server_name: str, config_path: str = "mcp_config.json") -> Tuple[str, str, int]:
     """

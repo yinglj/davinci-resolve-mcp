@@ -1,28 +1,40 @@
 {
-  "mcpServers": {
-    "Davinci_resolve": {
-        "command": "streamable-http", 
-        "args": ["http://localhost:8020/mcp"], 
-        "timeout": 15,
-        "knowledgeFiles": [
-            "davinci_resolve_agent/knowledge/Resolve Manual.pdf"
-        ],
-        "embedder": {
-            "type": "ollama",
-            "model": "hf.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF:Q4_K_M",
-            "dimensions": 2048
+    "mcpServers": {
+        "Davinci_resolve": {
+            "command": "streamable-http",
+            "args": [
+                "http://localhost:8020/mcp"
+            ],
+            "timeout": 15,
+            "knowledgeFiles": [
+                "davinci_resolve_agent/knowledge/17EXSENCE_DC.pdf"
+            ],
+            "embedder": {
+                "type": "ollama",
+                "model": "hf.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF:Q4_K_M",
+                "dimensions": 2048
+            },
+            "llm": {
+                "type": "ollama",
+                "model": "hf.co/Qwen/Qwen3-0.6B-GGUF:latest"
+            }
+        },
+        "get_local_time": {
+            "command": "uvx",
+            "args": [
+                "mcp-server-time",
+                "--local-timezone=Asia/Shanghai"
+            ],
+            "timeout": 15
         }
     },
-    "get_local_time": {
-        "command": "uvx",
-        "args": ["mcp-server-time", "--local-timezone=Asia/Shanghai"],
-        "timeout": 15
+    "apiKeys": {
+        "sk-1234567890abcdef": "user1",
+        "sk-abcdef1234567890": "user2"
+    },
+    "timeout": 60,
+    "llm": {
+        "type": "ollama",
+        "model": "hf.co/Qwen/Qwen3-0.6B-GGUF:latest"
     }
-  },
-  "apiKeys": {
-    "sk-1234567890abcdef": "user1",
-    "sk-abcdef1234567890": "user2"
-  },
-  "timeout": 60,
-  "llm_preference": "ollama"
 }

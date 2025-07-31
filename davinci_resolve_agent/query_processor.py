@@ -8,9 +8,7 @@ from typing import Dict, Optional, AsyncGenerator, Union, cast
 from agno.agent import Agent, RunResponse
 from mcp_agents import create_multi_agent, run_multimcp_agent, run_multimcp_agent_stream
 from anyio import ClosedResourceError
-import io
-from contextlib import redirect_stdout
-from configure import load_server_config, load_knowledge_config, load_embedder_config, get_llm_preference
+from configure import load_server_config, load_knowledge_config, load_embedder_config, get_llm_config
 from agno.tools.mcp import MultiMCPTools
 from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
@@ -29,7 +27,7 @@ class QueryProcessor:
         self.sessions: Dict[str, Dict] = {}
         self.vector_db = None
         self.knowledge_base = None
-        self.server_name = None  # Add to track the active server
+        self.server_name = None
 
     async def initialize(self, server_name: str = "Davinci_resolve") -> None:
         """
@@ -67,15 +65,13 @@ class QueryProcessor:
                 knowledge_docs = []
                 for file_path in knowledge_files:
                     if file_path.endswith(('.pdf', '.PDF')):
-                        # Handle PDF files
                         with open(file_path, "rb") as f:
                             pdf_bytes = f.read()
                         knowledge_docs.append(pdf_bytes)
                     elif file_path.endswith(('.md', '.txt')):
-                        # Handle Markdown and Text files
                         with open(file_path, "r", encoding="utf-8") as f:
                             text = f.read()
-                        knowledge_docs.append(text)  # Simplified for now
+                        knowledge_docs.append(text)
                     else:
                         logger.warning(f"Unsupported file type: {file_path}")
 
@@ -83,6 +79,7 @@ class QueryProcessor:
                     logger.info(f"Loaded {len(knowledge_docs)} documents from knowledge files for {server_name}")
                     self.knowledge_base = PDFBytesKnowledgeBase(
                         pdfs=[doc for doc in knowledge_docs if isinstance(doc, bytes)],
+                        texts=[doc for doc in knowledge_docs if isinstance(doc, str)],
                         vector_db=self.vector_db,
                     )
                     logger.info("Knowledge base initialized with PDF bytes")
@@ -95,7 +92,7 @@ class QueryProcessor:
                         logger.info(f"Knowledge base recreated and loaded successfully for {server_name}")
 
             # Initialize multi-agent
-            self.agent = await create_multi_agent()
+            self.agent = await create_multi_agent(server_name)
             if not self.agent:
                 logger.warning(f"No valid agent found for {server_name}, query functionality may be limited")
             else:
@@ -105,14 +102,14 @@ class QueryProcessor:
                     self.agent.search_knowledge = True
                     logger.info(f"Agent configured with knowledge base for {server_name}")
 
-            # Set model based on LLM preference
-            llm_preference = get_llm_preference()
-            if llm_preference == "ollama" and isinstance(self.agent.model, Ollama):
-                logger.info(f"Using Ollama model for {server_name} as per configuration")
-            elif llm_preference == "openai" and isinstance(self.agent.model, OpenAIChat):
-                logger.info(f"Using OpenAI model for {server_name} as per configuration")
+            # Verify LLM model
+            llm_type, llm_model = get_llm_config(server_name)
+            if llm_type == "ollama" and isinstance(self.agent.model, Ollama) and self.agent.model.id == llm_model:
+                logger.info(f"Using Ollama model for {server_name}: {llm_model}")
+            elif llm_type == "openai" and isinstance(self.agent.model, OpenAIChat) and self.agent.model.id == llm_model:
+                logger.info(f"Using OpenAI model for {server_name}: {llm_model}")
             else:
-                logger.warning(f"LLM preference {llm_preference} does not match agent model, using default Ollama")
+                logger.warning(f"LLM configuration mismatch for {server_name}, using default Ollama model")
                 self.agent.model = Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest")
         except Exception as e:
             logger.error(f"QueryProcessor initialization failed for {server_name}: {str(e)}")
@@ -147,7 +144,11 @@ class QueryProcessor:
         logger.info(f"Processing non-streaming query: {query}, session: {session_id} for server {self.server_name}")
 
         try:
-            response = await run_multimcp_agent(query, stream=True)
+            response = await run_multimcp_agent(query, self.server_name)
+            if isinstance(response, dict) and "error" in response:
+                return {"error": response["error"], "session_id": session_id}
+            session["history"].append({"response": response})
+            session["context"]["history"].append({"response": response})
             return {
                 "response": response,
                 "session_id": session_id,
@@ -230,102 +231,59 @@ class QueryProcessor:
             )
             return
 
-        # Load server configurations
-        server_configs = load_server_config()
-        if not server_configs:
-            logger.warning(f"There are no valid server configurations available for MultiMCPTools for server {self.server_name}")
+        if not self.agent:
+            logger.error(f"Agent not initialized for server {self.server_name}")
             yield await self._yield_error_response(
                 code=-32603,
-                message="There are no valid server configurations available for MultiMCPTools",
+                message="Agent not initialized",
                 request_id=request_id
             )
             return
 
-        # Prepare commands and URLs for MultiMCPTools
-        commands = []
-        urls = []
-        urls_transports = []
-
-        for config in server_configs:
-            try:
-                name = config.get("name")
-                command = config.get("command")
-                args = config.get("args", [])
-                if command == "sse" or command == "streamable-http":
-                    if args and args[0].startswith("http"):
-                        urls.append(args[0])
-                        urls_transports.append(command)
-                else:
-                    commands.append(" ".join([command] + args))
-            except Exception as e:
-                logger.error(f"failed to process server config {name} for server {self.server_name}: {str(e)}")
-                continue
-
-        if not commands and not urls:
-            logger.warning(f"There are no valid server configurations available for MultiMCPTools for server {self.server_name}")
-            yield await self._yield_error_response(
-                code=-32603,
-                message="There are no valid server configurations available for MultiMCPTools",
-                request_id=request_id
-            )
-            return
+        session = self.sessions[session_id]
+        session["history"].append({"query": query})
+        session["context"]["history"].append({"query": query})
+        logger.info(f"Processing streaming query: {query}, session: {session_id} for server {self.server_name}")
 
         try:
-            # Create MultiMCPTools and Agent within the same async with block
-            async with MultiMCPTools(
-                commands=commands,
-                urls=urls,
-                urls_transports=urls_transports,
-                timeout_seconds=int(max(config.get("timeout", 10) for config in server_configs)),
-                # allow_partial_failure=True
-            ) as mcp_tools:
-                agent = Agent(
-                    name="MultiMCPAgent",
-                    instructions=f"You are a {self.server_name} agent. Use the MCP tools and knowledge base to complete the user's queries.",
-                    tools=[mcp_tools],
-                    model=Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest"),  # Consistent with ollama preference
-                    markdown=True,
-                    add_datetime_to_instructions=True,
-                    show_tool_calls=True,
-                    knowledge=self.knowledge_base if self.knowledge_base else None,
-                    search_knowledge=bool(self.knowledge_base),
-                )
-                # Start streaming and iterate over the response
-                run_response = await agent.arun(query, stream=True, markdown=True, stream_intermediate_steps=False)
-                content = ""
-                final_output = ""
-                async for run_response_chunk in run_response:
-                    run_response_chunk = cast(RunResponse, run_response_chunk)
-                    chunk_json = run_response_chunk.to_json()
-                    content += chunk_json
-                    yield await self._yield_success_response(
-                        session_id=session_id,
-                        event_type="message",
-                        content=chunk_json,  # Yield each chunk separately
-                        complete=False,
-                        request_id=request_id
-                    )
-                    final_output += chunk_json + "\n"
-
-                # After all chunks are processed, send the final response
-                if final_output:
-                    self.sessions[session_id]["history"].append({"response": final_output.strip()})
-                    self.sessions[session_id]["context"]["history"].append({"response": final_output.strip()})
-                    yield await self._yield_success_response(
-                        session_id=session_id,
-                        event_type="final",
-                        content=final_output.strip(),
-                        complete=True,
-                        request_id=request_id
-                    )
-                    logger.info(f"Stream query succeeded, session {session_id} for server {self.server_name}")
-                else:
-                    logger.warning(f"Stream query produced no output, session {session_id} for server {self.server_name}")
+            final_output = ""
+            async for chunk in run_multimcp_agent_stream(query, self.server_name):
+                chunk = cast(RunResponse, chunk)
+                if hasattr(chunk, 'error') and chunk.error:
                     yield await self._yield_error_response(
                         code=-32603,
-                        message="Stream query produced no valid output",
+                        message=chunk.error,
                         request_id=request_id
                     )
+                    return
+                chunk_json = chunk.to_json()
+                final_output += chunk_json + "\n"
+                yield await self._yield_success_response(
+                    session_id=session_id,
+                    event_type="message",
+                    content=chunk_json,
+                    complete=False,
+                    request_id=request_id
+                )
+
+            if final_output:
+                session["history"].append({"response": final_output.strip()})
+                session["context"]["history"].append({"response": final_output.strip()})
+                yield await self._yield_success_response(
+                    session_id=session_id,
+                    event_type="final",
+                    content=final_output.strip(),
+                    complete=True,
+                    request_id=request_id
+                )
+                logger.info(f"Stream query succeeded, session {session_id} for server {self.server_name}")
+            else:
+                logger.warning(f"Stream query produced no output, session {session_id} for server {self.server_name}")
+                yield await self._yield_error_response(
+                    code=-32603,
+                    message="Stream query produced no valid output",
+                    request_id=request_id
+                )
         except Exception as e:
             logger.error(f"Stream query error, session {session_id} for server {self.server_name}: {str(e)}\n{traceback.format_exc()}")
             yield await self._yield_error_response(
