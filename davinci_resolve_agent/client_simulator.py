@@ -389,14 +389,14 @@ class ClientSimulator:
                     if isinstance(msg, str):
                         decoded_msg = msg.encode().decode('unicode_escape')
                     else:
-                        decoded_msg = ""
+                        decoded_msg = str(msg)
                     logger.print(colored(f"Error: {decoded_msg}", "red"))
                 else:
                     msg = success_msg or result.get("response", "Operation successful")
                     if isinstance(msg, str):
                         decoded_msg = msg.encode().decode('unicode_escape')
                     else:
-                        decoded_msg = ""
+                        decoded_msg = str(msg)
                     logger.print(colored(decoded_msg, "green"))
 
                 if result.get("complete", False):
@@ -406,7 +406,7 @@ class ClientSimulator:
                 if isinstance(msg, str):
                     decoded_msg = msg.encode().decode('unicode_escape')
                 else:
-                    decoded_msg = ""
+                    decoded_msg = str(msg)
                 logger.print(colored(f"RPC Error: {decoded_msg}", "red"))
 
         except json.JSONDecodeError as e:
@@ -418,11 +418,10 @@ class ClientSimulator:
         finally:
             logger.info("Response processing completed")
 
-
     def _print_stream_response(self, response: Dict) -> None:
         try:
             logger.info(f"Processing stream response")
-            # logger.debug(f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}")
+            logger.debug(f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}")
             
             # Check if the response is a JSON-RPC error response
             if "jsonrpc" in response and "error" in response:
@@ -441,8 +440,8 @@ class ClientSimulator:
                 result = response["result"]
                 event_type = result.get("type", "unknown")
                 content = result.get("content")
+                # Prepare content for display
                 try:
-                    # Parse content if it's JSON, otherwise use as-is
                     if isinstance(content, str):
                         try:
                             parsed_content = json.loads(content)
@@ -455,15 +454,24 @@ class ClientSimulator:
                                             pass
                             content_display = json.dumps(parsed_content, indent=2, ensure_ascii=False)
                         except json.JSONDecodeError:
-                            # If not JSON, use raw string and replace \n with actual newlines
-                            content_display = content.replace("\\n", "\n").replace("\\t", "\t")
+                            # Decode Unicode escape sequences and replace newlines/tabs
+                            content_display = content.encode().decode('unicode_escape').replace("\\n", "\n").replace("\\t", "\t")
                     else:
                         content_display = str(content)
                 except Exception as e:
                     logger.error(f"Failed to process content: {str(e)}")
                     content_display = str(content) if content else "No content"
 
-                if event_type == "message":
+                # Handle final response
+                if event_type == "final":
+                    final_content = result.get("response", content_display)
+                    if isinstance(final_content, str):
+                        # Decode Unicode escape sequences for final response
+                        final_display = final_content.encode().decode('unicode_escape').replace("\\n", "\n").replace("\\t", "\t")
+                    else:
+                        final_display = json.dumps(final_content, indent=2, ensure_ascii=False)
+                    logger.print(colored(f"[Final] {final_display}", "green"))
+                elif event_type == "message":
                     logger.print(colored(f"[Message] {content_display}", "blue"))
                 elif event_type == "data":
                     logger.print(colored(f"[Data] {content_display}", "cyan"))
@@ -471,14 +479,6 @@ class ClientSimulator:
                     logger.print(colored(f"[RunItem] {content_display}", "yellow"))
                 elif event_type == "agent_updated":
                     logger.print(colored(f"[Agent] {content_display}", "magenta"))
-                elif event_type == "final":
-                    # Display raw content with newlines instead of JSON format
-                    final_content = result.get("response", content_display)
-                    if isinstance(final_content, str):
-                        final_display = final_content.replace("\\n", "\n").replace("\\t", "\t")
-                    else:
-                        final_display = str(final_content)
-                    logger.print(colored(f"[Final] {final_display}", "green"))
                 elif event_type == "stream_complete":
                     logger.print(colored("[Stream Complete]", "green"))
                 if result.get("complete", False):
@@ -493,13 +493,13 @@ class ClientSimulator:
             logger.error(f"Error processing stream response: {str(e)}")
             logger.print(colored(f"Error processing stream response: {str(e)}, response: {response}", "red"))
 
-def generate_ascii_art(text: str, font: str = "slant", color: str = "green") -> str:
-    try:
-        ascii_art = pyfiglet.figlet_format(text, font=font)
-        return colored(ascii_art, color)
-    except pyfiglet.FontNotFound:
-        logger.error(f"Font '{font}' not available")
-        return f"Error: Font '{font}' not available"
+    def generate_ascii_art(self, text: str, font: str = "slant", color: str = "green") -> str:
+        try:
+            ascii_art = pyfiglet.figlet_format(text, font=font)
+            return colored(ascii_art, color)
+        except pyfiglet.FontNotFound:
+            logger.error(f"Font '{font}' not available")
+            return f"Error: Font '{font}' not available"
 
 async def main() -> None:
     api_key = os.getenv("MCP_API_KEY")
@@ -508,5 +508,5 @@ async def main() -> None:
 
 if __name__ == "__main__":
     text = "Client Simulator v1.0"
-    print(generate_ascii_art(text))
+    # print(simulator.generate_ascii_art(text))
     asyncio.run(main())
