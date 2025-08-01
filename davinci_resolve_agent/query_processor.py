@@ -1,10 +1,12 @@
 # file: query_processor.py
 import asyncio
 import uuid
+import os
 import json
 import traceback
 from logger import logger
 from typing import Dict, Optional, AsyncGenerator, Union, cast
+from pathlib import Path
 from agno.agent import Agent, RunResponse
 from mcp_agents import create_multi_agent, run_multimcp_agent, run_multimcp_agent_stream
 from anyio import ClosedResourceError
@@ -14,6 +16,9 @@ from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
 from agno.vectordb.lancedb import LanceDb
 from agno.knowledge.pdf_bytes import PDFBytesKnowledgeBase
+from agno.knowledge.markdown import MarkdownKnowledgeBase
+from agno.knowledge.csv import CSVKnowledgeBase
+from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.embedder.ollama import OllamaEmbedder
 from agno.embedder.openai import OpenAIEmbedder
 import pyarrow as pa
@@ -62,34 +67,104 @@ class QueryProcessor:
             if not knowledge_files:
                 logger.warning(f"No knowledge files loaded for {server_name}, proceeding without knowledge base")
             else:
-                knowledge_docs = []
-                for file_path in knowledge_files:
+                pdf_files = []
+                markdown_files = []
+                csv_files = []
+                text_files = []
+
+                # Categorize files by extension
+                for entry in knowledge_files:
+                    file_path = entry["path"]
+                    metadata = entry["metadata"]
                     if file_path.endswith(('.pdf', '.PDF')):
-                        with open(file_path, "rb") as f:
-                            pdf_bytes = f.read()
-                        knowledge_docs.append(pdf_bytes)
-                    elif file_path.endswith(('.md', '.txt')):
-                        with open(file_path, "r", encoding="utf-8") as f:
-                            text = f.read()
-                        knowledge_docs.append(text)
+                        pdf_files.append({"path": file_path, "metadata": metadata})
+                    elif file_path.endswith('.md'):
+                        markdown_files.append({"path": file_path, "metadata": metadata})
+                    elif file_path.endswith('.csv'):
+                        csv_files.append({"path": file_path, "metadata": metadata})
+                    elif file_path.endswith('.txt'):
+                        text_files.append({"path": file_path, "metadata": metadata})
                     else:
                         logger.warning(f"Unsupported file type: {file_path}")
 
-                if knowledge_docs:
-                    logger.info(f"Loaded {len(knowledge_docs)} documents from knowledge files for {server_name}")
-                    self.knowledge_base = PDFBytesKnowledgeBase(
-                        pdfs=[doc for doc in knowledge_docs if isinstance(doc, bytes)],
-                        texts=[doc for doc in knowledge_docs if isinstance(doc, str)],
-                        vector_db=self.vector_db,
-                    )
-                    logger.info("Knowledge base initialized with PDF bytes")
+                knowledge_bases = []
+
+                # Create PDF knowledge base
+                if pdf_files:
                     try:
-                        await self.knowledge_base.aload(recreate=False)
-                        logger.info(f"Knowledge base loaded with {len(knowledge_docs)} documents for {server_name}")
+                        pdf_docs = []
+                        for entry in pdf_files:
+                            with open(entry["path"], "rb") as f:
+                                pdf_docs.append(f.read())
+                        pdf_kb = PDFBytesKnowledgeBase(
+                            pdfs=pdf_docs,
+                            texts=[],
+                            vector_db=self.vector_db,
+                        )
+                        knowledge_bases.append(pdf_kb)
+                        logger.info(f"Initialized PDFBytesKnowledgeBase with {len(pdf_docs)} PDF documents for {server_name}")
                     except Exception as e:
-                        logger.error(f"Failed to load knowledge base for {server_name}: {str(e)}. Attempting to recreate...")
-                        await self.knowledge_base.aload(recreate=True)
-                        logger.info(f"Knowledge base recreated and loaded successfully for {server_name}")
+                        logger.error(f"Failed to initialize PDF knowledge base for {server_name}: {str(e)}")
+
+                # Create Markdown knowledge base
+                if markdown_files:
+                    try:
+                        markdown_kb = MarkdownKnowledgeBase(
+                            path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in markdown_files],
+                            vector_db=self.vector_db,
+                            num_documents=5,  # Number of documents to return on search
+                        )
+                        knowledge_bases.append(markdown_kb)
+                        logger.info(f"Initialized MarkdownKnowledgeBase with {len(markdown_files)} Markdown documents for {server_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to initialize Markdown knowledge base for {server_name}: {str(e)}")
+
+                # Create CSV knowledge base
+                if csv_files:
+                    try:
+                        csv_kb = CSVKnowledgeBase(
+                            path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in csv_files],
+                            vector_db=self.vector_db,
+                        )
+                        knowledge_bases.append(csv_kb)
+                        logger.info(f"Initialized CSVKnowledgeBase with {len(csv_files)} CSV documents for {server_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to initialize CSV knowledge base for {server_name}: {str(e)}")
+
+                # Create Text knowledge base (using PDFBytesKnowledgeBase for .txt files)
+                if text_files:
+                    try:
+                        text_docs = []
+                        for entry in text_files:
+                            with open(entry["path"], "r", encoding="utf-8") as f:
+                                text_docs.append(f.read())
+                        text_kb = PDFBytesKnowledgeBase(
+                            pdfs=[],
+                            texts=text_docs,
+                            vector_db=self.vector_db,
+                        )
+                        knowledge_bases.append(text_kb)
+                        logger.info(f"Initialized PDFBytesKnowledgeBase with {len(text_docs)} text documents for {server_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to initialize Text knowledge base for {server_name}: {str(e)}")
+
+                # Combine knowledge bases
+                if knowledge_bases:
+                    try:
+                        self.knowledge_base = CombinedKnowledgeBase(
+                            sources=knowledge_bases,
+                            vector_db=self.vector_db,
+                        )
+                        await self.knowledge_base.aload(recreate=False)
+                        logger.info(f"Combined knowledge base loaded with {len(knowledge_bases)} sources for {server_name}")
+                    except Exception as e:
+                        logger.error(f"Failed to load combined knowledge base for {server_name}: {str(e)}")
+                        try:
+                            await self.knowledge_base.aload(recreate=True)
+                            logger.info(f"Combined knowledge base recreated and loaded successfully for {server_name}")
+                        except Exception as reinit_e:
+                            logger.error(f"Combined knowledge base recreation failed: {str(reinit_e)}")
+                            self.knowledge_base = None
 
             # Initialize multi-agent
             self.agent = await create_multi_agent(server_name)
@@ -100,7 +175,7 @@ class QueryProcessor:
                 if self.knowledge_base:
                     self.agent.knowledge = self.knowledge_base
                     self.agent.search_knowledge = True
-                    logger.info(f"Agent configured with knowledge base for {server_name}")
+                    logger.info(f"Agent configured with combined knowledge base for {server_name}")
 
             # Verify LLM model
             llm_type, llm_model = get_llm_config(server_name)
@@ -117,6 +192,15 @@ class QueryProcessor:
             raise
 
     def start_session(self, session_id: Optional[str] = None) -> str:
+        """
+        Start a new session.
+
+        Args:
+            session_id (Optional[str]): Optional session ID, generates a new one if not provided.
+
+        Returns:
+            str: The session ID.
+        """
         session_id = session_id or str(uuid.uuid4())
         self.sessions[session_id] = {
             "history": [],
@@ -127,11 +211,30 @@ class QueryProcessor:
         return session_id
 
     def is_session_valid(self, session_id: str) -> bool:
+        """
+        Check if a session is valid.
+
+        Args:
+            session_id (str): The session ID to validate.
+
+        Returns:
+            bool: True if the session is valid, False otherwise.
+        """
         valid = session_id in self.sessions
         logger.info(f"Session validation {session_id} for server {self.server_name}: {'valid' if valid else 'invalid'}")
         return valid
 
     async def process_query(self, session_id: str, query: str) -> Dict[str, object]:
+        """
+        Process a non-streaming query.
+
+        Args:
+            session_id (str): The session ID.
+            query (str): The query to process.
+
+        Returns:
+            Dict[str, object]: The query response or error.
+        """
         if session_id not in self.sessions:
             logger.error(f"Session does not exist: {session_id} for server {self.server_name}")
             return {"error": "Session does not exist", "session_id": session_id}
@@ -170,6 +273,12 @@ class QueryProcessor:
             return {"error": f"Query processing failed: {str(e) or 'Unknown error'}", "session_id": session_id}
 
     async def reinitialize(self) -> None:
+        """
+        Reinitialize the QueryProcessor.
+
+        Raises:
+            Exception: If reinitialization fails.
+        """
         logger.info(f"Start reinitialization of QueryProcessor for server {self.server_name}")
         try:
             self.agent = None
@@ -188,6 +297,17 @@ class QueryProcessor:
             raise
 
     async def _yield_error_response(self, code: int, message: str, request_id: Optional[int] = None) -> Dict:
+        """
+        Yield an error response for streaming.
+
+        Args:
+            code (int): Error code.
+            message (str): Error message.
+            request_id (Optional[int]): Request ID.
+
+        Returns:
+            Dict: Error response dictionary.
+        """
         error_response = {
             "jsonrpc": "2.0",
             "error": {"code": code, "message": message},
@@ -204,6 +324,19 @@ class QueryProcessor:
         complete: bool,
         request_id: Optional[int] = None
     ) -> Dict:
+        """
+        Yield a success response for streaming.
+
+        Args:
+            session_id (str): The session ID.
+            event_type (str): The event type (e.g., "message", "final").
+            content (Union[str, Dict]): The response content.
+            complete (bool): Whether the response is complete.
+            request_id (Optional[int]): Request ID.
+
+        Returns:
+            Dict: Success response dictionary.
+        """
         result = {
             "session_id": session_id,
             "type": event_type,
@@ -222,6 +355,17 @@ class QueryProcessor:
         return response
 
     async def process_query_stream(self, session_id: str, query: str, request_id: Optional[int] = None) -> AsyncGenerator[Dict, None]:
+        """
+        Process a streaming query.
+
+        Args:
+            session_id (str): The session ID.
+            query (str): The query to process.
+            request_id (Optional[int]): Request ID.
+
+        Yields:
+            Dict: Streamed response or error.
+        """
         if session_id not in self.sessions:
             logger.error(f"Stream session does not exist: {session_id} for server {self.server_name}")
             yield await self._yield_error_response(
@@ -293,6 +437,15 @@ class QueryProcessor:
             )
 
     def end_session(self, session_id: str) -> Dict[str, str]:
+        """
+        End a session.
+
+        Args:
+            session_id (str): The session ID to end.
+
+        Returns:
+            Dict[str, str]: Response indicating session status.
+        """
         if session_id in self.sessions:
             del self.sessions[session_id]
             logger.info(f"Session ended: {session_id} for server {self.server_name}")
@@ -301,6 +454,9 @@ class QueryProcessor:
         return {"error": "Session does not exist", "session_id": session_id}
 
     async def cleanup(self) -> None:
+        """
+        Clean up QueryProcessor resources.
+        """
         logger.info(f"Start cleanup of QueryProcessor for server {self.server_name}")
         self.sessions.clear()
         self.agent = None

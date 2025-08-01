@@ -1,6 +1,7 @@
 # file: mcp_agents.py
 import traceback
 from typing import Optional, AsyncGenerator, cast
+from pathlib import Path
 from agno.agent import Agent, RunResponse
 from agno.tools.mcp import MultiMCPTools
 from logger import logger
@@ -8,6 +9,9 @@ from configure import load_server_config, load_knowledge_config, load_embedder_c
 from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
 from agno.knowledge.pdf_bytes import PDFBytesKnowledgeBase
+from agno.knowledge.markdown import MarkdownKnowledgeBase
+from agno.knowledge.csv import CSVKnowledgeBase
+from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.embedder.ollama import OllamaEmbedder
 from agno.embedder.openai import OpenAIEmbedder
 from agno.vectordb.lancedb import LanceDb
@@ -76,42 +80,114 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         logger.error(f"Failed to load embedder configuration for {server_name}: {str(e)}")
         return None
 
+    # Initialize vector database
+    vector_db = LanceDb(
+        table_name="knowledge_base",
+        uri="tmp/lancedb",
+        embedder=embedder,
+    )
+
     # Load knowledge files
     knowledge_files = load_knowledge_config(server_name)
     knowledge_base = None
     if knowledge_files:
-        knowledge_docs = []
-        for file_path in knowledge_files:
+        pdf_files = []
+        markdown_files = []
+        csv_files = []
+        text_files = []
+
+        # Categorize files by extension
+        for entry in knowledge_files:
+            file_path = entry["path"]
+            metadata = entry["metadata"]
             if file_path.endswith(('.pdf', '.PDF')):
-                with open(file_path, "rb") as f:
-                    knowledge_docs.append(f.read())
-            elif file_path.endswith(('.md', '.txt')):
-                with open(file_path, "r", encoding="utf-8") as f:
-                    knowledge_docs.append(f.read())
+                pdf_files.append({"path": file_path, "metadata": metadata})
+            elif file_path.endswith('.md'):
+                markdown_files.append({"path": file_path, "metadata": metadata})
+            elif file_path.endswith('.csv'):
+                csv_files.append({"path": file_path, "metadata": metadata})
+            elif file_path.endswith('.txt'):
+                text_files.append({"path": file_path, "metadata": metadata})
             else:
                 logger.warning(f"Unsupported file type: {file_path}")
-        
-        if knowledge_docs:
+
+        knowledge_bases = []
+
+        # Create PDF knowledge base
+        if pdf_files:
             try:
-                vector_db = LanceDb(
-                    table_name="knowledge_base",
-                    uri="tmp/lancedb",
-                    embedder=embedder,
+                pdf_docs = []
+                for entry in pdf_files:
+                    with open(entry["path"], "rb") as f:
+                        pdf_docs.append(f.read())
+                pdf_kb = PDFBytesKnowledgeBase(
+                    pdfs=pdf_docs,
+                    texts=[],
+                    vector_db=vector_db,
                 )
-                knowledge_base = PDFBytesKnowledgeBase(
-                    pdfs=[doc for doc in knowledge_docs if isinstance(doc, bytes)],
-                    texts=[doc for doc in knowledge_docs if isinstance(doc, str)],
+                knowledge_bases.append(pdf_kb)
+                logger.info(f"Initialized PDFBytesKnowledgeBase with {len(pdf_docs)} PDF documents for {server_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize PDF knowledge base for {server_name}: {str(e)}")
+
+        # Create Markdown knowledge base
+        if markdown_files:
+            try:
+                markdown_kb = MarkdownKnowledgeBase(
+                    path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in markdown_files],
+                    vector_db=vector_db,
+                    num_documents=5,  # Number of documents to return on search
+                )
+                knowledge_bases.append(markdown_kb)
+                logger.info(f"Initialized MarkdownKnowledgeBase with {len(markdown_files)} Markdown documents for {server_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Markdown knowledge base for {server_name}: {str(e)}")
+
+        # Create CSV knowledge base
+        if csv_files:
+            try:
+                csv_kb = CSVKnowledgeBase(
+                    path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in csv_files],
+                    vector_db=vector_db,
+                )
+                knowledge_bases.append(csv_kb)
+                logger.info(f"Initialized CSVKnowledgeBase with {len(csv_files)} CSV documents for {server_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize CSV knowledge base for {server_name}: {str(e)}")
+
+        # Create Text knowledge base (using PDFBytesKnowledgeBase for .txt files)
+        if text_files:
+            try:
+                text_docs = []
+                for entry in text_files:
+                    with open(entry["path"], "r", encoding="utf-8") as f:
+                        text_docs.append(f.read())
+                text_kb = PDFBytesKnowledgeBase(
+                    pdfs=[],
+                    texts=text_docs,
+                    vector_db=vector_db,
+                )
+                knowledge_bases.append(text_kb)
+                logger.info(f"Initialized PDFBytesKnowledgeBase with {len(text_docs)} text documents for {server_name}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Text knowledge base for {server_name}: {str(e)}")
+
+        # Combine knowledge bases
+        if knowledge_bases:
+            try:
+                knowledge_base = CombinedKnowledgeBase(
+                    sources=knowledge_bases,
                     vector_db=vector_db,
                 )
                 await knowledge_base.aload(recreate=False)
-                logger.info(f"Knowledge base loaded with {len(knowledge_docs)} documents for {server_name}")
+                logger.info(f"Combined knowledge base loaded with {len(knowledge_bases)} sources for {server_name}")
             except Exception as e:
-                logger.error(f"Failed to load knowledge base for {server_name}: {str(e)}")
+                logger.error(f"Failed to load combined knowledge base for {server_name}: {str(e)}")
                 try:
                     await knowledge_base.aload(recreate=True)
-                    logger.info(f"Knowledge base recreated and loaded successfully for {server_name}")
+                    logger.info(f"Combined knowledge base recreated and loaded successfully for {server_name}")
                 except Exception as reinit_e:
-                    logger.error(f"Knowledge base recreation failed: {str(reinit_e)}")
+                    logger.error(f"Combined knowledge base recreation failed: {str(reinit_e)}")
                     knowledge_base = None
 
     # Determine LLM model based on preference
@@ -127,18 +203,17 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         return None
 
     try:
-        # Create MultiMCPTools and Agent
-        mcp_tools = MultiMCPTools(
-            commands=commands,
-            urls=urls,
-            urls_transports=urls_transports,
-            timeout_seconds=int(max(config.get("timeout", 10) for config in server_configs)),
-        )
-        function_names = [getattr(f, 'name', key) for key, f in mcp_tools.functions.items()]
+        # Store tool configuration for runtime initialization
+        tool_config = {
+            "commands": commands,
+            "urls": urls,
+            "urls_transports": urls_transports,
+            "timeout_seconds": int(max(config.get("timeout", 10) for config in server_configs)),
+        }
         agent = Agent(
             name=f"MultiMCPAgent_{server_name}",
             instructions=f"You are a {server_name} agent. Use the MCP tools and knowledge base to complete the user's queries.",
-            tools=[mcp_tools],
+            tools=[],  # Tools will be initialized at runtime
             model=model,
             markdown=True,
             add_datetime_to_instructions=True,
@@ -146,7 +221,9 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
             knowledge=knowledge_base,
             search_knowledge=bool(knowledge_base),
         )
-        logger.info(f"Created agent: {agent.name}, tools: {function_names}")
+        # Attach tool configuration to agent for runtime use
+        setattr(agent, "_mcp_tool_config", tool_config)
+        logger.info(f"Created agent: {agent.name}, tool config: {tool_config}")
         return agent
     except Exception as e:
         logger.error(f"Failed to create MultiMCPAgent for {server_name}: {str(e)}")
@@ -173,17 +250,26 @@ async def run_multimcp_agent(
         return {"error": "Failed to create agent"}
 
     try:
-        run_response = await agent.arun(
-            message=message,
-            stream=False,
-            markdown=True,
-            stream_intermediate_steps=False
-        )
-        # Since stream=False, run_response should be a single RunResponse or similar
-        response = cast(RunResponse, run_response)
-        if hasattr(response, 'error') and response.error:
-            return {"error": response.error}
-        return response.to_json()
+        # Initialize MultiMCPTools at runtime
+        tool_config = getattr(agent, "_mcp_tool_config", {})
+        async with MultiMCPTools(
+            commands=tool_config.get("commands", []),
+            urls=tool_config.get("urls", []),
+            urls_transports=tool_config.get("urls_transports", []),
+            timeout_seconds=tool_config.get("timeout_seconds", 10),
+        ) as mcp_tools:
+            agent.tools = [mcp_tools]
+            logger.info(f"Initialized MultiMCPTools for {server_name} with config: {tool_config}")
+            run_response = await agent.arun(
+                message=message,
+                stream=False,
+                markdown=True,
+                stream_intermediate_steps=False
+            )
+            response = cast(RunResponse, run_response)
+            if hasattr(response, 'error') and response.error:
+                return {"error": response.error}
+            return response.to_json()
     except Exception as e:
         logger.error(f"Failed to run MultiMCPAgent for {server_name}: {str(e)}")
         logger.debug(f"Stack trace: {traceback.format_exc()}")
@@ -210,15 +296,25 @@ async def run_multimcp_agent_stream(
         return
 
     try:
-        run_response = await agent.arun(
-            message=message,
-            stream=True,
-            markdown=True,
-            stream_intermediate_steps=True
-        )
-        async for chunk in run_response:
-            chunk = cast(RunResponse, chunk)
-            yield chunk
+        # Initialize MultiMCPTools at runtime
+        tool_config = getattr(agent, "_mcp_tool_config", {})
+        async with MultiMCPTools(
+            commands=tool_config.get("commands", []),
+            urls=tool_config.get("urls", []),
+            urls_transports=tool_config.get("urls_transports", []),
+            timeout_seconds=tool_config.get("timeout_seconds", 10),
+        ) as mcp_tools:
+            agent.tools = [mcp_tools]
+            logger.info(f"Initialized MultiMCPTools for {server_name} with config: {tool_config}")
+            run_response = await agent.arun(
+                message=message,
+                stream=True,
+                markdown=True,
+                stream_intermediate_steps=True
+            )
+            async for chunk in run_response:
+                chunk = cast(RunResponse, chunk)
+                yield chunk
     except Exception as e:
         logger.error(f"Failed to run MultiMCPAgent for {server_name}: {str(e)}")
         logger.debug(f"Stack trace: {traceback.format_exc()}")

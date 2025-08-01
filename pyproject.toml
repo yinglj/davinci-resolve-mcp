@@ -35,4 +35,6 @@ dependencies = [
     "prompt-toolkit>=3.0.51",
     "lancedb>=0.24.1",
     "pypdf>=5.8.0",
+    "unstructured>=0.18.11",
+    "markdown>=3.8.2",
 ]

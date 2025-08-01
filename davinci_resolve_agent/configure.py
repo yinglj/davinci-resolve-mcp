@@ -1,7 +1,8 @@
 # file: configure.py
 import json
 import os
-from typing import List, Dict, Any, Optional, Tuple
+import glob
+from typing import List, Dict, Any, Optional, Tuple, Union
 from logger import logger
 
 class ConfigError(Exception):
@@ -210,20 +211,21 @@ def get_llm_config(server_name: str = None, config_path: str = "mcp_config.json"
     logger.info(f"Loaded global LLM config: type={llm_type}, model={llm_model}")
     return llm_type, llm_model
 
-def load_knowledge_config(server_name: str = None, config_path: str = "mcp_config.json") -> List[str]:
+def load_knowledge_config(server_name: str = None, config_path: str = "mcp_config.json") -> List[Dict[str, Union[str, Dict[str, Any]]]]:
     """
-    Load knowledge files from mcp_config.json, optionally filtered by server name.
+    Load knowledge files from mcp_config.json, supporting file paths, wildcard paths, and paths with metadata.
 
     Args:
         server_name (str, optional): The name of the server to load knowledge files for.
         config_path (str): Path to the configuration file.
 
     Returns:
-        List[str]: List of valid file paths.
+        List[Dict[str, Union[str, Dict[str, Any]]]]: List of dictionaries with 'path' and optional 'metadata' for each file.
     """
     config = _load_config(config_path)
     if config is None:
         return []
+    
     knowledge_files = []
     if server_name:
         mcp_servers = config.get("mcpServers", {})
@@ -231,19 +233,89 @@ def load_knowledge_config(server_name: str = None, config_path: str = "mcp_confi
         knowledge_files = server_config.get("knowledgeFiles", [])
     else:
         knowledge_files = config.get("knowledgeFiles", [])
+    
     if not isinstance(knowledge_files, list):
         logger.error(f"Invalid knowledgeFiles format in {config_path}: expected a list, got {type(knowledge_files)}")
         return []
+    
     valid_files = []
     base_dir = os.path.dirname(config_path)
-    for file_path in knowledge_files:
-        full_path = os.path.join(base_dir, file_path)
-        if os.path.exists(full_path):
-            valid_files.append(full_path)
+    
+    for entry in knowledge_files:
+        if isinstance(entry, str):
+            # Handle string paths (file or wildcard)
+            full_path = os.path.join(base_dir, entry)
+            if '*' in full_path or '?' in full_path or '[' in full_path:
+                # Validate directory part of the wildcard path
+                dir_path = os.path.dirname(full_path)
+                if not os.path.isdir(dir_path):
+                    logger.warning(f"Directory does not exist for wildcard path: {dir_path}")
+                    continue
+                
+                # Use glob to find all matching files
+                matched_files = glob.glob(full_path, recursive=True)
+                if not matched_files:
+                    logger.warning(f"No files matched wildcard pattern: {full_path}")
+                    continue
+                
+                # Add each matched file as a dictionary with no metadata
+                for matched_file in matched_files:
+                    if os.path.isfile(matched_file):
+                        valid_files.append({"path": matched_file, "metadata": {}})
+                        logger.debug(f"Found valid knowledge file: {matched_file}")
+                    else:
+                        logger.warning(f"Matched path is not a file: {matched_file}")
+            else:
+                # Handle single file path
+                if os.path.isfile(full_path):
+                    valid_files.append({"path": full_path, "metadata": {}})
+                    logger.debug(f"Found valid knowledge file: {full_path}")
+                else:
+                    logger.warning(f"Knowledge file not found: {full_path}")
+        elif isinstance(entry, dict) and "path" in entry:
+            # Handle dictionary with path and metadata
+            file_path = entry["path"]
+            metadata = entry.get("metadata", {})
+            if not isinstance(file_path, str):
+                logger.warning(f"Invalid path in knowledgeFiles entry: {file_path}, expected string")
+                continue
+            if not isinstance(metadata, dict):
+                logger.warning(f"Invalid metadata in knowledgeFiles entry: {metadata}, expected dict")
+                continue
+            full_path = os.path.join(base_dir, file_path)
+            if '*' in full_path or '?' in full_path or '[' in full_path:
+                # Validate directory part of the wildcard path
+                dir_path = os.path.dirname(full_path)
+                if not os.path.isdir(dir_path):
+                    logger.warning(f"Directory does not exist for wildcard path: {dir_path}")
+                    continue
+                
+                # Use glob to find all matching files
+                matched_files = glob.glob(full_path, recursive=True)
+                if not matched_files:
+                    logger.warning(f"No files matched wildcard pattern: {full_path}")
+                    continue
+                
+                # Add each matched file with the same metadata
+                for matched_file in matched_files:
+                    if os.path.isfile(matched_file):
+                        valid_files.append({"path": matched_file, "metadata": metadata.copy()})
+                        logger.debug(f"Found valid knowledge file with metadata: {matched_file}")
+                    else:
+                        logger.warning(f"Matched path is not a file: {matched_file}")
+            else:
+                # Handle single file path with metadata
+                if os.path.isfile(full_path):
+                    valid_files.append({"path": full_path, "metadata": metadata.copy()})
+                    logger.debug(f"Found valid knowledge file with metadata: {full_path}")
+                else:
+                    logger.warning(f"Knowledge file not found: {full_path}")
         else:
-            logger.warning(f"Knowledge file not found: {full_path}")
+            logger.warning(f"Invalid knowledgeFiles entry: {entry}, expected string or dict with 'path'")
+    
     if not valid_files:
         logger.warning(f"No valid knowledge files found in {config_path} for server {server_name or 'global'}")
+    
     return valid_files
 
 def load_embedder_config(server_name: str, config_path: str = "mcp_config.json") -> Tuple[str, str, int]:
