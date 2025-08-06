@@ -29,19 +29,40 @@ SOFTWARE.
 @date: 2025-04-22
 """
 
+import os
 import asyncio
 import json
+from typing import AsyncGenerator, Dict, Optional
 import aiohttp
-import os
-from typing import Dict, Optional, AsyncGenerator
 import pyfiglet
-from termcolor import colored
 from logger import logger
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.key_binding import KeyBindings
+from termcolor import colored
 
 class ClientSimulator:
+    """A client simulator for interacting with MCP server.
+
+    This class provides functionality to:
+    - Connect to and communicate with an MCP RPC server
+    - Manage client sessions
+    - Handle streaming and non-streaming requests
+    - Support command history and Linux-style ! command matching
+    - Process user queries in an interactive chat loop
+
+    Attributes:
+        rpc_url (str): The URL endpoint for RPC requests
+        stream_url (str): The URL endpoint for streaming requests
+        api_key (str): Authentication key for the MCP server
+        session_id (Optional[str]): Current active session ID
+        request_id (int): Counter for tracking RPC requests
+        timeout (aiohttp.ClientTimeout): Request timeout settings
+        command_history (list): List of previously executed commands
+        history (InMemoryHistory): Prompt toolkit history manager
+        bindings (KeyBindings): Keyboard shortcut bindings
+        prompt_session (PromptSession): Interactive prompt handler
+    """
     def __init__(self, rpc_url: str = "http://localhost:8080/rpc", api_key: str = None, timeout: int = 120):
         self.rpc_url = rpc_url
         self.stream_url = f"{rpc_url}/stream"
@@ -111,7 +132,7 @@ class ClientSimulator:
                 logger.debug(f"Request details: {json.dumps(request, indent=2, ensure_ascii=False)}")
                 logger.print(f"Sending stream request:\n{json.dumps(request, indent=2, ensure_ascii=False)}")
                 async with session.post(self.stream_url, json=request, headers=headers, timeout=self.timeout) as response:
-                    logger.info(f"Received stream response: status={response.status}, headers={response.headers}")
+                    logger.info("Received stream response: status=%s, headers=%s", response.status, response.headers)
                     if response.status != 200:
                         error_msg = f"Stream request failed with status {response.status}"
                         logger.error(error_msg)
@@ -504,9 +525,9 @@ class ClientSimulator:
 async def main() -> None:
     api_key = os.getenv("MCP_API_KEY")
     simulator = ClientSimulator(api_key=api_key)
+    text = "Client Simulator v1.0"
+    logger.print(simulator.generate_ascii_art(text))
     await simulator.chat_loop()
 
 if __name__ == "__main__":
-    text = "Client Simulator v1.0"
-    # print(simulator.generate_ascii_art(text))
     asyncio.run(main())

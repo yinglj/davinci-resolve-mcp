@@ -7,11 +7,13 @@ The DaVinci Resolve AI Agent is an intelligent copilot that transforms natural l
 ## Key Features
 
 ### 🤖 Intelligent Task Planning
+
 - Converts natural language requests into executable plans
 - Automatically breaks down complex tasks into manageable steps
 - Understands context and dependencies between operations
 
 ### 👁️ Video Analysis
+
 - **General Analysis**: Content description, object detection, quality metrics
 - **Color Analysis**: Dominant colors, color temperature, brightness statistics
 - **Composition Analysis**: Rule of thirds, leading lines, focal points
@@ -19,16 +21,19 @@ The DaVinci Resolve AI Agent is an intelligent copilot that transforms natural l
 - **Scene Detection**: Automatic scene change detection and classification
 
 ### 📚 Built-in Documentation RAG
+
 - Comprehensive knowledge base of DaVinci Resolve operations
 - Context-aware documentation retrieval
 - Examples and best practices
 
 ### 🔄 Self-Correcting Feedback Loop
+
 - Automatic error detection and recovery
 - Learns from failures to improve future performance
 - Can undo and retry operations with fixes
 
 ### 🧠 Memory Management
+
 - Short-term memory for context awareness
 - Long-term memory for learning patterns
 - Tracks successful workflows for reuse
@@ -91,6 +96,7 @@ agent_learn_from_feedback(
 ## Example Workflows
 
 ### 1. Complete Edit Setup
+
 ```
 "Create a new project called 'Documentary', set up a 4K timeline at 25fps, 
 import all MP4 files from the footage folder, create proxies, and organize 
@@ -98,18 +104,21 @@ clips by date"
 ```
 
 ### 2. Color Grading Workflow
+
 ```
 "Apply a cinematic color grade to all clips in the timeline, increase 
 contrast slightly, and export a LUT for future use"
 ```
 
 ### 3. Audio Post-Production
+
 ```
 "Sync all audio clips with their video counterparts, normalize audio 
 levels, and add room tone to silent sections"
 ```
 
 ### 4. Quality Control
+
 ```
 "Analyze the timeline for technical issues like overexposed shots, 
 shaky footage, and audio clipping, then generate a report"
@@ -154,21 +163,27 @@ shaky footage, and audio clipping, then generate a report"
 ## Advanced Features
 
 ### Custom Analysis Models
+
 The agent supports pluggable vision models for specialized analysis:
+
 - Scene classification
 - Object tracking
 - Color matching
 - Shot type detection
 
 ### Workflow Templates
+
 Common workflows are pre-programmed and can be customized:
+
 - Documentary editing
 - Music video production
 - Corporate video workflow
 - Social media content
 
 ### Error Recovery Strategies
+
 The agent implements smart recovery for common issues:
+
 - Missing media files
 - Incompatible formats
 - Permission errors
@@ -177,6 +192,7 @@ The agent implements smart recovery for common issues:
 ## Configuration
 
 ### Environment Variables
+
 ```bash
 # Optional: Use custom models
 VISION_MODEL_ENDPOINT=http://localhost:8000
@@ -187,6 +203,7 @@ AGENT_MEMORY_DB=/path/to/agent_memory.db
 ```
 
 ### Performance Tuning
+
 - Adjust frame sampling rate for video analysis
 - Configure parallel execution limits
 - Set memory retention policies
@@ -194,16 +211,19 @@ AGENT_MEMORY_DB=/path/to/agent_memory.db
 ## Troubleshooting
 
 ### Agent Not Initialized
+
 - Ensure DaVinci Resolve is running
 - Check API permissions in Resolve preferences
 - Verify all dependencies are installed
 
 ### Slow Performance
+
 - Reduce video analysis resolution
 - Enable GPU acceleration if available
 - Limit concurrent operations
 
 ### Inaccurate Results
+
 - Provide more specific requests
 - Use the feedback system to improve
 - Check documentation for correct terminology
@@ -219,6 +239,7 @@ AGENT_MEMORY_DB=/path/to/agent_memory.db
 ## Contributing
 
 The AI agent is designed to be extensible. You can:
+
 1. Add new task patterns in the planner
 2. Implement custom analysis modules
 3. Extend the documentation RAG
