@@ -11,6 +11,7 @@ from agno.models.ollama import Ollama
 from agno.knowledge.pdf_bytes import PDFBytesKnowledgeBase
 from agno.knowledge.markdown import MarkdownKnowledgeBase
 from agno.knowledge.csv import CSVKnowledgeBase
+from agno.knowledge.text import TextKnowledgeBase
 from agno.knowledge.combined import CombinedKnowledgeBase
 from agno.embedder.ollama import OllamaEmbedder
 from agno.embedder.openai import OpenAIEmbedder
@@ -169,20 +170,15 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
             except Exception as e:
                 logger.error(f"Failed to initialize CSV knowledge base for {server_name}: {str(e)}")
 
-        # Create Text knowledge base (using PDFBytesKnowledgeBase for .txt files)
+        # Create Text knowledge base
         if text_files:
             try:
-                text_docs = []
-                for entry in text_files:
-                    with open(entry["path"], "r", encoding="utf-8") as f:
-                        text_docs.append(f.read())
-                text_kb = PDFBytesKnowledgeBase(
-                    pdfs=[],
-                    texts=text_docs,
+                text_kb = TextKnowledgeBase(
+                    path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in text_files],
                     vector_db=vector_db,
                 )
                 knowledge_bases.append(text_kb)
-                logger.info(f"Initialized PDFBytesKnowledgeBase with {len(text_docs)} text documents for {server_name}")
+                logger.info(f"Initialized TextKnowledgeBase with {len(text_files)} text documents for {server_name}")
             except Exception as e:
                 logger.error(f"Failed to initialize Text knowledge base for {server_name}: {str(e)}")
 

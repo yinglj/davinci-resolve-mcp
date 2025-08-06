@@ -186,27 +186,17 @@ class QueryProcessor:
                             f"Failed to initialize CSV knowledge base for {server_name}: {str(e)}"
                         )
 
-                # Create Text knowledge base (using PDFBytesKnowledgeBase for .txt files)
+                # Create Text knowledge base
                 if text_files:
                     try:
-                        text_docs = []
-                        for entry in text_files:
-                            with open(entry["path"], "r",
-                                      encoding="utf-8") as f:
-                                text_docs.append(f.read())
-                        text_kb = PDFBytesKnowledgeBase(
-                            pdfs=[],
-                            texts=text_docs,
-                            vector_db=self.vector_db,
+                        text_kb = TextKnowledgeBase(
+                            path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in text_files],
+                            vector_db=vector_db,
                         )
                         knowledge_bases.append(text_kb)
-                        logger.info(
-                            f"Initialized PDFBytesKnowledgeBase with {len(text_docs)} text documents for {server_name}"
-                        )
+                        logger.info(f"Initialized TextKnowledgeBase with {len(text_files)} text documents for {server_name}")
                     except Exception as e:
-                        logger.error(
-                            f"Failed to initialize Text knowledge base for {server_name}: {str(e)}"
-                        )
+                        logger.error(f"Failed to initialize Text knowledge base for {server_name}: {str(e)}")
 
                 # Combine knowledge bases
                 if knowledge_bases:
