@@ -173,7 +173,7 @@ def get_llm_config(server_name: str = None, config_path: str = "mcp_config.json"
     """
     default_type = "ollama"
     default_model = "hf.co/Qwen/Qwen3-0.6B-GGUF:latest"
-    
+
     config = _load_config(config_path)
     if config is None:
         logger.info(f"Using default LLM config: type={default_type}, model={default_model}")
@@ -200,18 +200,22 @@ def get_llm_config(server_name: str = None, config_path: str = "mcp_config.json"
     llm_config = config.get("llm", {})
     llm_type = llm_config.get("type", default_type)
     llm_model = llm_config.get("model", default_model)
-    
+
     if not isinstance(llm_type, str) or llm_type not in ["ollama", "openai"]:
         logger.error(f"Invalid global LLM type: {llm_type}, using default: {default_type}")
         llm_type = default_type
     if not isinstance(llm_model, str) or not llm_model:
         logger.error(f"Invalid global LLM model: {llm_model}, using default: {default_model}")
         llm_model = default_model
-    
+
     logger.info(f"Loaded global LLM config: type={llm_type}, model={llm_model}")
     return llm_type, llm_model
 
-def load_knowledge_config(server_name: str = None, config_path: str = "mcp_config.json") -> List[Dict[str, Union[str, Dict[str, Any]]]]:
+
+def load_knowledge_config(
+    server_name: str = None,
+    config_path: str = "mcp_config.json"
+) -> List[Dict[str, Union[str, Dict[str, Any]]]]:
     """
     Load knowledge files from mcp_config.json, supporting file paths, wildcard paths, and paths with metadata.
 
@@ -225,7 +229,7 @@ def load_knowledge_config(server_name: str = None, config_path: str = "mcp_confi
     config = _load_config(config_path)
     if config is None:
         return []
-    
+
     knowledge_files = []
     if server_name:
         mcp_servers = config.get("mcpServers", {})
@@ -233,38 +237,54 @@ def load_knowledge_config(server_name: str = None, config_path: str = "mcp_confi
         knowledge_files = server_config.get("knowledgeFiles", [])
     else:
         knowledge_files = config.get("knowledgeFiles", [])
-    
+
     if not isinstance(knowledge_files, list):
-        logger.error(f"Invalid knowledgeFiles format in {config_path}: expected a list, got {type(knowledge_files)}")
+        logger.error(
+            f"Invalid knowledgeFiles format in {config_path}: expected a list, got {type(knowledge_files)}"
+        )
         return []
-    
+
     valid_files = []
     base_dir = os.path.dirname(config_path)
-    
+
     for entry in knowledge_files:
         if isinstance(entry, str):
             # Handle string paths (file or wildcard)
             full_path = os.path.join(base_dir, entry)
+            logger.debug(f"Resolved full path: {full_path}")
             if '*' in full_path or '?' in full_path or '[' in full_path:
                 # Validate directory part of the wildcard path
                 dir_path = os.path.dirname(full_path)
                 if not os.path.isdir(dir_path):
-                    logger.warning(f"Directory does not exist for wildcard path: {dir_path}")
+                    logger.warning(
+                        f"Directory does not exist for wildcard path: {dir_path}"
+                    )
                     continue
-                
+
                 # Use glob to find all matching files
+                logger.debug(
+                    f"Searching for files matching pattern: {full_path}")
                 matched_files = glob.glob(full_path, recursive=True)
+                logger.debug(
+                    f"Found {len(matched_files)} files matching pattern: {full_path}"
+                )
                 if not matched_files:
-                    logger.warning(f"No files matched wildcard pattern: {full_path}")
+                    logger.warning(
+                        f"No files matched wildcard pattern: {full_path}")
                     continue
-                
+
                 # Add each matched file as a dictionary with no metadata
                 for matched_file in matched_files:
                     if os.path.isfile(matched_file):
-                        valid_files.append({"path": matched_file, "metadata": {}})
-                        logger.debug(f"Found valid knowledge file: {matched_file}")
+                        valid_files.append({
+                            "path": matched_file,
+                            "metadata": {}
+                        })
+                        logger.debug(
+                            f"Found valid knowledge file: {matched_file}")
                     else:
-                        logger.warning(f"Matched path is not a file: {matched_file}")
+                        logger.warning(
+                            f"Matched path is not a file: {matched_file}")
             else:
                 # Handle single file path
                 if os.path.isfile(full_path):
@@ -275,47 +295,65 @@ def load_knowledge_config(server_name: str = None, config_path: str = "mcp_confi
         elif isinstance(entry, dict) and "path" in entry:
             # Handle dictionary with path and metadata
             file_path = entry["path"]
+            logger.info(
+                f"Processing server_name:{server_name} knowledge file entry: {file_path}"
+            )
             metadata = entry.get("metadata", {})
             if not isinstance(file_path, str):
-                logger.warning(f"Invalid path in knowledgeFiles entry: {file_path}, expected string")
+                logger.warning(
+                    f"Invalid path in knowledgeFiles entry: {file_path}, expected string"
+                )
                 continue
             if not isinstance(metadata, dict):
-                logger.warning(f"Invalid metadata in knowledgeFiles entry: {metadata}, expected dict")
+                logger.warning(
+                    f"Invalid metadata in knowledgeFiles entry: {metadata}, expected dict"
+                )
                 continue
             full_path = os.path.join(base_dir, file_path)
             if '*' in full_path or '?' in full_path or '[' in full_path:
-                # Validate directory part of the wildcard path
-                dir_path = os.path.dirname(full_path)
-                if not os.path.isdir(dir_path):
-                    logger.warning(f"Directory does not exist for wildcard path: {dir_path}")
-                    continue
-                
+
                 # Use glob to find all matching files
                 matched_files = glob.glob(full_path, recursive=True)
                 if not matched_files:
-                    logger.warning(f"No files matched wildcard pattern: {full_path}")
+                    logger.warning(
+                        f"No files matched wildcard pattern: {full_path}")
                     continue
-                
+
                 # Add each matched file with the same metadata
                 for matched_file in matched_files:
                     if os.path.isfile(matched_file):
-                        valid_files.append({"path": matched_file, "metadata": metadata.copy()})
-                        logger.debug(f"Found valid knowledge file with metadata: {matched_file}")
+                        valid_files.append({
+                            "path": matched_file,
+                            "metadata": metadata.copy()
+                        })
+                        logger.debug(
+                            f"Found valid knowledge file with metadata: {matched_file}"
+                        )
                     else:
-                        logger.warning(f"Matched path is not a file: {matched_file}")
+                        logger.warning(
+                            f"Matched path is not a file: {matched_file}")
             else:
                 # Handle single file path with metadata
                 if os.path.isfile(full_path):
-                    valid_files.append({"path": full_path, "metadata": metadata.copy()})
-                    logger.debug(f"Found valid knowledge file with metadata: {full_path}")
+                    valid_files.append({
+                        "path": full_path,
+                        "metadata": metadata.copy()
+                    })
+                    logger.debug(
+                        f"Found valid knowledge file with metadata: {full_path}"
+                    )
                 else:
                     logger.warning(f"Knowledge file not found: {full_path}")
         else:
-            logger.warning(f"Invalid knowledgeFiles entry: {entry}, expected string or dict with 'path'")
-    
+            logger.warning(
+                f"Invalid knowledgeFiles entry: {entry}, expected string or dict with 'path'"
+            )
+
     if not valid_files:
-        logger.warning(f"No valid knowledge files found in {config_path} for server {server_name or 'global'}")
-    
+        logger.warning(
+            f"No valid knowledge files found in {config_path} for server {server_name or 'global'}"
+        )
+
     return valid_files
 
 def load_embedder_config(server_name: str, config_path: str = "mcp_config.json") -> Tuple[str, str, int]:
@@ -336,19 +374,19 @@ def load_embedder_config(server_name: str, config_path: str = "mcp_config.json")
     if config is None:
         logger.error(f"Failed to load config for embedder of server {server_name}")
         raise ConfigError("Configuration file not found or invalid")
-    
+
     mcp_servers = config.get("mcpServers", {})
     server_config = mcp_servers.get(server_name, {})
     embedder_config = server_config.get("embedder", {})
-    
+
     if not isinstance(embedder_config, dict):
         logger.error(f"Invalid embedder configuration for server {server_name}: expected a dict, got {type(embedder_config)}")
         raise ConfigError(f"Invalid embedder configuration for server {server_name}")
-    
+
     embedder_type = embedder_config.get("type", "ollama")  # Default to ollama
     embedder_model = embedder_config.get("model", "hf.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF:Q4_K_M")
     dimensions = embedder_config.get("dimensions", 2048)
-    
+
     if not isinstance(embedder_type, str) or embedder_type not in ["ollama", "openai"]:
         logger.error(f"Invalid embedder type for server {server_name}: {embedder_type}, using default 'ollama'")
         embedder_type = "ollama"
@@ -358,6 +396,6 @@ def load_embedder_config(server_name: str, config_path: str = "mcp_config.json")
     if not isinstance(dimensions, int) or dimensions <= 0:
         logger.error(f"Invalid embedder dimensions for server {server_name}: {dimensions}")
         raise ConfigError(f"Invalid embedder dimensions for server {server_name}")
-    
+
     logger.info(f"Loaded embedder config for server {server_name}: type={embedder_type}, model={embedder_model}, dimensions={dimensions}")
     return embedder_type, embedder_model, dimensions

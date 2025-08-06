@@ -189,7 +189,7 @@ workflows = {
 
 The `resolve_mcp_server.py` file is the core implementation of the DaVinci Resolve MCP Server, providing a comprehensive API for controlling DaVinci Resolve through the Model Context Protocol (MCP).
 
-### Features
+### Core Features and Capabilities
 
 - **Multiple Communication Modes**: Supports stdio, SSE, and streamable-HTTP protocols
 - **Comprehensive API**: Provides access to all major DaVinci Resolve functions
@@ -297,6 +297,7 @@ python resolve_mcp_server.py --mode websocket
 The server exposes the following key resources:
 
 #### Project Management
+
 - `resolve://version` - Get DaVinci Resolve version information
 - `resolve://current-page` - Get the current page in DaVinci Resolve
 - `resolve://projects` - List all available projects
@@ -305,6 +306,7 @@ The server exposes the following key resources:
 - `resolve://project-setting/{setting_name}` - Get a specific project setting
 
 #### Timeline Operations
+
 - `resolve://timelines` - List all timelines in the current project
 - `resolve://current-timeline` - Get information about the current timeline
 - `resolve://timeline/{timeline_name}` - Get information about a specific timeline
@@ -313,12 +315,14 @@ The server exposes the following key resources:
 - `resolve://timeline/clips` - Get information about all clips in the current timeline
 
 #### Media Operations
+
 - `resolve://media-pool/clips` - List all clips in the media pool
 - `resolve://media-pool/bins` - List all bins in the media pool
 - `resolve://media-pool/structure` - Get the complete structure of the media pool
 - `resolve://media-pool/selected-clips` - Get information about currently selected clips
 
 #### Color Grading
+
 - `resolve://color/lut-formats` - Get available LUT export formats and sizes
 
 ### Available Tools
@@ -326,6 +330,7 @@ The server exposes the following key resources:
 The server provides tools for manipulating DaVinci Resolve:
 
 #### Project Tools
+
 - `switch_page` - Switch to a specific page in DaVinci Resolve
 - `set_project_setting` - Set a project setting to a specified value
 - `create_project` - Create a new project with specified settings
@@ -340,12 +345,14 @@ The server provides tools for manipulating DaVinci Resolve:
 - `load_layout_preset` - Load a saved UI layout preset
 
 #### Media Tools
+
 - `import_media` - Import media file into the current project's media pool
 - `delete_media` - Delete a media clip from the media pool
 - `move_media_to_bin` - Move a media clip to a specific bin
 - `auto_sync_audio` - Sync audio between clips
 
 #### Timeline Tools
+
 - `create_timeline` - Create a new timeline with specified settings
 - `add_clip_to_timeline` - Add a clip to the timeline at a specific position
 - `delete_timeline` - Delete a timeline by name
@@ -357,7 +364,8 @@ The server provides tools for manipulating DaVinci Resolve:
 - `duplicate_timeline` - Create a copy of an existing timeline
 - `export_timeline` - Export the timeline using specified render settings
 
-#### Media Tools
+#### Media Pool Tools
+
 - `import_media` - Import media file into the current project's media pool
 - `delete_media` - Delete a media clip from the media pool
 - `move_media_to_bin` - Move a media clip to a specific bin
@@ -369,6 +377,7 @@ The server provides tools for manipulating DaVinci Resolve:
 - `create_subclip` - Create a subclip from an existing clip
 
 #### Color Tools
+
 - `export_lut` - Export the current grade as a LUT file
 - `export_all_powergrade_luts` - Export all PowerGrade presets as LUT files
 - `apply_lut` - Apply a LUT to the current clip or selected clips
@@ -378,6 +387,7 @@ The server provides tools for manipulating DaVinci Resolve:
 - `apply_color_preset` - Apply a saved color preset to clips
 
 #### Delivery Tools
+
 - `add_to_render_queue` - Add the current timeline to the render queue
 - `start_render` - Start rendering the queued items
 - `clear_render_queue` - Clear all items from the render queue
@@ -672,6 +682,7 @@ Many MCP tools share common parameters:
 Creates a new DaVinci Resolve project.
 
 **Parameters:**
+
 ```json
 {
   "project_name": "My New Project",
@@ -680,6 +691,7 @@ Creates a new DaVinci Resolve project.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {
@@ -694,6 +706,7 @@ Creates a new DaVinci Resolve project.
 Opens an existing DaVinci Resolve project.
 
 **Parameters:**
+
 ```json
 {
   "project_name": "My Project"
@@ -701,6 +714,7 @@ Opens an existing DaVinci Resolve project.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {
@@ -710,13 +724,14 @@ Opens an existing DaVinci Resolve project.
 }
 ```
 
-### Timeline Tools
+### Timeline Operations and Tools
 
 #### create_timeline
 
 Creates a new timeline in the current project.
 
 **Parameters:**
+
 ```json
 {
   "name": "My Timeline",
@@ -728,6 +743,7 @@ Creates a new timeline in the current project.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {
@@ -742,6 +758,7 @@ Creates a new timeline in the current project.
 Adds a clip from the media pool to the current timeline.
 
 **Parameters:**
+
 ```json
 {
   "clip_name": "Interview.mp4",
@@ -753,6 +770,7 @@ Adds a clip from the media pool to the current timeline.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {
@@ -765,13 +783,14 @@ Adds a clip from the media pool to the current timeline.
 }
 ```
 
-### Media Tools
+### Media Pool Operations
 
 #### import_media
 
 Imports media files into the media pool.
 
 **Parameters:**
+
 ```json
 {
   "file_path": "/path/to/media.mp4",
@@ -780,6 +799,7 @@ Imports media files into the media pool.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {
@@ -790,13 +810,14 @@ Imports media files into the media pool.
 }
 ```
 
-### Color Tools
+### Color Grading Tools
 
 #### apply_lut
 
 Applies a LUT to the current clip or selected clips.
 
 **Parameters:**
+
 ```json
 {
   "lut_path": "/path/to/my_lut.cube",
@@ -805,6 +826,7 @@ Applies a LUT to the current clip or selected clips.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {
@@ -821,6 +843,7 @@ Applies a LUT to the current clip or selected clips.
 Sends a natural language request to the AI Agent for processing.
 
 **Parameters:**
+
 ```json
 {
   "request": "Create a highlight reel from my interview footage",
@@ -832,6 +855,7 @@ Sends a natural language request to the AI Agent for processing.
 ```
 
 **Returns:**
+
 ```json
 {
   "result": {

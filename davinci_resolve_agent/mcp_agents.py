@@ -109,7 +109,21 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
             elif file_path.endswith('.txt'):
                 text_files.append({"path": file_path, "metadata": metadata})
             else:
-                logger.warning(f"Unsupported file type: {file_path}")
+                # Treat all other files as text files
+                try:
+                    # Try to open the file as text to verify it's readable
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        f.read(1024)  # Read first 1KB to check if readable
+                    text_files.append({
+                        "path": file_path,
+                        "metadata": metadata
+                    })
+                    if not file_path.endswith('.txt'):
+                        logger.info(f"Treating file as text: {file_path}")
+                except UnicodeDecodeError:
+                    logger.warning(f"File type isn't supported: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Error processing file {file_path}: {str(e)}")
 
         knowledge_bases = []
 
