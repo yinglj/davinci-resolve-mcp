@@ -1,21 +1,13 @@
 # file: mcp_agents.py
 import traceback
 from typing import Optional, AsyncGenerator, cast
-from pathlib import Path
 from agno.agent import Agent, RunResponse
 from agno.tools.mcp import MultiMCPTools
 from logger import logger
-from configure import load_server_config, load_knowledge_config, load_embedder_config, get_llm_config
+from configure import load_server_config, get_llm_config
 from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
-from agno.knowledge.pdf_bytes import PDFBytesKnowledgeBase
-from agno.knowledge.markdown import MarkdownKnowledgeBase
-from agno.knowledge.csv import CSVKnowledgeBase
-from agno.knowledge.text import TextKnowledgeBase
-from agno.knowledge.combined import CombinedKnowledgeBase
-from agno.embedder.ollama import OllamaEmbedder
-from agno.embedder.openai import OpenAIEmbedder
-from agno.vectordb.lancedb import LanceDb
+from common_utils import initialize_embedder_and_vector_db, initialize_knowledge_base
 
 async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[Agent]:
     """
@@ -67,146 +59,18 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         logger.warning("No valid server configurations available for MultiMCPTools")
         return None
 
-    # Load embedder configuration
-    try:
-        embedder_type, embedder_model, dimensions = load_embedder_config(server_name)
-        if embedder_type == "ollama":
-            embedder = OllamaEmbedder(id=embedder_model, dimensions=dimensions)
-        elif embedder_type == "openai":
-            embedder = OpenAIEmbedder(model=embedder_model, dimensions=dimensions)
-        else:
-            logger.error(f"Unsupported embedder type {embedder_type}, defaulting to Ollama")
-            embedder = OllamaEmbedder(id="hf.co/jinaai/jina-embeddings-v4-text-retrieval-GGUF:Q4_K_M", dimensions=2048)
-    except Exception as e:
-        logger.error(f"Failed to load embedder configuration for {server_name}: {str(e)}")
+    # Initialize embedder and vector database
+    vector_db, embedder = initialize_embedder_and_vector_db(server_name)
+    if not vector_db or not embedder:
         return None
 
-    # Initialize vector database
-    vector_db = LanceDb(
-        table_name="knowledge_base",
-        uri="tmp/lancedb",
-        embedder=embedder,
-    )
-
-    # Load knowledge files
-    knowledge_files = load_knowledge_config(server_name)
-    knowledge_base = None
-    if knowledge_files:
-        pdf_files = []
-        markdown_files = []
-        csv_files = []
-        text_files = []
-
-        # Categorize files by extension
-        for entry in knowledge_files:
-            file_path = entry["path"]
-            metadata = entry["metadata"]
-            if file_path.endswith(('.pdf', '.PDF')):
-                pdf_files.append({"path": file_path, "metadata": metadata})
-            elif file_path.endswith('.md'):
-                markdown_files.append({"path": file_path, "metadata": metadata})
-            elif file_path.endswith('.csv'):
-                csv_files.append({"path": file_path, "metadata": metadata})
-            elif file_path.endswith('.txt'):
-                text_files.append({"path": file_path, "metadata": metadata})
-            else:
-                # Treat all other files as text files
-                try:
-                    # Try to open the file as text to verify it's readable
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        f.read(1024)  # Read first 1KB to check if readable
-                    text_files.append({
-                        "path": file_path,
-                        "metadata": metadata
-                    })
-                    if not file_path.endswith('.txt'):
-                        logger.info(f"Treating file as text: {file_path}")
-                except UnicodeDecodeError:
-                    logger.warning(f"File type isn't supported: {file_path}")
-                except Exception as e:
-                    logger.warning(f"Error processing file {file_path}: {str(e)}")
-
-        knowledge_bases = []
-
-        # Create PDF knowledge base
-        if pdf_files:
-            try:
-                pdf_docs = []
-                for entry in pdf_files:
-                    with open(entry["path"], "rb") as f:
-                        pdf_docs.append(f.read())
-                pdf_kb = PDFBytesKnowledgeBase(
-                    pdfs=pdf_docs,
-                    texts=[],
-                    vector_db=vector_db,
-                )
-                knowledge_bases.append(pdf_kb)
-                logger.info(f"Initialized PDFBytesKnowledgeBase with {len(pdf_docs)} PDF documents for {server_name}")
-            except Exception as e:
-                logger.error(f"Failed to initialize PDF knowledge base for {server_name}: {str(e)}")
-
-        # Create Markdown knowledge base
-        if markdown_files:
-            try:
-                markdown_kb = MarkdownKnowledgeBase(
-                    path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in markdown_files],
-                    vector_db=vector_db,
-                    num_documents=5,  # Number of documents to return on search
-                )
-                knowledge_bases.append(markdown_kb)
-                logger.info(f"Initialized MarkdownKnowledgeBase with {len(markdown_files)} Markdown documents for {server_name}")
-            except Exception as e:
-                logger.error(f"Failed to initialize Markdown knowledge base for {server_name}: {str(e)}")
-
-        # Create CSV knowledge base
-        if csv_files:
-            try:
-                csv_kb = CSVKnowledgeBase(
-                    path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in csv_files],
-                    vector_db=vector_db,
-                )
-                knowledge_bases.append(csv_kb)
-                logger.info(f"Initialized CSVKnowledgeBase with {len(csv_files)} CSV documents for {server_name}")
-            except Exception as e:
-                logger.error(f"Failed to initialize CSV knowledge base for {server_name}: {str(e)}")
-
-        # Create Text knowledge base
-        if text_files:
-            try:
-                text_kb = TextKnowledgeBase(
-                    path=[{"path": entry["path"], "metadata": entry["metadata"]} for entry in text_files],
-                    vector_db=vector_db,
-                )
-                knowledge_bases.append(text_kb)
-                logger.info(f"Initialized TextKnowledgeBase with {len(text_files)} text documents for {server_name}")
-            except Exception as e:
-                logger.error(f"Failed to initialize Text knowledge base for {server_name}: {str(e)}")
-
-        # Combine knowledge bases
-        if knowledge_bases:
-            try:
-                knowledge_base = CombinedKnowledgeBase(
-                    sources=knowledge_bases,
-                    vector_db=vector_db,
-                )
-                await knowledge_base.aload(recreate=False)
-                logger.info(f"Combined knowledge base loaded with {len(knowledge_bases)} sources for {server_name}")
-            except Exception as e:
-                logger.error(f"Failed to load combined knowledge base for {server_name}: {str(e)}")
-                try:
-                    await knowledge_base.aload(recreate=True)
-                    logger.info(f"Combined knowledge base recreated and loaded successfully for {server_name}")
-                except Exception as reinit_e:
-                    logger.error(f"Combined knowledge base recreation failed: {str(reinit_e)}")
-                    knowledge_base = None
+    # Initialize knowledge base
+    knowledge_base = initialize_knowledge_base(server_name, vector_db)
 
     # Determine LLM model based on preference
     try:
         llm_type, llm_model = get_llm_config(server_name)
-        model = (
-            Ollama(id=llm_model) if llm_type == "ollama"
-            else OpenAIChat(id=llm_model)
-        )
+        model = Ollama(id=llm_model) if llm_type == "ollama" else OpenAIChat(id=llm_model)
         logger.info(f"Using LLM model for {server_name}: type={llm_type}, model={llm_model}")
     except Exception as e:
         logger.error(f"Failed to load LLM configuration for {server_name}: {str(e)}")
@@ -231,7 +95,6 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
             knowledge=knowledge_base,
             search_knowledge=bool(knowledge_base),
         )
-        # Attach tool configuration to agent for runtime use
         setattr(agent, "_mcp_tool_config", tool_config)
         logger.info(f"Created agent: {agent.name}, tool config: {tool_config}")
         return agent
@@ -240,10 +103,7 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         logger.debug(f"Stack trace: {traceback.format_exc()}")
         return None
 
-async def run_multimcp_agent(
-    message: str,
-    server_name: str = "Davinci_resolve"
-) -> dict | str:
+async def run_multimcp_agent(message: str, server_name: str = "Davinci_resolve") -> dict | str:
     """
     Run the MultiMCPAgent for a given message in non-streaming mode.
 
@@ -260,7 +120,6 @@ async def run_multimcp_agent(
         return {"error": "Failed to create agent"}
 
     try:
-        # Initialize MultiMCPTools at runtime
         tool_config = getattr(agent, "_mcp_tool_config", {})
         async with MultiMCPTools(
             commands=tool_config.get("commands", []),
@@ -285,10 +144,7 @@ async def run_multimcp_agent(
         logger.debug(f"Stack trace: {traceback.format_exc()}")
         return {"error": f"Agent execution failed: {str(e)}"}
 
-async def run_multimcp_agent_stream(
-    message: str,
-    server_name: str = "Davinci_resolve"
-) -> AsyncGenerator[RunResponse, None]:
+async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_resolve") -> AsyncGenerator[RunResponse, None]:
     """
     Run the MultiMCPAgent for a given message in streaming mode.
 
@@ -306,7 +162,6 @@ async def run_multimcp_agent_stream(
         return
 
     try:
-        # Initialize MultiMCPTools at runtime
         tool_config = getattr(agent, "_mcp_tool_config", {})
         async with MultiMCPTools(
             commands=tool_config.get("commands", []),
