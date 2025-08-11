@@ -32,12 +32,12 @@ SOFTWARE.
 import os
 import asyncio
 import json
-from typing import AsyncGenerator, Dict, Optional
+from typing import AsyncGenerator, Dict, Optional, List
 import aiohttp
 import pyfiglet
 from logger import logger
 from prompt_toolkit import PromptSession
-from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from termcolor import colored
 
@@ -70,10 +70,17 @@ class ClientSimulator:
         self.session_id: Optional[str] = None
         self.request_id = 0
         self.timeout = aiohttp.ClientTimeout(total=timeout, sock_read=120)
-        # Command history
-        self.command_history = []
-        # Prompt session with history support
-        self.history = InMemoryHistory()
+        
+        # Create history directory if it doesn't exist
+        history_dir = os.path.expanduser("~/.mcp_client")
+        os.makedirs(history_dir, exist_ok=True)
+        
+        # Set up history file
+        self.history_file = os.path.join(history_dir, "command_history.txt")
+        self.command_history = self._load_history_from_file()
+        
+        # Use FileHistory instead of InMemoryHistory
+        self.history = FileHistory(self.history_file)
         self.bindings = KeyBindings()
         self.prompt_session = PromptSession(
             message="> [Session: None] ",
@@ -81,6 +88,42 @@ class ClientSimulator:
             key_bindings=self.bindings,
             multiline=False
         )
+
+    def _load_history_from_file(self) -> List[str]:
+        """Load command history from file, filtering duplicates and system markers."""
+        try:
+            if os.path.exists(self.history_file):
+                with open(self.history_file, 'r', encoding='utf-8') as f:
+                    # Filter out system markers and duplicates while preserving order
+                    seen = set()
+                    filtered_history = []
+                    for line in f:
+                        line = line.strip()
+                        if (line and 
+                            not line.startswith(('#', '+')) and 
+                            line not in seen):
+                            seen.add(line)
+                            filtered_history.append(line)
+                    return filtered_history
+            return []
+        except Exception as e:
+            logger.error(f"Error loading history file: {str(e)}")
+            return []
+
+    def _save_command_to_history(self, command: str) -> None:
+        """Save a command to the history file, avoiding duplicates."""
+        try:
+            # Skip empty lines, system markers, and duplicates
+            if (not command.strip() or 
+                command.strip().startswith(('#', '+')) or
+                (self.command_history and command == self.command_history[-1])):
+                return
+                
+            with open(self.history_file, 'a', encoding='utf-8') as f:
+                f.write(f"{command}\n")
+            self.command_history.append(command)
+        except Exception as e:
+            logger.error(f"Error saving command to history: {str(e)}")
 
     async def send_rpc_request(self, method: str, params: Dict) -> Dict:
         self.request_id += 1
@@ -270,31 +313,56 @@ class ClientSimulator:
         return response
 
     def _resolve_bang_command(self, query: str) -> Optional[str]:
-        """Resolve !n or !prefix commands to a historical command."""
-        if not query.startswith("!"):
+        """Resolve history substitution commands like !!, !n, !-n, !string."""
+        if not query.startswith('!'):
             return query
         if not self.command_history:
             logger.print(colored("No command history available.", "red"))
             return None
 
-        bang_cmd = query[1:].strip()
-        if bang_cmd.isdigit():
-            # !n: Execute the nth command
-            index = int(bang_cmd) - 1
-            if 0 <= index < len(self.command_history):
-                resolved = self.command_history[index]
-                logger.print(colored(f"Executing command #{bang_cmd}: {resolved}", "yellow"))
-                return resolved
+        # Remove leading '!' and get the command specifier
+        specifier = query[1:].strip()
+        
+        try:
+            # Handle !! (last command)
+            if specifier == '!':
+                if self.command_history:
+                    resolved = self.command_history[-1]
+                    logger.print(colored(f"Executing previous command: {resolved}", "yellow"))
+                    return resolved
+            
+            # Handle !-n (nth previous command)
+            elif specifier.startswith('-'):
+                try:
+                    n = int(specifier)
+                    if abs(n) <= len(self.command_history):
+                        resolved = self.command_history[n]
+                        logger.print(colored(f"Executing command !{n}: {resolved}", "yellow"))
+                        return resolved
+                except ValueError:
+                    pass
+            
+            # Handle !n (nth command)
+            elif specifier.isdigit():
+                n = int(specifier) - 1
+                if 0 <= n < len(self.command_history):
+                    resolved = self.command_history[n]
+                    logger.print(colored(f"Executing command #{specifier}: {resolved}", "yellow"))
+                    return resolved
+                    
+            # Handle !string (most recent command starting with string)
             else:
-                logger.print(colored(f"Invalid history index: {bang_cmd}", "red"))
-                return None
-        else:
-            # !prefix: Execute the most recent command starting with prefix
-            for cmd in reversed(self.command_history):
-                if cmd.startswith(bang_cmd):
-                    logger.print(colored(f"Executing command matching '!{bang_cmd}': {cmd}", "yellow"))
-                    return cmd
-            logger.print(colored(f"No command found matching prefix: {bang_cmd}", "red"))
+                for cmd in reversed(self.command_history):
+                    if cmd.startswith(specifier):
+                        logger.print(colored(f"Executing command matching '!{specifier}': {cmd}", "yellow"))
+                        return cmd
+                        
+            logger.print(colored(f"No matching command found for '{query}'", "red"))
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error resolving history command: {str(e)}")
+            logger.print(colored(f"Error: {str(e)}", "red"))
             return None
 
     async def chat_loop(self) -> None:
@@ -309,6 +377,12 @@ class ClientSimulator:
         logger.print("- 'help': Show this help message")
         logger.print("- 'exit': Quit the simulator")
         logger.print(f"Using API key: {self.api_key}")
+        logger.print("History commands:")
+        logger.print("- '!!': Execute the previous command")
+        logger.print("- '!n': Execute command number n")
+        logger.print("- '!-n': Execute nth previous command")
+        logger.print("- '!string': Execute most recent command starting with 'string'")
+        logger.print("- 'history': Show numbered command history")
 
         while True:
             try:
@@ -320,9 +394,8 @@ class ClientSimulator:
                     continue
 
                 logger.info(f"Received user input: {query}")
-                # Store command in history
-                self.command_history.append(query)
-                self.history.append_string(query)
+                # Store command in history file and memory
+                self._save_command_to_history(query)
 
                 # Handle bang (!) commands
                 resolved_query = self._resolve_bang_command(query)
