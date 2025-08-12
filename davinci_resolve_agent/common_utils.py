@@ -2,6 +2,7 @@
 """
 Common utility functions for knowledge base and embedder initialization.
 """
+import asyncio
 import traceback
 from typing import List, Dict, Optional
 from pathlib import Path
@@ -45,7 +46,7 @@ def initialize_embedder_and_vector_db(server_name: str) -> tuple[Optional[LanceD
         logger.debug(f"Stack trace: {traceback.format_exc()}")
         return None, None
 
-def initialize_knowledge_base(server_name: str, vector_db: LanceDb) -> Optional[CombinedKnowledgeBase]:
+async def initialize_knowledge_base(server_name: str, vector_db: LanceDb) -> Optional[CombinedKnowledgeBase]:
     """
     Initialize knowledge base from configured files.
 
@@ -136,13 +137,13 @@ def initialize_knowledge_base(server_name: str, vector_db: LanceDb) -> Optional[
     if knowledge_bases:
         try:
             knowledge_base = CombinedKnowledgeBase(sources=knowledge_bases, vector_db=vector_db)
-            asyncio.run(knowledge_base.aload(recreate=False))
+            await knowledge_base.aload(recreate=False)
             logger.info(f"Combined knowledge base loaded with {len(knowledge_bases)} sources for {server_name}")
             return knowledge_base
         except Exception as e:
             logger.error(f"Failed to load combined knowledge base for {server_name}: {str(e)}")
             try:
-                asyncio.run(knowledge_base.aload(recreate=True))
+                await knowledge_base.aload(recreate=True)
                 logger.info(f"Combined knowledge base recreated and loaded for {server_name}")
                 return knowledge_base
             except Exception as reinit_e:

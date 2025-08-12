@@ -9,7 +9,6 @@ class ConfigError(Exception):
     """
     Custom exception for configuration errors.
     """
-    pass
 
 def _load_config(config_path: str = "mcp_config.json") -> Optional[Dict[str, Any]]:
     """
@@ -25,7 +24,7 @@ def _load_config(config_path: str = "mcp_config.json") -> Optional[Dict[str, Any
         logger.error(f"Configuration file {config_path} not found")
         return None
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
         if not isinstance(config, dict):
             logger.error(f"Invalid configuration format in {config_path}: expected a dict")
@@ -35,7 +34,7 @@ def _load_config(config_path: str = "mcp_config.json") -> Optional[Dict[str, Any
         logger.error(f"Failed to parse {config_path}: {str(e)}")
         return None
     except Exception as e:
-        logger.exception(f"Error loading configuration from {config_path}")
+        logger.exception(f"Error loading configuration from {config_path}, {str(e)}")
         return None
 
 def load_environment() -> None:

@@ -65,7 +65,7 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         return None
 
     # Initialize knowledge base
-    knowledge_base = initialize_knowledge_base(server_name, vector_db)
+    knowledge_base = await initialize_knowledge_base(server_name, vector_db)
 
     # Determine LLM model based on preference
     try:

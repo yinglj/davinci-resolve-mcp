@@ -104,9 +104,9 @@ This server acts as the bridge between AI assistants (like Cursor, Claude Deskto
    ```
 
 6. **Verify DaVinci Resolve is Running**:
-   
+
    Before starting the server, ensure DaVinci Resolve is running. You can use the provided script:
-   
+
    ```bash
    # On macOS/Linux
    ./scripts/check-resolve-ready.sh
@@ -325,7 +325,7 @@ The server supports multiple knowledge file types to enhance the AI's responses 
 
 ## File Structure
 
-```
+```text
 .
 ├── agnomcp_server.py       # Main server implementation with JSON-RPC handling
 ├── client_simulator.py     # Client simulator for testing and demonstration
@@ -419,7 +419,8 @@ Log entries include:
 
 Example log entry:
 
-```
+```text
+
 2023-06-15 14:32:45,123 - INFO - agnomcp_server - [PID:1234 TID:5678] - Server started on http://localhost:8080
 ```
 
@@ -462,7 +463,7 @@ If you find a bug or have a feature request, please open an issue on the GitHub 
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-```
+```text
 MIT License
 
 Copyright (c) 2023 DaVinci Resolve MCP Contributors

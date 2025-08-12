@@ -17,47 +17,46 @@ from common_utils import initialize_embedder_and_vector_db, initialize_knowledge
 logger.debug("Loading query_processor module")
 
 class QueryProcessor:
-    def __init__(self):
+    def __init__(self, server_name: str = "Davinci Resolve"):
         logger.debug("Initializing QueryProcessor")
-        self.agent = None
+        self.agent: Optional[Agent] = None
         self.sessions: Dict[str, Dict] = {}
         self.vector_db = None
         self.knowledge_base = None
-        self.server_name = None
-
-    async def initialize(self, server_name: str = "Davinci_resolve") -> None:
         self.server_name = server_name
-        logger.info(f"Starting initialization of QueryProcessor for server: {server_name}")
+
+    async def initialize(self) -> None:
+        logger.info(f"Starting initialization of QueryProcessor for server: {self.server_name}")
         try:
             # Initialize embedder and vector database
-            self.vector_db, _ = initialize_embedder_and_vector_db(server_name)
+            self.vector_db, _ = initialize_embedder_and_vector_db(self.server_name)
             if not self.vector_db:
                 raise Exception("Failed to initialize vector database")
 
             # Initialize knowledge base
-            self.knowledge_base = initialize_knowledge_base(server_name, self.vector_db)
+            self.knowledge_base = await initialize_knowledge_base(self.server_name, self.vector_db)
 
             # Initialize multi-agent
-            self.agent = await create_multi_agent(server_name)
+            self.agent = await create_multi_agent()
             if not self.agent:
-                logger.warning(f"No valid agent found for {server_name}, query functionality may be limited")
+                logger.warning(f"No valid agent found for {self.server_name}, query functionality may be limited")
             else:
                 if self.knowledge_base:
                     self.agent.knowledge = self.knowledge_base
                     self.agent.search_knowledge = True
-                    logger.info(f"Agent configured with combined knowledge base for {server_name}")
+                    logger.info(f"Agent configured with combined knowledge base for {self.server_name}")
 
             # Verify LLM model
-            llm_type, llm_model = get_llm_config(server_name)
+            llm_type, llm_model = get_llm_config(self.server_name)
             if llm_type == "ollama" and isinstance(self.agent.model, Ollama) and self.agent.model.id == llm_model:
-                logger.info(f"Using Ollama model for {server_name}: {llm_model}")
+                logger.info(f"Using Ollama model for {self.server_name}: {llm_model}")
             elif llm_type == "openai" and isinstance(self.agent.model, OpenAIChat) and self.agent.model.id == llm_model:
-                logger.info(f"Using OpenAI model for {server_name}: {llm_model}")
+                logger.info(f"Using OpenAI model for {self.server_name}: {llm_model}")
             else:
-                logger.warning(f"LLM configuration mismatch for {server_name}, using default Ollama model")
+                logger.warning(f"LLM configuration mismatch for {self.server_name}, using default Ollama model")
                 self.agent.model = Ollama(id="hf.co/Qwen/Qwen3-0.6B-GGUF:latest")
         except Exception as e:
-            logger.error(f"QueryProcessor initialization failed for {server_name}: {str(e)}")
+            logger.error(f"QueryProcessor initialization failed for {self.server_name}: {str(e)}")
             self.agent = None
             raise
 
@@ -116,7 +115,7 @@ class QueryProcessor:
             self.agent = None
             self.vector_db = None
             self.knowledge_base = None
-            await self.initialize(self.server_name)
+            await self.initialize()
             for session in self.sessions.values():
                 session["starting_agent"] = self.agent
             logger.info(f"QueryProcessor reinitialization succeeded for server {self.server_name}, agent: {self.agent.name if self.agent else 'none'}")

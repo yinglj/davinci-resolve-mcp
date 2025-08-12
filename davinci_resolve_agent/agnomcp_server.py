@@ -12,11 +12,11 @@ from errors import JSONRPC_ERROR_CODES
 import pyfiglet
 from termcolor import colored
 
-logger.debug("加载 agnomcp_server 模块")
+logger.debug("Loading agnomcp_server module")
 
 class JSONRPCServer:
     def __init__(self):
-        logger.debug("初始化 JSONRPCServer")
+        logger.debug("Initializing JSONRPCServer")
         load_environment()
         self.query_processor = None
         self.is_connected = False
@@ -340,27 +340,31 @@ class JSONRPCServer:
 
     async def start(self) -> None:
         try:
-            logger.info("开始启动 JSON-RPC 服务器")
+            logger.info("start JSON-RPC server")
             if 'ipykernel' in sys.modules:
-                logger.warning("检测到 Jupyter 环境，可能导致事件循环冲突，建议在标准 Python 环境中运行")
+                logger.warning("Detected Jupyter environment, may cause event loop conflicts, consider running in standard Python environment")
 
             # Load server configurations
             server_configs = load_server_config()
             if not server_configs:
-                logger.warning("没有有效的服务器配置，将继续启动")
+                logger.warning("No valid server configurations found, continuing startup")
             else:
-                logger.info(f"加载的服务器配置: {[s['name'] for s in server_configs]}")
+                logger.info(f"Loaded server configurations: {[s['name'] for s in server_configs]}")
 
-            # Initialize QueryProcessor with agent
+            # Modify this part of the initialization code
             self.query_processor = QueryProcessor()
-            await self.query_processor.initialize()
-            logger.info("QueryProcessor 初始化完成")
+            try:
+                await self.query_processor.initialize()  # Correctly await asynchronous initialization
+                logger.info("QueryProcessor initialization complete")
 
-            if self.query_processor.agent:
-                logger.info(f"代理初始化完成: {self.query_processor.agent.name}")
-                self.is_connected = True
-            else:
-                logger.warning("没有有效的代理")
+                if self.query_processor.agent:
+                    logger.info(f"Agent initialization complete: {self.query_processor.agent.name}")
+                    self.is_connected = True
+                else:
+                    logger.warning("No valid agent found")
+            except Exception as e:
+                logger.error(f"QueryProcessor initialization failed: {str(e)}")
+                raise RuntimeError(f"QueryProcessor initialization failed: {str(e)}")
 
             if not self.api_keys:
                 logger.warning("No API keys found. All requests will be rejected.")
@@ -399,28 +403,28 @@ class JSONRPCServer:
             logger.warning("Server startup cancelled")
             raise
         except Exception as e:
-            logger.error(f"服务器启动失败: {str(e)}")
+            logger.error(f"Server startup failed: {str(e)}")
             await self.cleanup()
-            raise RuntimeError(f"服务器启动失败: {str(e)}")
+            raise RuntimeError(f"Server startup failed: {str(e)}")
 
     async def cleanup(self) -> None:
-        logger.info("开始清理 JSONRPCServer")
+        logger.info("Starting cleanup of JSONRPCServer")
         if self.runner:
             try:
                 await self.runner.cleanup()
-                logger.info("Aiohttp 服务器清理完成")
+                logger.info("Aiohttp server cleanup complete")
             except Exception as e:
-                logger.error(f"清理 aiohttp 服务器失败: {str(e)}")
+                logger.error(f"Failed to cleanup Aiohttp server: {str(e)}")
             self.runner = None
         if self.query_processor:
             try:
                 await self.query_processor.cleanup()
-                logger.info("QueryProcessor 清理完成")
+                logger.info("QueryProcessor cleanup complete")
             except Exception as e:
-                logger.error(f"清理 QueryProcessor 失败: {str(e)}")
+                logger.error(f"Failed to cleanup QueryProcessor: {str(e)}")
             self.query_processor = None
         self.is_connected = False
-        logger.info("JSONRPCServer 已清理")
+        logger.info("JSONRPCServer cleanup complete")
 
 def generate_ascii_art(text: str, font: str = "slant", color: str = "green") -> str:
     try:
@@ -441,7 +445,7 @@ async def main() -> None:
         logger.warning("Main task cancelled")
         await server.cleanup()
     except Exception as e:
-        logger.error(f"服务器启动失败: {str(e)}")
+        logger.error(f"Server startup failed: {str(e)}")
         await server.cleanup()
         raise
 
@@ -449,5 +453,5 @@ if __name__ == "__main__":
     text = "JSON-RPC Server"
     ascii_art = generate_ascii_art(text)
     print(ascii_art)
-    logger.print("启动 JSON-RPC 服务器...")
+    logger.print("Starting JSON-RPC server...")
     asyncio.run(main())
