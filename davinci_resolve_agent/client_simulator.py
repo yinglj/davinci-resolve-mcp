@@ -395,12 +395,12 @@ class ClientSimulator:
 
                 logger.info(f"Received user input: {query}")
                 # Store command in history file and memory
-                self._save_command_to_history(query)
 
                 # Handle bang (!) commands
                 resolved_query = self._resolve_bang_command(query)
                 if resolved_query is None:
                     continue
+                self._save_command_to_history(resolved_query)
                 query = resolved_query
 
                 if query.lower() == "exit":
@@ -539,13 +539,6 @@ class ClientSimulator:
                     if isinstance(content, str):
                         try:
                             parsed_content = json.loads(content)
-                            if isinstance(parsed_content, dict) and "results" in parsed_content:
-                                for item in parsed_content.get("results", []):
-                                    if "result" in item and "content" in item["result"]:
-                                        try:
-                                            item["result"]["content"] = json.loads(item["result"]["content"])
-                                        except json.JSONDecodeError:
-                                            pass
                             content_display = json.dumps(parsed_content, indent=2, ensure_ascii=False)
                         except json.JSONDecodeError:
                             # Decode Unicode escape sequences and replace newlines/tabs
