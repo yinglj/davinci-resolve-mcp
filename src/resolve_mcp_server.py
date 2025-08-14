@@ -35,7 +35,7 @@ if RESOLVE_MODULES_PATH not in sys.path:
     sys.path.append(RESOLVE_MODULES_PATH)
 
 # Import MCP
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 # Import our utility functions
 from src.utils.platform import setup_environment, get_platform, get_resolve_paths

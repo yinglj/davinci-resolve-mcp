@@ -158,7 +158,7 @@ async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_re
     agent = await create_multi_agent(server_name)
     if not agent:
         logger.error(f"Failed to create agent for {server_name}")
-        yield RunResponse(content=f"Failed to create agent for {server_name}", complete=True)
+        yield RunResponse(content=f"Failed to create agent for {server_name}", status="COMPLETED")
         return
 
     try:
@@ -183,4 +183,4 @@ async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_re
     except Exception as e:
         logger.error(f"Failed to run MultiMCPAgent for {server_name}: {str(e)}")
         logger.debug(f"Stack trace: {traceback.format_exc()}")
-        yield RunResponse(content=f"Agent execution failed: {str(e)}", complete=True)
+        yield RunResponse(content=f"Agent execution failed: {str(e)}", status="COMPLETED")

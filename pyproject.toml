@@ -27,7 +27,7 @@ dependencies = [
     "sqlite3-api>=2.0.0",
     # Additional libraries for davinci resolve agents
     "ollama>=0.5.1",
-    "agno>=1.7.5",
+    "agno>=1.7.10",
     "openai>=1.97.0",
     "httpx[socks]>=0.28.1",
     "pyfiglet>=1.0.3",
@@ -37,4 +37,5 @@ dependencies = [
     "pypdf>=5.8.0",
     "unstructured>=0.18.11",
     "markdown>=3.8.2",
+    "fastmcp >= 2.11"
 ]

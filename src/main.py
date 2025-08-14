@@ -92,8 +92,7 @@ def run_server(debug=False, port=8020, mode="streamable-http"):
             for interface, ip in ip_list:
                 logger.print(f"http://{ip}:{port}/mcp")
     
-    mcp.run(transport=mode, mount_path="/mcp" if mode == "streamable-http" else None)
-
+    mcp.run(transport=mode)
     return 0
 
 def main():
