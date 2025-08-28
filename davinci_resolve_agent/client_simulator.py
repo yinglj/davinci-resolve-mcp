@@ -137,7 +137,7 @@ class ClientSimulator:
         try:
             async with aiohttp.ClientSession() as session:
                 logger.debug(f"Sending RPC request: {json.dumps(request, indent=2, ensure_ascii=False)}")
-                logger.print(f"Sending request:\n{json.dumps(request, indent=2, ensure_ascii=False)}")
+                logger.print(colored(f"Sending request:\n{json.dumps(request, indent=2, ensure_ascii=False)}", "magenta"))
                 async with session.post(self.rpc_url, json=request, headers=headers, timeout=self.timeout) as response:
                     logger.info(f"RPC response status: {response.status}")
                     if response.status != 200:
@@ -146,7 +146,7 @@ class ClientSimulator:
                         return {"error": error_msg}
                     result = await response.json()
                     logger.debug(f"RPC response: {json.dumps(result, indent=2, ensure_ascii=False)}")
-                    logger.print(f"Received response:\n{json.dumps(result, indent=2, ensure_ascii=False)}")
+                    logger.print(colored(f"Received response:\n{json.dumps(result, indent=2, ensure_ascii=False)}", "yellow"))
                     return result
         except asyncio.TimeoutError:
             error_msg = f"RPC request timed out after {self.timeout.total} seconds"
@@ -173,7 +173,7 @@ class ClientSimulator:
             async with aiohttp.ClientSession() as session:
                 logger.info(f"Sending stream RPC request with ID {self.request_id}")
                 logger.debug(f"Request details: {json.dumps(request, indent=2, ensure_ascii=False)}")
-                logger.print(f"Sending stream request:\n{json.dumps(request, indent=2, ensure_ascii=False)}")
+                logger.print(colored(f"Sending stream request:\n{json.dumps(request, indent=2, ensure_ascii=False)}", "magenta"))
                 async with session.post(self.stream_url, json=request, headers=headers, timeout=self.timeout) as response:
                     logger.info("Received stream response: status=%s, headers=%s", response.status, response.headers)
                     if response.status != 200:
@@ -306,10 +306,7 @@ class ClientSimulator:
         params = {"session_id": self.session_id}
         response = await self.send_rpc_request("end_session", params)
         logger.print(f"Ending session: {self.session_id}, response: {response}")
-        if "result" in response:
-            self.session_id = None
-        if "error" in response:
-            self.session_id = None
+        self.session_id = None
         return response
 
     def _resolve_bang_command(self, query: str) -> Optional[str]:
@@ -539,7 +536,8 @@ class ClientSimulator:
                     if isinstance(content, str):
                         try:
                             parsed_content = json.loads(content)
-                            content_display = json.dumps(parsed_content, indent=2, ensure_ascii=False)
+                            logger.debug(f"Parsed content: {parsed_content.get('content')}")
+                            content_display = json.dumps(parsed_content.get('content'), indent=2, ensure_ascii=False)
                         except json.JSONDecodeError:
                             # Decode Unicode escape sequences and replace newlines/tabs
                             content_display = content.encode().decode('unicode_escape').replace("\\n", "\n").replace("\\t", "\t")
@@ -559,7 +557,10 @@ class ClientSimulator:
                         final_display = json.dumps(final_content, indent=2, ensure_ascii=False)
                     logger.print(colored(f"[Final] {final_display}", "green"))
                 elif event_type == "message":
-                    logger.print(colored(f"[Message] {content_display}", "blue"))
+                    if isinstance(content_display, str):
+                        content_display = json.loads(content_display)
+                    # print(colored(f"{content_display}", "blue"), end='', flush=True)
+                    logger.print(colored(f"{content_display}", "blue"), end='')
                 elif event_type == "data":
                     logger.print(colored(f"[Data] {content_display}", "cyan"))
                 elif event_type == "run_item":

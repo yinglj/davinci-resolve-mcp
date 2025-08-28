@@ -193,7 +193,8 @@ class QueryProcessor:
                 yield await self._yield_success_response(
                     session_id=session_id,
                     event_type="final",
-                    content=final_output.strip(),
+                    # content=final_output.strip(),
+                    content="Done",
                     complete=True,
                     request_id=request_id
                 )

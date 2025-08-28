@@ -57,26 +57,26 @@ class CustomLogger(logging.Logger):
         self.console_handler.setFormatter(logging.Formatter('%(message)s'))
         self.has_console = False
 
-    def print(self, message: str, *args, **kwargs) -> None:
+    def print(self, message: str, *args, end: str = '\n', flush: bool = True, **kwargs) -> None:
         """
-        Logs a message to the standard file/stream handlers AND prints to console.
-        Captures and uses the caller's file name and line number in the log record.
+        Logs a message to the console like print(..., end='', flush=True).
+        Captures caller's file name and line number, formats the message, and writes directly to stdout.
 
         Args:
             message (str): The message to log and print.
             *args: Arguments to format the message string.
-            **kwargs: Additional keyword arguments (not used directly by formatting).
+            end (str): String appended after the message. Defaults to '' (no newline).
+            flush (bool): Whether to flush stdout immediately. Defaults to True.
+            **kwargs: Ignored for compatibility.
         """
         try:
             frame = sys._getframe(2)
-            filename = os.path.basename(frame.f_code.co_filename)
-            lineno = frame.f_lineno
-            func_name = frame.f_code.co_name
         except ValueError:
             frame = sys._getframe(1)
-            filename = os.path.basename(frame.f_code.co_filename)
-            lineno = frame.f_lineno
-            func_name = frame.f_code.co_name
+
+        filename = os.path.basename(frame.f_code.co_filename)
+        lineno = frame.f_lineno
+        func_name = frame.f_code.co_name
 
         record = self.makeRecord(
             self.name,
@@ -90,14 +90,15 @@ class CustomLogger(logging.Logger):
             sinfo=None,
         )
 
-        if not self.has_console:
-            self.addHandler(self.console_handler)
-            self.has_console = True
+        # Format the record manually
+        formatter = self.console_handler.formatter or logging.Formatter('%(message)s')
+        formatted = formatter.format(record) + end
 
-        self.handle(record)
+        # Write to stdout directly
+        sys.stdout.write(formatted)
+        if flush:
+            sys.stdout.flush()
 
-        self.removeHandler(self.console_handler)
-        self.has_console = False
 
     def exception(self, msg: str, *args, exc_info=True, **kwargs) -> None:
         """
