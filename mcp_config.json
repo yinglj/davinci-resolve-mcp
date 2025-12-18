@@ -3,7 +3,7 @@
         "Davinci_resolve": {
             "command": "streamable-http",
             "args": [
-                "http://localhost:8020/mcp"
+                "http://127.0.0.1:8020/mcp"
             ],
             "timeout": 15,
             "knowledgeFiles": [
@@ -18,7 +18,7 @@
             },
             "llm": {
                 "type": "ollama",
-                "model": "hf.co/Qwen/Qwen3-0.6B-GGUF:latest"
+                "model": "hf.co/reedmayhew/claude-3.7-sonnet-reasoning-gemma3-12B:Q8_0"
             }
         },
         "get_local_time": {

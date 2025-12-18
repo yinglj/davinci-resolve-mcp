@@ -123,26 +123,34 @@ def create_mcp_instance(mode: str = "stdio", host: str = "0.0.0.0", port: int = 
 mcp = create_mcp_instance()
 
 # Initialize connection to DaVinci Resolve
-try:
-    # Direct import from the Modules directory
-    sys.path.insert(0, RESOLVE_MODULES_PATH)
-    import DaVinciResolveScript as dvr_script
-    resolve = dvr_script.scriptapp("Resolve")
-    if resolve:
-        logger.info(f"Connected to DaVinci Resolve: {resolve.GetProductName()} {resolve.GetVersionString()}")
-    else:
-        logger.error("Failed to get Resolve object. Is DaVinci Resolve running?")
-except ImportError as e:
-    logger.error(f"Failed to import DaVinciResolveScript: {str(e)}")
-    logger.error("Check that DaVinci Resolve is installed and running.")
-    logger.error(f"RESOLVE_SCRIPT_API: {RESOLVE_API_PATH}")
-    logger.error(f"RESOLVE_SCRIPT_LIB: {RESOLVE_LIB_PATH}")
-    logger.error(f"RESOLVE_MODULES_PATH: {RESOLVE_MODULES_PATH}")
-    logger.error(f"sys.path: {sys.path}")
-    resolve = None
-except Exception as e:
-    logger.error(f"Unexpected error initializing Resolve: {str(e)}")
-    resolve = None
+resolve = None  # Global variable for resolve
+
+def initialize_resolve():
+    """Initialize or reinitialize connection to DaVinci Resolve."""
+    global resolve
+    # Initialize connection to DaVinci Resolve
+    try:
+        # Direct import from the Modules directory
+        sys.path.insert(0, RESOLVE_MODULES_PATH)
+        import DaVinciResolveScript as dvr_script
+        resolve = dvr_script.scriptapp("Resolve")
+        if resolve:
+            logger.info(f"Connected to DaVinci Resolve: {resolve.GetProductName()} {resolve.GetVersionString()}")
+        else:
+            logger.error("Failed to get Resolve object. Is DaVinci Resolve running?")
+    except ImportError as e:
+        logger.error(f"Failed to import DaVinciResolveScript: {str(e)}")
+        logger.error("Check that DaVinci Resolve is installed and running.")
+        logger.error(f"RESOLVE_SCRIPT_API: {RESOLVE_API_PATH}")
+        logger.error(f"RESOLVE_SCRIPT_LIB: {RESOLVE_LIB_PATH}")
+        logger.error(f"RESOLVE_MODULES_PATH: {RESOLVE_MODULES_PATH}")
+        logger.error(f"sys.path: {sys.path}")
+        resolve = None
+    except Exception as e:
+        logger.error(f"Unexpected error initializing Resolve: {str(e)}")
+        resolve = None
+
+initialize_resolve()
 
 # Initialize AI Agent
 agent = None
@@ -181,6 +189,12 @@ def register_mcp_resources(mcp: FastMCP):
             logger.error("Not connected to DaVinci Resolve")
             return "Error: Not connected to DaVinci Resolve"
         logger.info("Connected to DaVinci Resolve")
+        try:
+            logger.info("Connected to DaVinci Resolve")
+            return f"{resolve.GetProductName()} {resolve.GetVersionString()}"
+        except (TypeError, AttributeError) as e:
+            logger.error(f"Error calling Resolve methods: {str(e)}. Attempting to reinitialize once...")
+            initialize_resolve()  # Reinitialize once
         return f"{resolve.GetProductName()} {resolve.GetVersionString()}"
 
     @mcp.resource("resolve://current-page")
@@ -201,6 +215,7 @@ def register_mcp_resources(mcp: FastMCP):
         except Exception as e:
             # Log any errors that occur during page retrieval
             logger.error(f"Failed to get current page: {str(e)}")
+            initialize_resolve()  # Reinitialize once
             return f"Error: Failed to get current page: {str(e)}"
 
     @mcp.tool()
