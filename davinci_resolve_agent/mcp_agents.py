@@ -1,7 +1,7 @@
 # file: mcp_agents.py
 import traceback
 from typing import Optional, AsyncGenerator, cast
-from agno.agent import Agent, RunResponse
+from agno.agent import Agent, RunOutput
 from agno.tools.mcp import MultiMCPTools
 from logger import logger
 from configure import load_server_config, get_llm_config
@@ -60,12 +60,12 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         return None
 
     # Initialize embedder and vector database
-    vector_db, embedder = initialize_embedder_and_vector_db(server_name)
-    if not vector_db or not embedder:
+    vector_db, content_db,embedder = initialize_embedder_and_vector_db(server_name)
+    if not vector_db or not content_db or not embedder:
         return None
 
     # Initialize knowledge base
-    knowledge_base = await initialize_knowledge_base(server_name, vector_db)
+    knowledge_base = await initialize_knowledge_base(server_name, vector_db, content_db)
 
     # Determine LLM model based on preference
     try:
@@ -90,8 +90,8 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
             tools=[],  # Tools will be initialized at runtime
             model=model,
             markdown=True,
-            add_datetime_to_instructions=True,
-            show_tool_calls=True,
+            add_datetime_to_context=True,
+            read_tool_call_history=True,
             knowledge=knowledge_base,
             search_knowledge=bool(knowledge_base),
         )
@@ -135,7 +135,7 @@ async def run_multimcp_agent(message: str, server_name: str = "Davinci_resolve")
                 markdown=True,
                 stream_intermediate_steps=False
             )
-            response = cast(RunResponse, run_response)
+            response = cast(RunOutput, run_response)
             if hasattr(response, 'error') and response.error:
                 return {"error": response.error}
             return response.to_json()
@@ -144,7 +144,7 @@ async def run_multimcp_agent(message: str, server_name: str = "Davinci_resolve")
         logger.debug(f"Stack trace: {traceback.format_exc()}")
         return {"error": f"Agent execution failed: {str(e)}"}
 
-async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_resolve") -> AsyncGenerator[RunResponse, None]:
+async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_resolve") -> AsyncGenerator[RunOutput, None]:
     """
     Run the MultiMCPAgent for a given message in streaming mode.
 
@@ -153,12 +153,12 @@ async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_re
         server_name (str): The name of the server configuration to use.
 
     Yields:
-        RunResponse: Stream of responses from the agent.
+        RunOutput: Stream of responses from the agent.
     """
     agent = await create_multi_agent(server_name)
     if not agent:
         logger.error(f"Failed to create agent for {server_name}")
-        yield RunResponse(content=f"Failed to create agent for {server_name}", status="COMPLETED")
+        yield RunOutput(content=f"Failed to create agent for {server_name}", status="COMPLETED")
         return
 
     try:
@@ -178,9 +178,9 @@ async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_re
                 stream_intermediate_steps=True
             )
             async for chunk in run_response:
-                chunk = cast(RunResponse, chunk)
+                chunk = cast(RunOutput, chunk)
                 yield chunk
     except Exception as e:
         logger.error(f"Failed to run MultiMCPAgent for {server_name}: {str(e)}")
         logger.debug(f"Stack trace: {traceback.format_exc()}")
-        yield RunResponse(content=f"Agent execution failed: {str(e)}", status="COMPLETED")
+        yield RunOutput(content=f"Agent execution failed: {str(e)}", status="COMPLETED")

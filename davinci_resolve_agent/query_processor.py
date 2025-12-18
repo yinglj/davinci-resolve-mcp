@@ -5,7 +5,7 @@ import json
 import traceback
 from logger import logger
 from typing import Dict, Optional, AsyncGenerator, Union, cast
-from agno.agent import Agent, RunResponse
+from agno.agent import Agent, RunOutput
 from mcp_agents import create_multi_agent, run_multimcp_agent, run_multimcp_agent_stream
 from anyio import ClosedResourceError
 from configure import load_server_config, get_llm_config
@@ -17,11 +17,12 @@ from common_utils import initialize_embedder_and_vector_db, initialize_knowledge
 logger.debug("Loading query_processor module")
 
 class QueryProcessor:
-    def __init__(self, server_name: str = "Davinci Resolve"):
+    def __init__(self, server_name: str = "Davinci_resolve"):
         logger.debug("Initializing QueryProcessor")
         self.agent: Optional[Agent] = None
         self.sessions: Dict[str, Dict] = {}
         self.vector_db = None
+        self.content_db = None
         self.knowledge_base = None
         self.server_name = server_name
 
@@ -29,12 +30,12 @@ class QueryProcessor:
         logger.info(f"Starting initialization of QueryProcessor for server: {self.server_name}")
         try:
             # Initialize embedder and vector database
-            self.vector_db, _ = initialize_embedder_and_vector_db(self.server_name)
+            self.vector_db, self.content_db, _ = initialize_embedder_and_vector_db(self.server_name)
             if not self.vector_db:
                 raise Exception("Failed to initialize vector database")
 
             # Initialize knowledge base
-            self.knowledge_base = await initialize_knowledge_base(self.server_name, self.vector_db)
+            self.knowledge_base = await initialize_knowledge_base(self.server_name, self.vector_db, self.content_db)
 
             # Initialize multi-agent
             self.agent = await create_multi_agent()
@@ -169,7 +170,7 @@ class QueryProcessor:
         try:
             final_output = ""
             async for chunk in run_multimcp_agent_stream(query, self.server_name):
-                chunk = cast(RunResponse, chunk)
+                chunk = cast(RunOutput, chunk)
                 if hasattr(chunk, 'error') and chunk.error:
                     yield await self._yield_error_response(
                         code=-32603,
