@@ -9,6 +9,7 @@ from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
 from common_utils import initialize_embedder_and_vector_db, initialize_knowledge_base
 
+
 async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[Agent]:
     """
     Create a MultiMCPAgent based on server configuration.
@@ -28,7 +29,9 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
     urls = []
     urls_transports = []
 
-    logger.debug(f"Processing {len(server_configs)} server configurations: {[c['name'] for c in server_configs]}")
+    logger.debug(
+        f"Processing {len(server_configs)} server configurations: {[c['name'] for c in server_configs]}"
+    )
     for config in server_configs:
         try:
             name = config.get("name")
@@ -42,14 +45,20 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
 
             if command in ["sse", "streamable-http"]:
                 if not args or not args[0].startswith("http"):
-                    logger.error(f"Invalid SSE configuration for server '{name}': args must contain a valid HTTP URL")
+                    logger.error(
+                        f"Invalid SSE configuration for server '{name}': args must contain a valid HTTP URL"
+                    )
                     continue
                 urls.append(args[0])
                 urls_transports.append(command)
-                logger.info(f"Added SSE server: {name}, url: {args[0]}, transport: {command}")
+                logger.info(
+                    f"Added SSE server: {name}, url: {args[0]}, transport: {command}"
+                )
             else:
                 commands.append(" ".join([command] + args))
-                logger.info(f"Added Stdio server: {name}, command: {' '.join([command] + args)}")
+                logger.info(
+                    f"Added Stdio server: {name}, command: {' '.join([command] + args)}"
+                )
         except Exception as e:
             logger.error(f"Failed to process server configuration for {name}: {str(e)}")
             logger.debug(f"Stack trace: {traceback.format_exc()}")
@@ -60,7 +69,7 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         return None
 
     # Initialize embedder and vector database
-    vector_db, content_db,embedder = initialize_embedder_and_vector_db(server_name)
+    vector_db, content_db, embedder = initialize_embedder_and_vector_db(server_name)
     if not vector_db or not content_db or not embedder:
         return None
 
@@ -70,8 +79,12 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
     # Determine LLM model based on preference
     try:
         llm_type, llm_model = get_llm_config(server_name)
-        model = Ollama(id=llm_model) if llm_type == "ollama" else OpenAIChat(id=llm_model)
-        logger.info(f"Using LLM model for {server_name}: type={llm_type}, model={llm_model}")
+        model = (
+            Ollama(id=llm_model) if llm_type == "ollama" else OpenAIChat(id=llm_model)
+        )
+        logger.info(
+            f"Using LLM model for {server_name}: type={llm_type}, model={llm_model}"
+        )
     except Exception as e:
         logger.error(f"Failed to load LLM configuration for {server_name}: {str(e)}")
         return None
@@ -82,7 +95,9 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
             "commands": commands,
             "urls": urls,
             "urls_transports": urls_transports,
-            "timeout_seconds": int(max(config.get("timeout", 10) for config in server_configs)),
+            "timeout_seconds": int(
+                max(config.get("timeout", 10) for config in server_configs)
+            ),
         }
         agent = Agent(
             name=f"MultiMCPAgent_{server_name}",
@@ -103,7 +118,10 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
         logger.debug(f"Stack trace: {traceback.format_exc()}")
         return None
 
-async def run_multimcp_agent(message: str, server_name: str = "Davinci_resolve") -> dict | str:
+
+async def run_multimcp_agent(
+    message: str, server_name: str = "Davinci_resolve"
+) -> dict | str:
     """
     Run the MultiMCPAgent for a given message in non-streaming mode.
 
@@ -128,15 +146,17 @@ async def run_multimcp_agent(message: str, server_name: str = "Davinci_resolve")
             timeout_seconds=tool_config.get("timeout_seconds", 10),
         ) as mcp_tools:
             agent.tools = [mcp_tools]
-            logger.info(f"Initialized MultiMCPTools for {server_name} with config: {tool_config}")
+            logger.info(
+                f"Initialized MultiMCPTools for {server_name} with config: {tool_config}"
+            )
             run_response = await agent.arun(
-                message=message,
+                input=message,
                 stream=False,
                 markdown=True,
-                stream_intermediate_steps=False
+                stream_intermediate_steps=False,
             )
             response = cast(RunOutput, run_response)
-            if hasattr(response, 'error') and response.error:
+            if hasattr(response, "error") and response.error:
                 return {"error": response.error}
             return response.to_json()
     except Exception as e:
@@ -144,7 +164,10 @@ async def run_multimcp_agent(message: str, server_name: str = "Davinci_resolve")
         logger.debug(f"Stack trace: {traceback.format_exc()}")
         return {"error": f"Agent execution failed: {str(e)}"}
 
-async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_resolve") -> AsyncGenerator[RunOutput, None]:
+
+async def run_multimcp_agent_stream(
+    message: str, server_name: str = "Davinci_resolve"
+) -> AsyncGenerator[RunOutput, None]:
     """
     Run the MultiMCPAgent for a given message in streaming mode.
 
@@ -158,7 +181,9 @@ async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_re
     agent = await create_multi_agent(server_name)
     if not agent:
         logger.error(f"Failed to create agent for {server_name}")
-        yield RunOutput(content=f"Failed to create agent for {server_name}", status="COMPLETED")
+        yield RunOutput(
+            content=f"Failed to create agent for {server_name}", status="COMPLETED"
+        )
         return
 
     try:
@@ -170,12 +195,14 @@ async def run_multimcp_agent_stream(message: str, server_name: str = "Davinci_re
             timeout_seconds=tool_config.get("timeout_seconds", 10),
         ) as mcp_tools:
             agent.tools = [mcp_tools]
-            logger.info(f"Initialized MultiMCPTools for {server_name} with config: {tool_config}")
+            logger.info(
+                f"Initialized MultiMCPTools for {server_name} with config: {tool_config}"
+            )
             run_response = await agent.arun(
-                message=message,
+                input=message,
                 stream=True,
                 markdown=True,
-                stream_intermediate_steps=True
+                stream_intermediate_steps=True,
             )
             async for chunk in run_response:
                 chunk = cast(RunOutput, chunk)
