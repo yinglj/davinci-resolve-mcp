@@ -2,18 +2,32 @@
 
 # MCP Protocol SDK with CLI support
 mcp[cli]
+fastmcp>=2.14.0
 
 # Dependencies for testing and automation scripts
 requests>=2.28.0
 psutil>=5.9.0
+netifaces>=0.11.0
 
 # JSON-RPC Server for API
 jsonrpcserver>=5.0.0
 
 # Git repository dependencies
-git+https://github.com/modelcontextprotocol/python-sdk.git 
+# git+https://github.com/modelcontextprotocol/python-sdk.git 
 
 # AI Agent Dependencies
+ollama>=0.5.1
+agno>=2.3.14
+openai>=1.97.0
+httpx[socks]>=0.28.1
+pyfiglet>=1.0.3
+termcolor>=3.1.0
+prompt-toolkit>=3.0.51
+lancedb>=0.24.1
+pypdf>=5.8.0
+unstructured>=0.18.11
+markdown>=3.8.2
+sqlalchemy>=2.0.43
 
 # Computer Vision and Image Processing
 opencv-python>=4.8.0
@@ -36,4 +50,4 @@ sqlite3-api>=2.0.0  # For memory management
 # Optional: For advanced video analysis (install separately if needed)
 # torch>=2.0.0
 # torchvision>=0.15.0
-# transformers>=4.30.0 
+# transformers>=4.30.0
