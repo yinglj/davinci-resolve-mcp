@@ -84,6 +84,7 @@ from src.utils.project_properties import (
     get_project_metadata,
     get_project_info,
 )
+from src.utils.screenshot import capture_resolve_window_mac
 
 # Import AI Agent components
 from src.agent import ResolveAgent
@@ -7173,6 +7174,19 @@ def register_mcp_resources(mcp: FastMCP):
         result = agent.state.get_task_history(limit=20)
         logger.info(f"Successfully retrieved task history with {len(result)} entries")
         return result
+
+    @mcp.tool()
+    def capture_screenshot(output_path: str = None) -> Dict[str, Any]:
+        """Capture a screenshot of the DaVinci Resolve window (macOS only).
+
+        Args:
+            output_path: Optional path to save the screenshot.
+
+        Returns:
+            Dict[str, Any]: A dictionary with 'success', 'path', and optional 'error'.
+        """
+        logger.info("Capturing DaVinci Resolve screenshot...")
+        return capture_resolve_window_mac(output_path)
 
 
 # Start the server
