@@ -927,3 +927,59 @@ def create_sub_clip(resolve, clip_name: str, start_frame: int, end_frame: int,
             pass
         
         return f"Error creating subclip: {str(e)}" 
+def link_proxy_media(resolve, clip_name: str, proxy_file_path: str) -> str:
+    """Link a proxy media file to a clip in the media pool."""
+    if resolve is None:
+        return "Error: Not connected to DaVinci Resolve"
+    
+    pm = resolve.GetProjectManager()
+    project = pm.GetCurrentProject()
+    media_pool = project.GetMediaPool()
+    
+    # Find clip in media pool
+    root = media_pool.GetRootFolder()
+    clips = root.GetClipList()
+    target_clip = None
+    for clip in clips:
+        if clip.GetName() == clip_name:
+            target_clip = clip
+            break
+    
+    if not target_clip:
+        return f"Error: Clip '{clip_name}' not found"
+
+    try:
+        result = target_clip.LinkProxyMedia(proxy_file_path)
+        return f"Successfully linked proxy for '{clip_name}'" if result else f"Failed to link proxy for '{clip_name}'"
+    except Exception as e:
+        return f"Error linking proxy: {e}"
+
+def register_tools(proxy):
+    """Register media tools with the proxy."""
+    from ..resolve_mcp_server import get_resolve
+    
+    proxy.register_tool(
+        "list_media_pool_clips",
+        lambda: list_media_pool_clips(get_resolve()),
+        "media",
+        "List all clips in the media pool",
+        {}
+    )
+    proxy.register_tool(
+        "import_media",
+        lambda file_path: import_media(get_resolve(), file_path),
+        "media",
+        "Import a media file into the media pool",
+        {"file_path": {"type": "string", "description": "Absolute path to media file"}}
+    )
+    proxy.register_tool(
+        "link_proxy_media",
+        lambda clip_name, proxy_file_path: link_proxy_media(get_resolve(), clip_name, proxy_file_path),
+        "media",
+        "Link a proxy media file to a clip",
+        {
+            "clip_name": {"type": "string", "description": "Name of the clip"},
+            "proxy_file_path": {"type": "string", "description": "Absolute path to proxy file"}
+        }
+    )
+    return 3

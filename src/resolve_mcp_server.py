@@ -9,14 +9,20 @@ Version: 1.3.8 - Improved Cursor Integration, Entry Point Standardization
 import os
 import sys
 import logging
-from typing import List, Dict, Any, Optional, Union
+import json
 import asyncio
+from typing import List, Dict, Any, Optional, Union, Callable
+from pathlib import Path
 
 # Add src directory to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, "src")
 if src_dir not in sys.path:
-    sys.path.insert(0, src_dir)
+    sys.path.insert(0, sys.path[0])  # Insert at the beginning
+    sys.path.insert(1, src_dir)
+
+# Import Proxy Layer
+from src.proxy import get_proxy
 
 # Import platform utilities
 from src.utils.platform import setup_environment, get_platform, get_resolve_paths
@@ -122,8 +128,8 @@ def create_mcp_instance(
         logger.info(f"Creating FastMCP instance for {mode} mode")
         return FastMCP("DaVinciResolveMCP")
     else:
-        logger.info(f"Creating FastMCP instance for {mode} mode on {host}:{port}")
-        return FastMCP("DaVinciResolveMCP", host=host, port=port)
+        logger.info(f"Creating FastMCP instance for {mode} mode")
+        return FastMCP("DaVinciResolveMCP")
 
 
 # Global MCP instance (to be used in main.py)
@@ -164,6 +170,36 @@ def initialize_resolve():
 
 initialize_resolve()
 
+
+# Getter functions for modular tools
+def get_resolve():
+    """Get the global Resolve instance."""
+    return resolve
+
+
+def get_project_manager():
+    """Get the Resolve Project Manager."""
+    if resolve:
+        return resolve.GetProjectManager()
+    return None
+
+
+def get_current_project():
+    """Get the currently open project."""
+    pm = get_project_manager()
+    if pm:
+        return pm.GetCurrentProject()
+    return None
+
+
+def get_current_timeline():
+    """Get the currently active timeline."""
+    proj = get_current_project()
+    if proj:
+        return proj.GetCurrentTimeline()
+    return None
+
+
 # Initialize AI Agent
 agent = None
 if resolve:
@@ -179,14 +215,105 @@ else:
     logger.warning("Skipping AI Agent initialization - Resolve not connected")
 
 
+# Import modular tools
+from src.api import (
+    timeline_advanced,
+    fusion_operations,
+    media_operations,
+    render_operations,
+    app_operations,
+    project_operations,
+)
+
+# Initialize Tool Proxy
+proxy = get_proxy()
+
+
+def proxy_tool(
+    category: str,
+    description: str = "",
+    parameters: Optional[Dict] = None,
+    register_mcp: bool = False,
+):
+    """Decorator to register tools with the Proxy.
+    Actual MCP registration happens in register_mcp_resources.
+    """
+
+    def decorator(func: Callable) -> Callable:
+        # Register with proxy and store MCP registration intent
+        proxy.register_tool(
+            name=func.__name__,
+            func=func,
+            category=category,
+            description=description or func.__doc__ or "",
+            parameters=parameters,
+            register_mcp=register_mcp,
+        )
+        return func
+
+    return decorator
+
+
 # Register MCP resources
 def register_mcp_resources(mcp: FastMCP):
     """Register all MCP resources with the provided MCP instance."""
     if mcp is None:
         logger.error("Cannot register resources: MCP instance is None")
         return
+
     # ------------------
-    # MCP Tools/Resources
+    # Meta Tools (Search/Execute)
+    # ------------------
+
+    @mcp.tool()
+    def search_resolve_tools(
+        query: str, category: Optional[str] = None, limit: int = 10
+    ) -> List[Dict[str, Any]]:
+        """Search for DaVinci Resolve tools by name or description.
+
+        Args:
+            query: Search term
+            category: Optional category filter
+            limit: Max results
+        """
+        return proxy.search_tools(query, category, limit)
+
+    @mcp.tool()
+    def execute_resolve_tool(tool_name: str, arguments: Dict[str, Any]) -> Any:
+        """Execute a specific DaVinci Resolve tool by name.
+
+        Args:
+            tool_name: The name of the tool to execute
+            arguments: Dictionary of arguments for the tool
+        """
+        try:
+            return proxy.execute_tool(tool_name, **arguments)
+        except Exception as e:
+            logger.error(f"Error executing {tool_name}: {e}")
+            return {"success": False, "error": str(e)}
+
+    @mcp.tool()
+    def list_resolve_tool_categories() -> List[str]:
+        """List all available tool categories."""
+        return proxy.get_categories()
+
+    @mcp.tool()
+    def list_tools_in_category(category: str) -> List[str]:
+        """List all tools in a specific category."""
+        return proxy.list_tools(category)
+
+    # ------------------
+    # Register Modular Tools
+    # ------------------
+    timeline_advanced.register_tools(proxy)
+    fusion_operations.register_tools(proxy)
+    media_operations.register_tools(proxy)
+    render_operations.register_tools(proxy)
+    app_operations.register_tools(proxy)
+    project_operations.register_tools(proxy)
+
+    # ------------------
+    # MCP Resources
     # ------------------
 
     @mcp.resource("resolve://version")
@@ -233,7 +360,7 @@ def register_mcp_resources(mcp: FastMCP):
             initialize_resolve()  # Reinitialize once
             return f"Error: Failed to get current page: {str(e)}"
 
-    @mcp.tool()
+    @proxy_tool(category="navigation", register_mcp=True)
     def switch_page(page: str) -> str:
         """Switch to a specific page in DaVinci Resolve.
 
@@ -404,7 +531,7 @@ def register_mcp_resources(mcp: FastMCP):
                 "error": f"Failed to get project setting '{setting_name}': {str(e)}"
             }
 
-    @mcp.tool()
+    @proxy_tool(category="project")
     def set_project_setting(setting_name: str, setting_value: Any) -> str:
         """Set a project setting to the specified value.
 
@@ -486,7 +613,7 @@ def register_mcp_resources(mcp: FastMCP):
             logger.error(f"Error setting project setting '{setting_name}': {str(e)}")
             return f"Error setting project setting: {str(e)}"
 
-    @mcp.tool()
+    @proxy_tool(category="project")
     def open_project(name: str) -> str:
         """Open a DaVinci Resolve project by name.
 
@@ -533,7 +660,7 @@ def register_mcp_resources(mcp: FastMCP):
             logger.error(f"Error opening project '{name}': {str(e)}")
             return f"Error opening project '{name}': {str(e)}"
 
-    @mcp.tool()
+    @proxy_tool(category="project")
     def create_project(name: str) -> str:
         """Create a new project with the given name.
 
@@ -578,7 +705,7 @@ def register_mcp_resources(mcp: FastMCP):
             logger.error(f"Error creating project '{name}': {str(e)}")
             return f"Error creating project '{name}': {str(e)}"
 
-    @mcp.tool()
+    @proxy_tool(category="project")
     def save_project() -> str:
         """Save the current project.
 
@@ -687,7 +814,7 @@ def register_mcp_resources(mcp: FastMCP):
             logger.error(f"Error saving project: {str(e)}")
             return f"Error saving project: {str(e)}"
 
-    @mcp.tool()
+    @proxy_tool(category="project")
     def close_project() -> str:
         """Close the current project.
 
@@ -7187,6 +7314,30 @@ def register_mcp_resources(mcp: FastMCP):
         """
         logger.info("Capturing DaVinci Resolve screenshot...")
         return capture_resolve_window_mac(output_path)
+
+    # ------------------
+    # Finalize Proxy Tools Registration
+    # ------------------
+    # This must be at the end of register_mcp_resources to catch all tools
+    # defined inside this function using the @proxy_tool decorator.
+    for name, info in proxy.tool_registry.items():
+        if info.get("register_mcp") or proxy.config.get("mode") == "full":
+            # Check if tool is already registered with MCP
+            try:
+                # FastMCP 2.x stores tools in _tool_manager._tools (dict)
+                if hasattr(mcp, "_tool_manager") and hasattr(
+                    mcp._tool_manager, "_tools"
+                ):
+                    if name in mcp._tool_manager._tools:
+                        logger.debug(
+                            f"Tool {name} already registered with MCP, skipping"
+                        )
+                        continue
+            except:
+                pass
+
+            logger.debug(f"Registering proxy tool with MCP: {name}")
+            mcp.tool(name=name, description=info["description"])(info["func"])
 
 
 # Start the server

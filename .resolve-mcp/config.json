@@ -1,0 +1,11 @@
+{
+    "mode": "full",
+    "max_tools": 400,
+    "active_profile": "full",
+    "profiles": {
+        "full": {
+            "description": "All tools",
+            "categories": "all"
+        }
+    }
+}
