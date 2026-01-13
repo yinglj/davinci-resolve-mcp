@@ -278,7 +278,6 @@ from src.api import (
     timeline_advanced,
     fusion_operations,
     media_operations,
-    render_operations,
     app_operations,
     project_operations,
 )
@@ -366,7 +365,6 @@ def register_mcp_resources(mcp: FastMCP):
     timeline_advanced.register_tools(proxy)
     fusion_operations.register_tools(proxy)
     media_operations.register_tools(proxy)
-    render_operations.register_tools(proxy)
     app_operations.register_tools(proxy)
     project_operations.register_tools(proxy)
 
@@ -672,6 +670,29 @@ def register_mcp_resources(mcp: FastMCP):
             return f"Error setting project setting: {str(e)}"
 
     @proxy_tool(category="project")
+    def set_timeline_format(width: int, height: int, frame_rate: float) -> str:
+        """Set timeline resolution and frame rate.
+
+        Args:
+            width: Width in pixels.
+            height: Height in pixels.
+            frame_rate: Frame rate (e.g. 24.0, 30.0, 60.0).
+
+        Returns:
+            str: A message indicating the success or failure of the operation.
+        """
+        logger.debug(f"Setting timeline format: {width}x{height} @ {frame_rate}fps")
+        from src.api.project_operations import set_timeline_format as set_format_func
+
+        try:
+            result = set_format_func(resolve, width, height, frame_rate)
+            logger.info(f"Set timeline format result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error setting timeline format: {str(e)}")
+            return f"Error setting timeline format: {str(e)}"
+
+    @proxy_tool(category="project")
     def open_project(name: str) -> str:
         """Open a DaVinci Resolve project by name.
 
@@ -913,6 +934,32 @@ def register_mcp_resources(mcp: FastMCP):
         except Exception as e:
             logger.error(f"Error closing project: {str(e)}")
             return f"Error closing project: {str(e)}"
+
+    # ------------------
+    # Application Operations
+    # ------------------
+
+    @mcp.tool()
+    def quit_resolve(force: bool = False, save_project: bool = True) -> str:
+        """Quit DaVinci Resolve.
+
+        Args:
+            force: Force quit (default: False).
+            save_project: Save before quitting (default: True).
+
+        Returns:
+            str: Status message.
+        """
+        logger.info(f"Requesting Quit (force={force}, save={save_project})")
+        from src.api.app_operations import quit_app
+
+        try:
+            result = quit_app(resolve, force, save_project)
+            logger.info(f"Quit result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error quitting Resolve: {str(e)}")
+            return f"Error quitting Resolve: {str(e)}"
 
     # ------------------
     # Timeline Operations
@@ -1284,8 +1331,74 @@ def register_mcp_resources(mcp: FastMCP):
             logger.info(f"Razor timeline result: {result}")
             return result
         except Exception as e:
-            logger.error(f"Error executing razor: {str(e)}")
             return f"Error executing razor: {str(e)}"
+
+    @mcp.tool()
+    def export_timeline(
+        file_path: str, export_type: str, export_subtype: str = None
+    ) -> Dict[str, Any]:
+        """Export timeline to various formats (AAF, EDL, XML, FCP XML, etc.).
+
+        Args:
+            file_path: Destination file path.
+            export_type: Export format (AAF, EDL, FCPXML_1_10, etc.).
+            export_subtype: Optional subtype.
+
+        Returns:
+            Dict[str, Any]: Result dictionary.
+        """
+        logger.debug(f"Exporting timeline to {file_path} ({export_type})")
+        from src.api.timeline_advanced import export_timeline as export_func
+
+        try:
+            result = export_func(file_path, export_type, export_subtype)
+            logger.info(f"Export timeline result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error exporting timeline: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    @mcp.tool()
+    def duplicate_timeline(timeline_name: str) -> Dict[str, Any]:
+        """Duplicate the current timeline with a new name.
+
+        Args:
+            timeline_name: New timeline name.
+
+        Returns:
+            Dict[str, Any]: Result dictionary.
+        """
+        logger.debug(f"Duplicating timeline to '{timeline_name}'")
+        from src.api.timeline_advanced import duplicate_timeline as dup_func
+
+        try:
+            result = dup_func(timeline_name)
+            logger.info(f"Duplicate timeline result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error duplicating timeline: {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    @mcp.tool()
+    def insert_fusion_title(title_name: str) -> Dict[str, Any]:
+        """Insert a Fusion title into the timeline.
+
+        Args:
+            title_name: Fusion title name.
+
+        Returns:
+            Dict[str, Any]: Result dictionary.
+        """
+        logger.debug(f"Inserting Fusion title '{title_name}'")
+        from src.api.timeline_advanced import insert_fusion_title as insert_title_func
+
+        try:
+            result = insert_title_func(title_name)
+            logger.info(f"Insert Fusion title result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error inserting Fusion title: {str(e)}")
+            return {"success": False, "error": str(e)}
 
     @mcp.tool()
     def get_timeline_items(
@@ -1373,6 +1486,35 @@ def register_mcp_resources(mcp: FastMCP):
         except Exception as e:
             logger.error(f"Error adding Fusion generator: {str(e)}")
             return f"Error adding Fusion generator: {str(e)}"
+
+    @mcp.tool()
+    def set_timeline_item_transform(
+        timeline_item_id: str, property_name: str, value: float
+    ) -> Dict[str, Any]:
+        """Set transform property (Pan, Tilt, ZoomX, ZoomY, Rotation) for a specific clip.
+
+        Args:
+            timeline_item_id: Clip ID or Name.
+            property_name: Property name (e.g., 'Pan', 'ZoomX').
+            value: New value.
+
+        Returns:
+            Dict[str, Any]: Result dictionary.
+        """
+        logger.debug(
+            f"Setting transform for '{timeline_item_id}': {property_name}={value}"
+        )
+        from src.api.fusion_operations import set_timeline_item_property
+
+        try:
+            result = set_timeline_item_property(
+                resolve, timeline_item_id, property_name, value
+            )
+            logger.info(f"Set transform result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error setting transform: {str(e)}")
+            return {"success": False, "error": str(e)}
 
     # ------------------
     # Media Pool Operations
