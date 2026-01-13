@@ -91,6 +91,8 @@ from src.utils.project_properties import (
     get_project_info,
 )
 from src.utils.screenshot import capture_resolve_window_mac
+from src.utils.response import success_response, error_response
+
 
 # Import AI Agent components
 from src.agent import ResolveAgent
@@ -109,6 +111,62 @@ logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 logger.info(f"Detected platform: {get_platform()}")
 logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")
 logger.info(f"Using Resolve library path: {RESOLVE_LIB_PATH}")
+
+
+def _normalize_result(
+    op: str, result, context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Normalize diverse helper return types into a standard envelope.
+
+    This is intentionally conservative so we don't have to rewrite all
+    existing helpers. It understands:
+      * plain success strings
+      * strings starting with "Error:" or "Failed" as errors
+      * dicts containing an "error" key as error-ish payloads
+      * everything else as opaque data
+    """
+    # Already in our structured format
+    if isinstance(result, dict) and "ok" in result and "error" in result:
+        return result
+
+    # String results from older helpers
+    if isinstance(result, str):
+        text = result.strip()
+        if text.startswith("Error:"):
+            message = text[len("Error:") :].strip()
+            return error_response(
+                code=f"{op.upper()}_ERROR",
+                message=message or text,
+                details={"raw": result},
+                context=context,
+            )
+        if text.lower().startswith("failed"):
+            return error_response(
+                code=f"{op.upper()}_FAILED",
+                message=text,
+                details={"raw": result},
+                context=context,
+            )
+        # Otherwise treat as a successful human-readable message
+        return success_response(data={"raw": result}, message=text, context=context)
+
+    # Dict results that advertise an error field
+    if isinstance(result, dict) and "error" in result and not result.get("ok", True):
+        err = result["error"]
+        if isinstance(err, dict):
+            code = err.get("code") or f"{op.upper()}_ERROR"
+            message = err.get("message") or str(err)
+            details = err.get("details", result)
+        else:
+            code = f"{op.upper()}_ERROR"
+            message = str(err)
+            details = result
+        return error_response(
+            code=code, message=message, details=details, context=context
+        )
+
+    # Anything else is treated as data
+    return success_response(data=result, context=context)
 
 
 # Create MCP server instance with dynamic configuration based on mode
@@ -1187,6 +1245,135 @@ def register_mcp_resources(mcp: FastMCP):
             logger.error(f"Error adding marker: {str(e)}")
             return f"Error adding marker: {str(e)}"
 
+    @mcp.tool()
+    def set_current_frame(frame: int) -> str:
+        """Set the current playhead position to a specific frame.
+
+        Args:
+            frame: The absolute frame number to move to.
+
+        Returns:
+            str: A message indicating the success or failure of the operation.
+        """
+        logger.debug(f"Attempting to set current frame to {frame}")
+        from src.api.timeline_operations import set_current_frame as set_frame_func
+
+        try:
+            result = set_frame_func(resolve, frame)
+            logger.info(f"Set current frame result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error setting current frame: {str(e)}")
+            return f"Error setting current frame: {str(e)}"
+
+    @mcp.tool()
+    def razor_timeline(frame: int = None) -> str:
+        """Cut all clips at the current playhead position or a specified frame.
+
+        Args:
+            frame: Optional absolute frame number to cut at.
+
+        Returns:
+            str: A message indicating the success or failure of the operation.
+        """
+        logger.debug(f"Attempting to razor timeline at frame {frame}")
+        from src.api.timeline_operations import razor_timeline as razor_func
+
+        try:
+            result = razor_func(resolve, frame)
+            logger.info(f"Razor timeline result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error executing razor: {str(e)}")
+            return f"Error executing razor: {str(e)}"
+
+    @mcp.tool()
+    def get_timeline_items(
+        track_type: str = "video", track_index: int = 1
+    ) -> List[Dict[str, Any]]:
+        """Get list of items in a specific track with their IDs and time ranges.
+
+        Args:
+            track_type: 'video', 'audio', or 'subtitle'.
+            track_index: The index of the track (1-based).
+
+        Returns:
+            List[Dict[str, Any]]: List of item dictionaries with id, name, start, end, duration, type.
+        """
+        logger.debug(f"Getting timeline items from {track_type} track {track_index}")
+        from src.api.timeline_operations import get_timeline_items as get_items_func
+
+        try:
+            result = get_items_func(resolve, track_type, track_index)
+            if isinstance(result, str) and result.startswith("Error"):
+                logger.error(f"Get timeline items failed: {result}")
+                return [{"error": result}]
+            logger.info(
+                f"Got {len(result) if isinstance(result, list) else 0} timeline items"
+            )
+            return result if isinstance(result, list) else [{"error": str(result)}]
+        except Exception as e:
+            logger.error(f"Error getting timeline items: {str(e)}")
+            return [{"error": f"Error getting timeline items: {str(e)}"}]
+
+    # ------------------
+    # Fusion Operations
+    # ------------------
+
+    @mcp.tool()
+    def add_fusion_effect(
+        timeline_item_id: str, effect_name: str, settings: Dict[str, Any] = None
+    ) -> str:
+        """Add a Fusion effect to a timeline item.
+
+        Args:
+            timeline_item_id: The unique ID of the timeline item.
+            effect_name: The name of the effect (e.g., 'Blur').
+            settings: Optional dictionary of settings to apply to the effect.
+
+        Returns:
+            str: A message indicating success or failure.
+        """
+        logger.debug(
+            f"Adding Fusion effect '{effect_name}' to item '{timeline_item_id}'"
+        )
+        from src.api.fusion_operations import add_fusion_effect as add_effect_func
+
+        try:
+            result = add_effect_func(resolve, timeline_item_id, effect_name, settings)
+            logger.info(f"Add Fusion effect result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error adding Fusion effect: {str(e)}")
+            return f"Error adding Fusion effect: {str(e)}"
+
+    @mcp.tool()
+    def add_fusion_generator(
+        timeline_item_id: str, generator_name: str, settings: Dict[str, Any] = None
+    ) -> str:
+        """Add a Fusion generator to a timeline item.
+
+        Args:
+            timeline_item_id: The unique ID of the timeline item.
+            generator_name: The name of the generator (e.g., 'Text+').
+            settings: Optional dictionary of settings to apply to the generator.
+
+        Returns:
+            str: A message indicating success or failure.
+        """
+        logger.debug(
+            f"Adding Fusion generator '{generator_name}' to item '{timeline_item_id}'"
+        )
+        from src.api.fusion_operations import add_fusion_generator as add_gen_func
+
+        try:
+            result = add_gen_func(resolve, timeline_item_id, generator_name, settings)
+            logger.info(f"Add Fusion generator result: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"Error adding Fusion generator: {str(e)}")
+            return f"Error adding Fusion generator: {str(e)}"
+
     # ------------------
     # Media Pool Operations
     # ------------------
@@ -1446,12 +1633,33 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to create subclip from '{clip_name}', start_frame={start_frame}, end_frame={end_frame}, sub_clip_name={sub_clip_name}, bin_name={bin_name}"
         )
-        from api.media_operations import create_sub_clip as create_sub_clip_func
+        from src.api.media_operations import (
+            create_sub_clip as create_sub_clip_func,
+            create_pseudo_subclip,
+        )
 
         try:
             result = create_sub_clip_func(
                 resolve, clip_name, start_frame, end_frame, sub_clip_name, bin_name
             )
+
+            # Check for specific "not supported" error to trigger fallback
+            if "not supported" in result.lower() and "createsubclip" in result.lower():
+                logger.info(
+                    "Standard subclip creation failed/unsupported. "
+                    "Falling back to pseudo-subclip creation."
+                )
+                fallback_result = create_pseudo_subclip(
+                    resolve,
+                    clip_name,
+                    start_frame,
+                    end_frame,
+                    sub_clip_name,
+                    bin_name,
+                )
+                logger.info(f"Pseudo-subclip result: {fallback_result}")
+                return fallback_result
+
             logger.info(f"Create subclip result: {result}")
             return result
         except Exception as e:
@@ -1891,6 +2099,42 @@ def register_mcp_resources(mcp: FastMCP):
         except Exception as e:
             logger.error(f"Error adding to render queue: {str(e)}")
             return {"error": f"Error adding to render queue: {str(e)}"}
+
+    @mcp.tool()
+    def add_to_render_queue_json(
+        preset_name: str, timeline_name: str = None, use_in_out_range: bool = False
+    ) -> Dict[str, Any]:
+        """Add a timeline to the render queue and return a structured JSON response.
+
+        Args:
+            preset_name: Name of the render preset to use.
+            timeline_name: Name of the timeline to render (uses current if None).
+            use_in_out_range: Whether to render only the in/out range instead of entire timeline.
+
+        Returns:
+            Dict[str, Any]: A standardized success/error envelope.
+        """
+        logger.debug(
+            f"Adding to render queue (JSON): preset={preset_name}, timeline={timeline_name or 'current'}"
+        )
+        from src.api.delivery_operations import add_to_render_queue as add_queue_func
+
+        try:
+            # We call the same underlying function, but wrap the result
+            raw_result = add_queue_func(
+                resolve, preset_name, timeline_name, use_in_out_range
+            )
+
+            # _normalize_result will handle dicts with "error" keys or plain strings
+            return _normalize_result("add_to_render_queue", raw_result)
+
+        except Exception as e:
+            logger.error(f"Error in add_to_render_queue_json: {str(e)}")
+            return error_response(
+                code="RENDER_QUEUE_ADD_ERROR",
+                message=str(e),
+                details={"preset": preset_name, "timeline": timeline_name},
+            )
 
     @mcp.tool()
     def start_render() -> Dict[str, Any]:

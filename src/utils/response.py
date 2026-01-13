@@ -1,8 +1,19 @@
 #!/usr/bin/env python3
 """Common response helpers for MCP tools.
 
-Standardizes tool output for better AI parsing.
+These helpers provide a stable, pipeline‑friendly envelope so callers can
+rely on a consistent structure:
+
+{
+  "ok": bool,
+  "data": Any | None,
+  "error": {"code": str, "message": str, "details": Any} | None,
+  "message": str | None,
+  "context": dict | None,
+}
 """
+
+from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
@@ -12,7 +23,14 @@ def success_response(
     message: Optional[str] = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Standard success envelope."""
+    """Standard success envelope.
+
+    Args:
+        data: Optional payload
+        message: Optional human‑readable summary
+        context: Optional extra context (match id, project name, etc.)
+    """
+
     resp: Dict[str, Any] = {
         "ok": True,
         "data": data,
@@ -32,7 +50,15 @@ def error_response(
     details: Any = None,
     context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """Standard error envelope."""
+    """Standard error envelope.
+
+    Args:
+        code: Stable, machine‑readable error code (e.g. "NOT_CONNECTED")
+        message: Human‑readable message
+        details: Optional raw result / exception / extra fields
+        context: Optional extra context (match id, project name, etc.)
+    """
+
     err: Dict[str, Any] = {
         "code": code,
         "message": message,
