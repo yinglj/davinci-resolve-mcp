@@ -33,6 +33,9 @@ class TaskExecutor:
         """
         results = []
         
+        # set current plan context for parameter resolution
+        self._current_plan = plan
+
         while not plan.is_complete():
             # Get next steps that can be executed
             next_steps = plan.get_next_steps()
@@ -101,10 +104,30 @@ class TaskExecutor:
     async def _execute_resolve_api(self, step: PlanStep) -> Any:
         """Execute a DaVinci Resolve API call"""
         action = step.action
-        params = step.parameters
-        
-        # Get all tools from the MCP server
-        tools = {}
+        params = step.parameters or {}
+
+        # Resolve any parameter references to previous steps (e.g., shots_reference_step)
+        resolved_params = {}
+        for k, v in params.items():
+            if isinstance(k, str) and k.endswith('_reference_step') and isinstance(v, str):
+                # Look up the referenced step in the current plan
+                ref_step = None
+                if hasattr(self, '_current_plan') and self._current_plan:
+                    for s in self._current_plan.steps:
+                        if s.step_id == v:
+                            ref_step = s
+                            break
+                if ref_step:
+                    # Prefer actual result if available, fallback to parameters
+                    if ref_step.result is not None:
+                        resolved_params[k.replace('_reference_step', '')] = ref_step.result
+                    else:
+                        # Common case: the referenced step put 'shots' in its parameters
+                        resolved_params[k.replace('_reference_step', '')] = ref_step.parameters.get('shots', ref_step.parameters)
+                else:
+                    resolved_params[k.replace('_reference_step', '')] = v
+            else:
+                resolved_params[k] = v
         
         # Tools are stored in the _tools dictionary
         if hasattr(self.resolve_server, '_tools'):
@@ -121,11 +144,11 @@ class TaskExecutor:
         if action in tools:
             tool_func = tools[action]
             
-            # Run in thread pool to avoid blocking
+            # Run in thread pool to avoid blocking, using resolved params
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 self.executor,
-                lambda: tool_func(**params) if params else tool_func()
+                lambda: tool_func(**resolved_params) if resolved_params else tool_func()
             )
             return result
         else:
@@ -135,7 +158,7 @@ class TaskExecutor:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
                     self.executor,
-                    lambda: tool_func(**params) if params else tool_func()
+                    lambda: tool_func(**resolved_params) if resolved_params else tool_func()
                 )
                 return result
             
