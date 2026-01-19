@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import traceback
 
 from ..planner.plan import Plan, PlanStep, StepType
+from .skills.create_placeholder_timeline import create_placeholder_timeline
 
 logger = logging.getLogger(__name__)
 

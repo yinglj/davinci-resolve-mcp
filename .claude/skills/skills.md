@@ -87,6 +87,7 @@
 ## 初始 Roadmap（任务清单 / Issue 建议）🛠️
 1. Create: `.claude/skills/skills.md`（已完成） ✅
 2. 创建 P0 技能：`ScriptToShots`、`CreatePlaceholderTimeline`、`ImportAndTagAssets`、`RenderPresetRunner`（各写单元测试）。
+   - ✅ `ScriptToShots` 已实现 POC（解析器模块、单元测试、示例脚本），测试通过并已本地提交（见 `src/agent/planner/skills/script_to_shots.py`, `tests/test_script_to_shots.py`, `examples/generate_short_from_script.py`）。
 3. 为 `task_executor` 写模拟 Resolve 的测试 Mocks 并在 CI 中使用。
 4. 补充 RAG 索引：把用户示例项目与偏好文件加入向量库，便于风格检索。 
 5. 集成小型示例：`examples/generate_short_from_script.py`（演示从脚本到时间线的 POC）。

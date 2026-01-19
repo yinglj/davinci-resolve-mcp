@@ -6,6 +6,7 @@ import re
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 from .plan import Plan, PlanStep, StepType
+from .skills import parse_script_to_shots
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,12 @@ class TaskPlanner:
                 (r'check.*quality', 'analyze_video'),
                 (r'detect.*scenes?', 'analyze_video'),
                 (r'find.*objects?', 'analyze_video')
+            ],
+            'script_to_shots': [
+                (r'from script', 'script_to_shots'),
+                (r'script to', 'script_to_shots'),
+                (r'create.*from script', 'script_to_shots'),
+                (r'shot list', 'script_to_shots')
             ]
         }
         
@@ -161,6 +168,15 @@ class TaskPlanner:
             path_matches = re.findall(r'["\']([^"\']+)["\']', request)
             if path_matches:
                 entities['paths'] = path_matches
+        elif intent == 'script_to_shots':
+            # For script-based requests, capture the entire request as script text
+            # If user includes a colon followed by the script, extract that part
+            m = re.search(r':\s*(.+)$', request, re.S)
+            if m:
+                entities['script'] = m.group(1).strip()
+            else:
+                # Fallback: use whole request
+                entities['script'] = request.strip()
                 
         elif intent == 'color_grade':
             # Extract LUT path if mentioned
@@ -262,6 +278,43 @@ class TaskPlanner:
             expected_outcome="Switched to Fusion page"
         )
         plan.add_step(step)
+
+    async def _plan_script_to_shots(self, plan: Plan, entities: Dict[str, Any]):
+        """Parse the provided script text into shots and create placeholder timeline steps"""
+        script_text = entities.get('script', '')
+        shots = []
+        try:
+            shots = parse_script_to_shots(script_text)
+        except Exception as e:
+            logger.exception("Failed to parse script to shots")
+            # Add a documentation lookup step as fallback
+            step = PlanStep(
+                step_type=StepType.DOCUMENTATION,
+                action="lookup_command",
+                parameters={'query': script_text},
+                expected_outcome="Found relevant commands or examples"
+            )
+            plan.add_step(step)
+            return
+
+        # Add a step that records the generated shot list
+        step_shots = PlanStep(
+            step_type=StepType.VALIDATION,
+            action="script_to_shots",
+            parameters={'shots': shots},
+            expected_outcome="Shot list generated"
+        )
+        plan.add_step(step_shots)
+
+        # Add a dependent step to create a placeholder timeline
+        step_tl = PlanStep(
+            step_type=StepType.RESOLVE_API,
+            action="create_placeholder_timeline",
+            parameters={'shots_reference_step': step_shots.step_id},
+            dependencies=[step_shots.step_id],
+            expected_outcome="Placeholder timeline created"
+        )
+        plan.add_step(step_tl)
         
     async def _plan_generic(self, plan: Plan, request: str, context: Any):
         """Generic planning for unrecognized requests"""
