@@ -177,6 +177,17 @@ class TaskPlanner:
             else:
                 # Fallback: use whole request
                 entities['script'] = request.strip()
+
+            # Detect BPM if the user mentions music tempo and set an auto-cut flag when present
+            bpm_match = re.search(r'(\d+)\s*bpm', request.lower())
+            if bpm_match:
+                try:
+                    entities['bpm'] = int(bpm_match.group(1))
+                except Exception:
+                    pass
+
+            if 'auto cut' in request.lower() or 'autocut' in request.lower() or 'beat match' in request.lower():
+                entities['auto_cut'] = True
                 
         elif intent == 'color_grade':
             # Extract LUT path if mentioned
@@ -306,12 +317,26 @@ class TaskPlanner:
         )
         plan.add_step(step_shots)
 
-        # Add a dependent step to create a placeholder timeline
+        # Optionally add an AutoCut step if the user requested beat-matching or provided a BPM
+        auto_cut_enabled = entities.get('auto_cut') or (entities.get('bpm') is not None)
+        step_autocut = None
+        if auto_cut_enabled:
+            step_autocut = PlanStep(
+                step_type=StepType.COMPOSITE,
+                action="auto_cut",
+                parameters={'shots_reference_step': step_shots.step_id, 'bpm': entities.get('bpm')},
+                dependencies=[step_shots.step_id],
+                expected_outcome="AutoCut computed in/out for shots"
+            )
+            plan.add_step(step_autocut)
+
+        # Add a dependent step to create a placeholder timeline (depend on autotcut if present)
+        timeline_dep = step_autocut.step_id if step_autocut else step_shots.step_id
         step_tl = PlanStep(
             step_type=StepType.RESOLVE_API,
             action="create_placeholder_timeline",
-            parameters={'shots_reference_step': step_shots.step_id},
-            dependencies=[step_shots.step_id],
+            parameters={'shots_reference_step': timeline_dep},
+            dependencies=[timeline_dep],
             expected_outcome="Placeholder timeline created"
         )
         plan.add_step(step_tl)

@@ -20,8 +20,8 @@ class DummyTimeline:
         self._start_tc = tc
         return True
 
-    def AddMarker(self, frame, color, note):
-        self._markers[frame] = {'color': color, 'note': note}
+    def AddMarker(self, frame, color, note, track=None):
+        self._markers[frame] = {'color': color, 'note': note, 'track': track}
         return True
 
     def GetMarkers(self):

@@ -16,7 +16,8 @@ def test_create_placeholder_with_resolve_mock():
         {'id': 'shot_002', 'summary': 'Close up', 'duration': 4, 'shot_type': 'close'},
     ]
 
-    res = create_placeholder_timeline(shots, project='TestProj', options={'timeline_name': 'MockTL', 'frame_rate': 24})
+    # Place markers at the start (default)
+    res = create_placeholder_timeline(shots, project='TestProj', options={'timeline_name': 'MockTL', 'frame_rate': 24, 'marker_position': 'start'})
     assert res['timeline_name'] == 'MockTL'
     assert res['created_shots_count'] == 2
     assert 'markers' in res
@@ -24,3 +25,16 @@ def test_create_placeholder_with_resolve_mock():
     # Validate marker frames roughly equal cumulative seconds * frame_rate
     assert res['markers'][0]['frame'] == 0
     assert res['markers'][1]['frame'] == 5 * 24
+
+    # Middle markers
+    res_mid = create_placeholder_timeline(shots, project='TestProj', options={'timeline_name': 'MockTL_MID', 'frame_rate': 24, 'marker_position': 'middle'})
+    assert len(res_mid['markers']) == 2
+    assert res_mid['markers'][0]['frame'] == int( (0 + 5/2) * 24 )
+
+    # Test track and offset per shot
+    shots_with_track = [
+        {'id': 'shot_010', 'summary': 'Track test', 'duration': 4, 'shot_type': 'wide', 'marker_track': 2, 'offset': 1},
+    ]
+    res_track = create_placeholder_timeline(shots_with_track, project='TestProj', options={'timeline_name': 'MockTL_TRACK', 'frame_rate': 24, 'marker_position': 'start'})
+    assert res_track['markers'][0]['track'] == 2
+    assert res_track['markers'][0]['frame'] == 1 * 24

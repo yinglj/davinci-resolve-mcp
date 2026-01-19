@@ -28,14 +28,24 @@ def create_placeholder_timeline(shots: List[Dict[str, Any]], project: Optional[s
     timeline_name = options.get('timeline_name') if options and 'timeline_name' in options else 'AutoTimeline'
     frame_rate = options.get('frame_rate') if options and 'frame_rate' in options else None
 
-    # Build the created shots structure
+    # Marker placement options
+    marker_position = options.get('marker_position') if options and 'marker_position' in options else 'start'
+    # marker_position: 'start' | 'middle' | 'end' - where to place the marker within the shot
+    default_track = options.get('marker_track') if options and 'marker_track' in options else None
+    default_offset_frames = int(options.get('marker_offset_frames', 0)) if options and 'marker_offset_frames' in options else 0
+
+    # Build the created shots structure (keep shot metadata intact so we can consider in/out per shot)
     created = []
     for s in shots:
         created.append({
             'id': s.get('id'),
             'summary': s.get('summary'),
             'duration': s.get('duration'),
-            'shot_type': s.get('shot_type')
+            'shot_type': s.get('shot_type'),
+            'in': s.get('in'),
+            'out': s.get('out'),
+            'offset': s.get('offset', 0),
+            'marker_track': s.get('marker_track', None)
         })
 
     # Lazy imports to avoid import-time circular dependencies
@@ -63,19 +73,57 @@ def create_placeholder_timeline(shots: List[Dict[str, Any]], project: Optional[s
                 except Exception:
                     frame_rate = 30.0
 
-            # Add markers at cumulative positions
+            # Add markers at positions determined by marker_position and per-shot metadata
             cumulative = 0.0
             markers_added = []
             for s in created:
-                frame = _seconds_to_frame(cumulative, frame_rate)
-                note = s.get('summary', '')
-                # Use timeline_operations.add_marker wrapper
+                # Determine shot duration (prefer 'in'/'out' if present)
+                duration = None
                 try:
-                    add_marker(resolve, frame=frame, color='Blue', note=note)
-                    markers_added.append({'frame': frame, 'note': note})
+                    if s.get('in') is not None and s.get('out') is not None:
+                        # in/out are seconds relative to shot; duration is out - in
+                        duration = float(s['out']) - float(s['in'])
+                    else:
+                        duration = float(s.get('duration', 3))
+                except Exception:
+                    duration = float(s.get('duration', 3))
+
+                # Base start time is cumulative + per-shot offset (seconds)
+                shot_offset_seconds = float(s.get('offset', 0))
+                shot_start = cumulative + shot_offset_seconds
+
+                if marker_position == 'start':
+                    marker_seconds = shot_start
+                elif marker_position == 'middle':
+                    marker_seconds = shot_start + max(0.0, duration / 2.0)
+                elif marker_position == 'end':
+                    marker_seconds = shot_start + max(0.0, duration)
+                else:
+                    # unknown option - default to start
+                    marker_seconds = shot_start
+
+                # If shot specified explicit 'marker_offset_frames', apply
+                marker_offset_frames = default_offset_frames
+                marker_track = s.get('marker_track') if s.get('marker_track') is not None else default_track
+
+                frame = _seconds_to_frame(marker_seconds, frame_rate) + marker_offset_frames
+                note = s.get('summary', '')
+
+                # Use timeline_operations.add_marker wrapper, but catch and log failures per-shot
+                try:
+                    add_marker(resolve, frame=frame, color='Blue', note=note, track=marker_track)
+                    markers_added.append({'frame': frame, 'note': note, 'track': marker_track})
+                except TypeError:
+                    # older Resolve mock or API might not accept track param; try without it
+                    try:
+                        add_marker(resolve, frame=frame, color='Blue', note=note)
+                        markers_added.append({'frame': frame, 'note': note, 'track': None})
+                    except Exception as e:
+                        logger.warning("Failed to add marker in fallback attempt for shot %s: %s", s.get('id'), str(e))
                 except Exception as e:
-                    logger.warning(f"Failed to add marker for shot {s.get('id')}: {e}")
-                cumulative += float(s.get('duration', 3))
+                    logger.warning("Failed to add marker for shot %s: %s", s.get('id'), str(e))
+
+                cumulative += duration
 
             result = {
                 'timeline_name': timeline_name,
@@ -86,10 +134,11 @@ def create_placeholder_timeline(shots: List[Dict[str, Any]], project: Optional[s
                 'resolve_result': res
             }
 
-            logger.info(f"Created timeline '{timeline_name}' in Resolve, markers: {len(markers_added)}")
+            logger.info("Created timeline '%s' in Resolve, markers: %d", timeline_name, len(markers_added))
             return result
         except Exception as e:
-            logger.exception("Error creating timeline in Resolve, falling back to local representation")
+            # Log exception details and fallback
+            logger.exception("Error creating timeline in Resolve (will fallback to local representation): %s", str(e))
 
     # Fallback deterministic result (POC)
     result = {
