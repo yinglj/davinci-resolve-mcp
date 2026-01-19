@@ -46,12 +46,16 @@ class TaskPlanner:
             await self._plan_import_media(plan, entities)
         elif intent == "color_grade":
             await self._plan_color_grade(plan, entities)
+        elif intent == "auto_color":
+            await self._plan_auto_color(plan, entities)
         elif intent == "export_video":
             await self._plan_export_video(plan, entities)
         elif intent == "analyze_video":
             await self._plan_analyze_video(plan, entities)
         elif intent == "composite_effect":
             await self._plan_composite_effect(plan, entities, docs)
+        elif intent == "auto_audio":
+            await self._plan_auto_audio(plan, entities)
         else:
             # Generic planning based on action patterns
             await self._plan_generic(plan, user_request, context)
@@ -105,7 +109,9 @@ class TaskPlanner:
                 (r'color grade', 'color_grade'),
                 (r'apply.*lut', 'apply_lut'),
                 (r'color correct', 'color_grade'),
-                (r'grade.*clips?', 'color_grade')
+                (r'grade.*clips?', 'color_grade'),
+                (r'auto.*color', 'auto_color'),
+                (r'color.*auto', 'auto_color')
             ],
             'export_video': [
                 (r'export.*video', 'export_video'),
@@ -124,6 +130,12 @@ class TaskPlanner:
                 (r'script to', 'script_to_shots'),
                 (r'create.*from script', 'script_to_shots'),
                 (r'shot list', 'script_to_shots')
+            ],
+            'auto_audio': [
+                (r'normalize.*audio', 'auto_audio'),
+                (r'audio.*normalize', 'auto_audio'),
+                (r'voiceover', 'auto_audio'),
+                (r'tts|text.*speech', 'auto_audio')
             ]
         }
         
@@ -194,6 +206,29 @@ class TaskPlanner:
             lut_match = re.search(r'lut["\s]+([^"\s]+)', request.lower())
             if lut_match:
                 entities['lut_path'] = lut_match.group(1)
+                
+        elif intent == 'auto_color':
+            # Extract style preference
+            style_match = re.search(r'(cinematic|documentary|vibrant|cool|warm|auto)', request.lower())
+            if style_match:
+                entities['style'] = style_match.group(1)
+            else:
+                entities['style'] = 'auto'
+                
+        elif intent == 'auto_audio':
+            # Extract loudness target
+            loudness_match = re.search(r'([-]?\d+(?:\.\d+)?)\s*lufs?', request.lower())
+            if loudness_match:
+                try:
+                    entities['loudness'] = float(loudness_match.group(1))
+                except Exception:
+                    pass
+            
+            # Extract voiceover text
+            vo_match = re.search(r'voiceover[:"\']+\s*([^"\']+)["\']?', request, re.IGNORECASE)
+            if vo_match:
+                entities['voiceover_text'] = vo_match.group(1).strip()
+
                 
         return entities
         
@@ -289,6 +324,42 @@ class TaskPlanner:
             expected_outcome="Switched to Fusion page"
         )
         plan.add_step(step)
+
+    async def _plan_auto_color(self, plan: Plan, entities: Dict[str, Any]):
+        """Plan automatic color grading"""
+        style = entities.get('style', 'auto')
+        step = PlanStep(
+            step_type=StepType.RESOLVE_API,
+            action="auto_color_grade",
+            parameters={'style': style},
+            expected_outcome="Auto color grading applied"
+        )
+        plan.add_step(step)
+
+    async def _plan_auto_audio(self, plan: Plan, entities: Dict[str, Any]):
+        """Plan audio processing (normalization, TTS)"""
+        # Audio normalization step
+        step_norm = PlanStep(
+            step_type=StepType.RESOLVE_API,
+            action="audio_normalize",
+            parameters={'target_loudness': entities.get('loudness', -23.0)},
+            expected_outcome="Audio normalized"
+        )
+        plan.add_step(step_norm)
+        
+        # Optional TTS voiceover step
+        if entities.get('voiceover_text'):
+            step_tts = PlanStep(
+                step_type=StepType.RESOLVE_API,
+                action="text_to_speech",
+                parameters={
+                    'text': entities['voiceover_text'],
+                    'voice': entities.get('voice', 'default')
+                },
+                dependencies=[step_norm.step_id],
+                expected_outcome="Voiceover generated"
+            )
+            plan.add_step(step_tts)
 
     async def _plan_script_to_shots(self, plan: Plan, entities: Dict[str, Any]):
         """Parse the provided script text into shots and create placeholder timeline steps"""
