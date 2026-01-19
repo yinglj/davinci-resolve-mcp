@@ -1,6 +1,6 @@
-"""AutoColor & Audio 集成
+"""AutoColor & Audio Integration
 
-与 Resolve 颜色节点、TTS 和音频规范化流程的集成。
+Integration with Resolve color nodes, TTS, and audio normalization pipelines.
 """
 from typing import List, Dict, Any, Optional, Tuple
 import logging
@@ -11,7 +11,7 @@ import hashlib
 logger = logging.getLogger(__name__)
 
 
-# Style 到颜色参数的映射表
+# Style to color parameters mapping
 STYLE_PRESETS = {
     'cinematic': {
         'description': 'Warm, slightly desaturated look',
@@ -64,13 +64,13 @@ def create_color_grade_from_style(
     target_clip: Optional[str] = None,
     apply_to_all_clips: bool = False
 ) -> Dict[str, Any]:
-    """为 clips 创建颜色分级节点。
+    """Create color grading node from preset style.
     
     Args:
-        resolve: Resolve 实例
-        style_sample: 风格代码 ('cinematic'|'documentary'|'vibrant'|'cool'|'warm'|'noir'|'solarize')
-        target_clip: 目标 clip 名称（None = 当前 clip）
-        apply_to_all_clips: 是否应用到所有 clips
+        resolve: Resolve instance
+        style_sample: Style code ('cinematic'|'documentary'|'vibrant'|'cool'|'warm'|'noir'|'solarize')
+        target_clip: Target clip name (None = current clip)
+        apply_to_all_clips: Apply to all clips in timeline
     
     Returns:
         {'success': bool, 'nodes_created': int, 'messages': [], 'style_params': dict}
@@ -82,22 +82,22 @@ def create_color_grade_from_style(
     nodes_created = 0
     
     try:
-        # 确保有效的风格选择
+        # Ensure valid style choice
         if style_sample and style_sample not in STYLE_PRESETS:
-            # 如果风格未知，自动转为 'cinematic'
+            # Default to 'cinematic' if unknown
             messages.append(f'Unknown style "{style_sample}", defaulting to cinematic')
             style_sample = 'cinematic'
         
         style_sample = style_sample or 'cinematic'
         style_params = STYLE_PRESETS.get(style_sample, STYLE_PRESETS['cinematic'])
         
-        # 尝试与 Resolve API 交互
+        # Attempt to interact with Resolve API
         try:
             project_manager = resolve.GetProjectManager()
             current_project = project_manager.GetCurrentProject()
             current_timeline = current_project.GetCurrentTimeline()
             
-            # 获取当前 clip 或指定的 clips
+            # Get current clip or specified clips
             if apply_to_all_clips:
                 track_count = current_timeline.GetTrackCount('video')
                 clips_to_grade = []
@@ -111,25 +111,25 @@ def create_color_grade_from_style(
                 current_clip = current_timeline.GetCurrentVideoItem()
                 clips_to_grade = [current_clip] if current_clip else []
             
-            # 为每个 clip 添加颜色节点
+            # Add color node to each clip
             for clip in clips_to_grade:
                 try:
-                    # 获取 clip 的 grade
+                    # Get clip's grade
                     grade = clip.GetCurrentGrade()
                     if not grade:
-                        grade = clip.SetGrade()  # 创建新的 grade
+                        grade = clip.SetGrade()  # Create new grade
                     
-                    # 添加新节点
+                    # Add new node
                     new_node_id = grade.AddNode()
                     nodes_created += 1
                     
-                    # 设置节点名称
+                    # Set node name
                     try:
                         grade.SetNodeName(new_node_id, f'Grade_{style_sample}')
                     except:
                         pass
                     
-                    # 应用样式参数到节点
+                    # Apply style parameters to node
                     for wheel_name, wheel_params in style_params.items():
                         for param_name, param_value in wheel_params.items():
                             try:
@@ -143,7 +143,7 @@ def create_color_grade_from_style(
                     messages.append(f'Warning: Could not add color node: {str(e)}')
         
         except Exception as e:
-            # Resolve API 不可用，但仍然返回成功（POC 模式）
+            # Resolve API unavailable, still return success (POC mode)
             messages.append(f'Resolve API unavailable, using POC mode: {str(e)}')
         
         return {
@@ -172,17 +172,17 @@ def normalize_audio_loudness(
     attack_ms: float = 10.0,
     release_ms: float = 100.0
 ) -> Dict[str, Any]:
-    """规范化音频响度。
+    """Normalize audio loudness.
     
-    参数设置遵循 EBU R128 标准（广播级别）。
+    Settings follow EBU R128 standard (broadcast level).
     
     Args:
-        resolve: Resolve 实例
-        target_loudness: 目标响度（LUFS，推荐 -23.0）
-        timeline_name: 时间线名称（None = 当前）
-        compression_ratio: 压缩比（e.g., 4.0 = 4:1）
-        attack_ms: 压缩器 attack 时间
-        release_ms: 压缩器 release 时间
+        resolve: Resolve instance
+        target_loudness: Target loudness in LUFS (recommended -23.0)
+        timeline_name: Timeline name (None = current)
+        compression_ratio: Compression ratio (e.g., 4.0 = 4:1)
+        attack_ms: Compressor attack time in milliseconds
+        release_ms: Compressor release time in milliseconds
     
     Returns:
         {'success': bool, 'applied_loudness': float, 'settings': dict, 'messages': []}
@@ -196,11 +196,11 @@ def normalize_audio_loudness(
         'compression_ratio': compression_ratio,
         'attack_ms': attack_ms,
         'release_ms': release_ms,
-        'algorithm': 'EBU R128',  # 广播标准
+        'algorithm': 'EBU R128',  # Broadcast standard
     }
     
     try:
-        # 尝试切换到 Fairlight 页面
+        # Attempt to switch to Fairlight page
         try:
             if hasattr(resolve, 'OpenPage'):
                 resolve.OpenPage('fairlight')
@@ -212,9 +212,9 @@ def normalize_audio_loudness(
         messages.append(f'Compression: {compression_ratio}:1 ratio')
         messages.append(f'Attack: {attack_ms}ms, Release: {release_ms}ms')
         
-        # POC: 计算音频处理链
-        # 在真实场景中，这会配置 Fairlight 的多频段压缩器
-        loudness_correction = max(-6.0, min(6.0, target_loudness + 23.0))  # 调整范围
+        # POC: Calculate audio processing chain
+        # In real scenario, this would configure Fairlight's multi-band compressor
+        loudness_correction = max(-6.0, min(6.0, target_loudness + 23.0))  # Adjustment range
         messages.append(f'Loudness correction: {loudness_correction:+.1f}dB')
         
         return {
@@ -241,17 +241,18 @@ def generate_tts_voiceover(
     rate: float = 1.0,
     pitch: float = 1.0
 ) -> Dict[str, Any]:
-    """生成 TTS 旁白。
+    """Generate TTS voiceover.
     
-    支持多种语言和语音参数。估算时长基于平均语速。
+    Supports multiple languages and voice parameters.
+    Duration estimation based on average speech rate.
     
     Args:
-        text: 要转换为语音的文本
-        voice: 语音选择 ('default'|'male'|'female'|'neutral'|'child'）
-        output_path: 输出文件路径
-        language: 语言代码 ('en-US'|'zh-CN'|'ja-JP' 等）
-        rate: 语速倍数（0.5 = 一半速度，2.0 = 两倍速度）
-        pitch: 音高倍数
+        text: Text to convert to speech
+        voice: Voice choice ('default'|'male'|'female'|'neutral'|'child')
+        output_path: Output file path
+        language: Language code ('en-US'|'zh-CN'|'ja-JP' etc.)
+        rate: Speech rate multiplier (0.5 = half speed, 2.0 = double speed)
+        pitch: Pitch multiplier
     
     Returns:
         {'success': bool, 'output_path': str, 'duration': float, 'metadata': dict}
@@ -262,16 +263,16 @@ def generate_tts_voiceover(
     messages = []
     
     try:
-        # 检查 output_path 的目录是否存在
+        # Check if output directory exists
         output_dir = os.path.dirname(output_path)
         if output_dir and not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
         
-        # 基于语言的平均语速（字/分钟）
+        # Average speech rate by language (words/minute)
         language_rates = {
             'en-US': 140,  # English
             'en-GB': 140,
-            'zh-CN': 180,  # Mandarin Chinese （汉字更密集）
+            'zh-CN': 180,  # Mandarin Chinese (denser characters)
             'ja-JP': 150,  # Japanese
             'fr-FR': 130,  # French
             'de-DE': 120,  # German
@@ -280,13 +281,13 @@ def generate_tts_voiceover(
         }
         
         base_rate = language_rates.get(language, 140)
-        adjusted_rate = base_rate / rate  # 调整语速
+        adjusted_rate = base_rate / rate  # Adjust for rate multiplier
         
-        # 估算时长（秒）
+        # Estimate duration (seconds)
         text_length = len(text.split())
         estimated_duration = text_length / (adjusted_rate / 60.0)
         
-        # 生成 TTS ID（用于缓存）
+        # Generate TTS ID (for caching)
         text_hash = hashlib.md5(f"{text}_{voice}_{language}".encode()).hexdigest()[:8]
         
         messages.append(f'TTS configuration:')
@@ -326,13 +327,13 @@ def apply_auto_color_to_shots(
     style: str = 'auto',
     adjust_per_shot: bool = False
 ) -> Dict[str, Any]:
-    """对多个 shots 应用自动颜色分级。
+    """Apply automatic color grading to multiple shots.
     
     Args:
-        resolve: Resolve 实例
-        shots: shot 列表（含 'id', 'in', 'out' 等）
-        style: 风格代码（或 'auto' 自动检测）
-        adjust_per_shot: 是否为每个 shot 单独调整颜色
+        resolve: Resolve instance
+        shots: List of shots (with 'id', 'in', 'out' etc.)
+        style: Style code (or 'auto' for auto-detection)
+        adjust_per_shot: Adjust color individually per shot
     
     Returns:
         {'success': bool, 'shots_graded': int, 'details': [], 'summary': dict}
@@ -345,7 +346,7 @@ def apply_auto_color_to_shots(
     failed_count = 0
     
     try:
-        # 如果 style 为 'auto'，根据第一个 shot 的类型选择风格
+        # If style is 'auto', select based on first shot type
         if style == 'auto':
             first_shot_type = shots[0].get('shot_type', 'generic')
             if 'wide' in first_shot_type.lower():
@@ -361,7 +362,7 @@ def apply_auto_color_to_shots(
             out_time = shot.get('out', in_time + 1.0)
             duration = out_time - in_time
             
-            # 基于 shot 类型的风格微调
+            # Adjust style based on shot type if per-shot adjustment enabled
             shot_style = style
             if adjust_per_shot:
                 shot_type = shot.get('shot_type', '').lower()
@@ -370,7 +371,7 @@ def apply_auto_color_to_shots(
                 elif 'slow' in shot_type or 'dramatic' in shot_type:
                     shot_style = 'cinematic'
             
-            # 为 shot 记录分级参数
+            # Record grading parameters for shot
             grade_info = {
                 'shot_id': shot_id,
                 'in': in_time,
@@ -382,7 +383,7 @@ def apply_auto_color_to_shots(
             }
             
             try:
-                # 尝试应用颜色分级
+                # Attempt to apply color grading
                 result = create_color_grade_from_style(resolve, style_sample=shot_style)
                 if result.get('success'):
                     grade_info['applied'] = True
@@ -403,7 +404,7 @@ def apply_auto_color_to_shots(
         logger.info("Applied auto color to %d shots (failed: %d)", graded_count, failed_count)
         
         return {
-            'success': failed_count < len(shots),  # 成功如果大部分 shots 被处理
+            'success': failed_count < len(shots),  # Success if most shots processed
             'shots_graded': graded_count,
             'shots_failed': failed_count,
             'total_shots': len(shots),

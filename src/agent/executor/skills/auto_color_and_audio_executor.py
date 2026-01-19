@@ -1,6 +1,6 @@
-"""P1-03 AutoColor & Audio 的执行器工具
+"""P1-03 AutoColor & Audio Executor Tools
 
-与 Resolve 集成的颜色分级、音频规范化和 TTS 生成。
+Color grading, audio normalization, and TTS generation integrated with Resolve.
 """
 from typing import List, Dict, Any, Optional
 from .resolve_color_and_audio import (
@@ -21,16 +21,16 @@ def auto_color_grade(
     apply_to_all_clips: bool = False,
     adjust_per_shot: bool = False
 ) -> Dict[str, Any]:
-    """执行器工具：对 shots 应用自动颜色分级。
+    """Executor tool: Apply automatic color grading to shots.
     
     Args:
-        shots: shot 列表 (each with 'id', 'in', 'out', 'shot_type')
-        style: 风格代码或 'auto' (自动检测)
-        apply_to_all_clips: 是否应用到时间线中的所有 clips
-        adjust_per_shot: 是否为每个 shot 根据其 shot_type 微调风格
+        shots: List of shots (each with 'id', 'in', 'out', 'shot_type')
+        style: Style code or 'auto' for auto-detection
+        apply_to_all_clips: Apply to all clips in timeline
+        adjust_per_shot: Adjust style per shot based on shot_type
     
     Returns:
-        执行结果包含成功状态、应用的 shots 数、详细信息
+        Execution result with success status, graded shots count, details
     """
     try:
         from src.resolve_mcp_server import get_resolve
@@ -39,7 +39,7 @@ def auto_color_grade(
         resolve = None
     
     try:
-        # 如果 apply_to_all_clips，对所有 clips 应用，否则只对提供的 shots 应用
+        # If apply_to_all_clips, apply to all clips; otherwise apply to provided shots
         if apply_to_all_clips:
             result = create_color_grade_from_style(resolve, style_sample=style, apply_to_all_clips=True)
         else:
@@ -58,19 +58,19 @@ def audio_normalize(
     attack_ms: float = 10.0,
     release_ms: float = 100.0
 ) -> Dict[str, Any]:
-    """执行器工具：规范化时间线音频响度。
+    """Executor tool: Normalize timeline audio loudness.
     
-    遵循 EBU R128 广播标准的音频规范化。
+    Audio normalization following EBU R128 broadcast standard.
     
     Args:
-        target_loudness: 目标响度（LUFS，推荐 -23.0）
-        timeline_name: 时间线名称（None = 当前）
-        compression_ratio: 压缩比（e.g., 4.0）
-        attack_ms: 压缩器 attack 时间
-        release_ms: 压缩器 release 时间
+        target_loudness: Target loudness in LUFS (recommended -23.0)
+        timeline_name: Timeline name (None = current)
+        compression_ratio: Compression ratio (e.g., 4.0)
+        attack_ms: Compressor attack time in milliseconds
+        release_ms: Compressor release time in milliseconds
     
     Returns:
-        规范化结果
+        Normalization result
     """
     try:
         from src.resolve_mcp_server import get_resolve
@@ -100,20 +100,20 @@ def text_to_speech(
     rate: float = 1.0,
     pitch: float = 1.0
 ) -> Dict[str, Any]:
-    """执行器工具：生成 TTS 旁白。
+    """Executor tool: Generate TTS voiceover.
     
-    支持多种语言和语音参数。
+    Support for multiple languages and voice parameters.
     
     Args:
-        text: 旁白文本
-        voice: 语音选择 ('default'|'male'|'female'|'neutral'|'child')
-        output_path: 输出文件路径
-        language: 语言代码 ('en-US'|'zh-CN'|'ja-JP')
-        rate: 语速倍数 (0.5 = 一半速度，2.0 = 两倍速度)
-        pitch: 音高倍数
+        text: Voiceover text
+        voice: Voice choice ('default'|'male'|'female'|'neutral'|'child')
+        output_path: Output file path
+        language: Language code ('en-US'|'zh-CN'|'ja-JP')
+        rate: Speech rate multiplier (0.5 = half speed, 2.0 = double speed)
+        pitch: Pitch multiplier
     
     Returns:
-        TTS 结果
+        TTS result
     """
     try:
         return generate_tts_voiceover(
@@ -130,9 +130,9 @@ def text_to_speech(
 
 
 def get_available_styles() -> Dict[str, Dict[str, Any]]:
-    """获取所有可用的颜色风格。
+    """Get all available color grading styles.
     
     Returns:
-        风格预设字典，包含描述和参数
+        Style presets dictionary with descriptions and parameters
     """
     return STYLE_PRESETS
