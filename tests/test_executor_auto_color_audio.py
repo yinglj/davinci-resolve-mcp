@@ -1,4 +1,4 @@
-"""集成测试：AutoColor & Audio 执行器工具"""
+"""Integration Test: AutoColor & Audio Executor Tools"""
 import asyncio
 from src.agent.executor.skills.auto_color_and_audio_executor import (
     auto_color_grade,
@@ -8,7 +8,7 @@ from src.agent.executor.skills.auto_color_and_audio_executor import (
 
 
 def test_auto_color_grade_tool():
-    """测试 auto_color_grade 执行器工具"""
+    """Test auto_color_grade executor tool"""
     shots = [
         {'id': 's1', 'in': 0.0, 'out': 1.0},
         {'id': 's2', 'in': 1.0, 'out': 2.5},
@@ -19,24 +19,24 @@ def test_auto_color_grade_tool():
 
 
 def test_audio_normalize_tool():
-    """测试 audio_normalize 执行器工具"""
+    """Test audio_normalize executor tool"""
     result = audio_normalize(target_loudness=-23.0)
     assert 'success' in result or 'error' in result
 
 
 def test_text_to_speech_tool():
-    """测试 text_to_speech 执行器工具"""
-    result = text_to_speech("欢迎观看本视频", voice='default')
+    """Test text_to_speech executor tool"""
+    result = text_to_speech("Welcome to this video", voice='default')
     assert result['success'] is True
     assert result['duration'] > 0
 
 
 def test_executor_pipeline_with_color_and_audio():
-    """集成测试：Planner -> Executor with AutoColor & Audio"""
+    """Integration test: Planner -> Executor with AutoColor & Audio"""
     from src.agent.executor.task_executor import TaskExecutor
     from src.agent.planner.plan import Plan, PlanStep, StepType
     
-    # 创建一个包含 auto_color_grade 和 audio_normalize 步骤的计划
+    # Create a plan with auto_color_grade and audio_normalize steps
     plan = Plan(summary="Color and Audio Pipeline")
     
     step_color = PlanStep(
@@ -64,7 +64,7 @@ def test_executor_pipeline_with_color_and_audio():
     )
     plan.add_step(step_audio)
     
-    # 准备 Fake Resolve Server
+    # Prepare Fake Resolve Server
     class FakeResolveServer:
         def __init__(self):
             self._tools = {}

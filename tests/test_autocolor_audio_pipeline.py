@@ -1,4 +1,4 @@
-"""AutoColor & Audio 管道集成测试"""
+"""AutoColor & Audio Pipeline Integration Test"""
 import asyncio
 from src.agent.executor.skills.auto_color_and_audio_executor import (
     auto_color_grade,
@@ -9,7 +9,7 @@ from src.agent.executor.skills.auto_color_and_audio_executor import (
 
 
 def test_available_styles():
-    """获取所有可用的颜色风格"""
+    """Get all available color styles"""
     styles = get_available_styles()
     assert len(styles) > 0
     assert 'cinematic' in styles
@@ -18,20 +18,20 @@ def test_available_styles():
 
 
 def test_full_pipeline_color_and_audio():
-    """完整的 AutoColor & Audio 管道测试"""
-    # 1. 创建 shots
+    """Complete AutoColor & Audio pipeline test"""
+    # 1. Create shots
     shots = [
         {'id': 's1', 'in': 0.0, 'out': 2.0, 'summary': 'Opening wide shot', 'shot_type': 'wide'},
         {'id': 's2', 'in': 2.0, 'out': 4.0, 'summary': 'Close-up detail', 'shot_type': 'close'},
         {'id': 's3', 'in': 4.0, 'out': 6.0, 'summary': 'Action sequence', 'shot_type': 'action'},
     ]
     
-    # 2. 应用自动颜色分级
+    # 2. Apply automatic color grading
     color_result = auto_color_grade(shots, style='cinematic', adjust_per_shot=True)
     assert 'success' in color_result
     assert 'shots_graded' in color_result or 'details' in color_result
     
-    # 3. 规范化音频
+    # 3. Normalize audio
     audio_result = audio_normalize(
         target_loudness=-23.0,
         compression_ratio=4.0,
@@ -43,11 +43,11 @@ def test_full_pipeline_color_and_audio():
         assert 'applied_loudness' in audio_result
         assert audio_result['applied_loudness'] == -23.0
     
-    # 4. 生成 TTS 旁白
+    # 4. Generate TTS voiceover
     tts_result = text_to_speech(
-        "欢迎观看本视频",
+        "Welcome to this video",
         voice='neutral',
-        language='zh-CN',
+        language='en-US',
         rate=1.0
     )
     assert tts_result['success'] is True
@@ -56,7 +56,7 @@ def test_full_pipeline_color_and_audio():
 
 
 def test_multiformat_tts():
-    """测试多种语言和语音的 TTS"""
+    """Test TTS with multiple languages and voices"""
     test_cases = [
         ("Hello world", 'male', 'en-US'),
         ("你好世界", 'female', 'zh-CN'),
@@ -78,7 +78,7 @@ def test_multiformat_tts():
 
 
 def test_color_style_variations():
-    """测试不同颜色风格的应用"""
+    """Test application of different color styles"""
     shots = [
         {'id': 's1', 'in': 0.0, 'out': 1.0, 'shot_type': 'generic'},
         {'id': 's2', 'in': 1.0, 'out': 2.0, 'shot_type': 'generic'},
@@ -88,12 +88,12 @@ def test_color_style_variations():
     
     for style in styles_to_test:
         result = auto_color_grade(shots, style=style)
-        # 即使 Resolve 不可用，也应该成功返回元数据
+        # Even if Resolve is unavailable, should successfully return metadata
         assert 'success' in result
 
 
 def test_tts_with_speed_variations():
-    """测试不同语速的 TTS"""
+    """Test TTS with different speech speeds"""
     text = "This is a test voice over"
     speeds = [0.5, 1.0, 1.5, 2.0]
     
@@ -103,7 +103,7 @@ def test_tts_with_speed_variations():
         assert result['success'] is True
         results.append(result)
     
-    # 验证不同语速导致不同的时长
+    # Verify different speech speeds result in different durations
     durations = [r['duration'] for r in results]
-    # 语速快的应该时长短
-    assert durations[3] < durations[0]  # 2.0x 应该比 0.5x 快
+    # Faster speech should result in shorter duration
+    assert durations[3] < durations[0]  # 2.0x should be faster than 0.5x
