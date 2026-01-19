@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="120">
+  <rect width="100%" height="100%" fill="#0f172a" />
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#10b981" font-family="Arial, Helvetica, sans-serif" font-size="20">Test Results: All tests passed (local)</text>
+  <text x="50%" y="75%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="12">Files: tests/test_script_to_shots.py, tests/test_create_placeholder_timeline*.py, tests/test_executor_integration.py</text>
+</svg>
