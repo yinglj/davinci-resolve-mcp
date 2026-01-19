@@ -8,14 +8,23 @@ from configure import load_server_config, get_llm_config
 from agno.models.openai import OpenAIChat
 from agno.models.ollama import Ollama
 from common_utils import initialize_embedder_and_vector_db, initialize_knowledge_base
+from prompts.system_prompts import (
+    DIRECTOR_PROMPT,
+    EDITOR_PROMPT,
+    COLORIST_PROMPT,
+    SOUND_ENGINEER_PROMPT,
+)
 
 
-async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[Agent]:
+async def create_multi_agent(
+    server_name: str = "Davinci_resolve", role: str = "director"
+) -> Optional[Agent]:
     """
     Create a MultiMCPAgent based on server configuration.
 
     Args:
         server_name (str): Name of the server to initialize the agent for.
+        role (str): The persona/role of the agent (director, editor, colorist, sound_engineer).
 
     Returns:
         Optional[Agent]: The initialized agent or None if creation fails.
@@ -99,9 +108,20 @@ async def create_multi_agent(server_name: str = "Davinci_resolve") -> Optional[A
                 max(config.get("timeout", 10) for config in server_configs)
             ),
         }
+        # Select prompt based on role
+        role = role.lower()
+        if role == "editor":
+            instructions = EDITOR_PROMPT
+        elif role == "colorist":
+            instructions = COLORIST_PROMPT
+        elif role == "sound_engineer":
+            instructions = SOUND_ENGINEER_PROMPT
+        else:
+            instructions = DIRECTOR_PROMPT
+
         agent = Agent(
-            name=f"MultiMCPAgent_{server_name}",
-            instructions=f"You are a {server_name} agent. Use the MCP tools and knowledge base to complete the user's queries.",
+            name=f"MultiMCPAgent_{server_name}_{role}",
+            instructions=instructions,
             tools=[],  # Tools will be initialized at runtime
             model=model,
             markdown=True,
