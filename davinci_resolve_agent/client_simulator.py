@@ -166,6 +166,31 @@ class ClientSimulator:
             "id": self.request_id
         }
         headers = {
+            "Authorization": f"Bearer {self.api_key}"
+        } if self.api_key else {}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(self.rpc_url, json=request, headers=headers, timeout=self.timeout) as response:
+                    if response.status != 200:
+                        yield {"error": f"HTTP {response.status}"}
+                        return
+                    async for line in response.content:
+                        try:
+                            # Each line represents a JSON-RPC event
+                            data = json.loads(line.decode("utf-8"))
+                            yield data
+                        except Exception:
+                            continue
+        except asyncio.TimeoutError:
+            yield {"error": f"Stream timed out after {self.timeout.total} seconds"}
+        except Exception as e:
+            yield {"error": str(e)}
+
+    async def send_tool_request(self, tool_name: str, arguments: Dict) -> Dict:
+        """Convenience wrapper to call the server execute_tool RPC method."""
+        params = {"tool_name": tool_name, "arguments": arguments}
+        return await self.send_rpc_request("execute_tool", params)
+
             "Authorization": f"Bearer {self.api_key}" if self.api_key else "",
             "Accept": "text/event-stream"
         }
@@ -455,6 +480,67 @@ class ClientSimulator:
                     async for response in self.process_query_stream(stream_query):
                         self._print_stream_response(response)
                     logger.info("Stream query execution finished")
+                    continue
+
+                # Tools subcommand: tools <action> [params]
+                # Examples:
+                #   tools list [category]
+                #   tools call <tool_name> <json-args>
+                #   tools status <job_id>
+                #   tools cancel <job_id>
+                if query.lower().startswith("tools "):
+                    if not self.session_id:
+                        logger.print("No active session. Use 'start session' to begin.")
+                        continue
+                    parts = query.split(None, 2)
+                    action = parts[1].lower() if len(parts) > 1 else ""
+                    payload = parts[2].strip() if len(parts) > 2 else ""
+
+                    try:
+                        if action == "list":
+                            category = payload or None
+                            resp = await self.send_rpc_request("list_tools_in_category", {"category": category})
+                            self._print_response({"result": {"response": resp}})
+
+                        elif action in ("call", "invoke"):
+                            if not payload:
+                                logger.print("Usage: tools call <tool_name> <json-args>")
+                                continue
+                            subparts = payload.split(None, 1)
+                            tool_name = subparts[0]
+                            args = {}
+                            if len(subparts) > 1 and subparts[1]:
+                                try:
+                                    args = json.loads(subparts[1])
+                                except json.JSONDecodeError:
+                                    logger.print(colored("Invalid JSON for tool arguments", "red"))
+                                    continue
+                            logger.print(colored(f"Calling tool {tool_name} with args: {args}", "cyan"))
+                            response = await self.send_tool_request(tool_name, args)
+                            self._print_response({"result": {"response": response}})
+
+                        elif action == "status":
+                            job_id = payload
+                            if not job_id:
+                                logger.print("Usage: tools status <job_id>")
+                                continue
+                            response = await self.send_tool_request("jobs.status", {"job_id": job_id})
+                            self._print_response({"result": {"response": response}})
+
+                        elif action == "cancel":
+                            job_id = payload
+                            if not job_id:
+                                logger.print("Usage: tools cancel <job_id>")
+                                continue
+                            response = await self.send_tool_request("jobs.cancel", {"job_id": job_id})
+                            self._print_response({"result": {"response": response}})
+
+                        else:
+                            logger.print("Tools subcommands:\n - tools list [category]\n - tools call <tool_name> <json-args>\n - tools status <job_id>\n - tools cancel <job_id>")
+
+                    except Exception as e:
+                        logger.error(f"Tools command failed: {str(e)}")
+                        logger.print(colored(f"Error: {str(e)}", "red"))
                     continue
 
                 if not self.session_id:

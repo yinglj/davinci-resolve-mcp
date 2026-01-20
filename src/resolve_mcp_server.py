@@ -280,6 +280,7 @@ from src.api import (
     media_operations,
     app_operations,
     project_operations,
+    tools_operations,
 )
 
 # Initialize Tool Proxy
@@ -367,6 +368,8 @@ def register_mcp_resources(mcp: FastMCP):
     media_operations.register_tools(proxy)
     app_operations.register_tools(proxy)
     project_operations.register_tools(proxy)
+    # Register newly added generic tools (fusion/audio/color/render/jobs)
+    tools_operations.register_tools(proxy)
 
     # ------------------
     # MCP Resources
