@@ -1,7 +1,7 @@
 [project]
 name = "davinci-resolve-mcp"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.2.0"
+description = "DaVinci Resolve MCP Server with Fusion Composition, AutoColor & Audio Enhancement"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
