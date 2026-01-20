@@ -56,6 +56,12 @@ class TaskPlanner:
             await self._plan_composite_effect(plan, entities, docs)
         elif intent == "auto_audio":
             await self._plan_auto_audio(plan, entities)
+        elif intent == "fusion_composition":
+            await self._plan_fusion_composition(plan, entities)
+        elif intent == "color_automation":
+            await self._plan_color_automation(plan, entities)
+        elif intent == "fairlight_audio":
+            await self._plan_fairlight_audio(plan, entities)
         else:
             # Generic planning based on action patterns
             await self._plan_generic(plan, user_request, context)
@@ -136,6 +142,26 @@ class TaskPlanner:
                 (r'audio.*normalize', 'auto_audio'),
                 (r'voiceover', 'auto_audio'),
                 (r'tts|text.*speech', 'auto_audio')
+            ],
+            'fusion_composition': [
+                (r'fusion.*effect', 'fusion_composition'),
+                (r'dynamic.*fusion', 'fusion_composition'),
+                (r'add.*fusion', 'fusion_composition'),
+                (r'fusion.*composite', 'fusion_composition'),
+                (r'apply.*fusion', 'fusion_composition')
+            ],
+            'color_automation': [
+                (r'color.*automation', 'color_automation'),
+                (r'automated.*color.*grade', 'color_automation'),
+                (r'color.*auto.*keyframe', 'color_automation'),
+                (r'temporal.*smooth.*color', 'color_automation')
+            ],
+            'fairlight_audio': [
+                (r'fairlight.*audio', 'fairlight_audio'),
+                (r'audio.*chain.*fairlight', 'fairlight_audio'),
+                (r'fairlight.*process', 'fairlight_audio'),
+                (r'broadcast.*standard.*audio', 'fairlight_audio'),
+                (r'ebu.*r128', 'fairlight_audio')
             ]
         }
         
@@ -423,3 +449,115 @@ class TaskPlanner:
             expected_outcome="Found relevant commands"
         )
         plan.add_step(step)
+        
+    async def _plan_fusion_composition(self, plan: Plan, entities: Dict):
+        """Plan Fusion Dynamic Composition tasks"""
+        # Validate Resolve and timeline
+        step_validate = PlanStep(
+            step_type=StepType.VALIDATION,
+            action="validate_resolve_and_timeline",
+            parameters={'require_timeline': True},
+            expected_outcome="Resolve and timeline validated"
+        )
+        plan.add_step(step_validate)
+        
+        # Plan Fusion composition
+        step_fusion = PlanStep(
+            step_type=StepType.FUSION_COMPOSITION,
+            action="plan_fusion_composition",
+            parameters={
+                "script_summary": entities.get("script_summary", ""),
+                "shot_list": entities.get("shot_list", []),
+                "style": entities.get("style", "modern"),
+                "effect_intensity": entities.get("effect_intensity", 0.7),
+                "enable_3d": entities.get("enable_3d", False)
+            },
+            dependencies=[step_validate.step_id],
+            expected_outcome="Fusion composition plan generated with effect chains and transitions"
+        )
+        plan.add_step(step_fusion)
+        
+        # Create Fusion page and apply composition
+        step_create = PlanStep(
+            step_type=StepType.FUSION_COMPOSITION,
+            action="create_fusion_page",
+            parameters={},
+            dependencies=[step_fusion.step_id],
+            expected_outcome="Fusion page created and composition applied"
+        )
+        plan.add_step(step_create)
+        
+    async def _plan_color_automation(self, plan: Plan, entities: Dict):
+        """Plan Color Automation with keyframes"""
+        # Validate timeline and clips
+        step_validate = PlanStep(
+            step_type=StepType.VALIDATION,
+            action="validate_resolve_and_timeline",
+            parameters={'require_timeline': True, 'require_clips': True},
+            expected_outcome="Timeline and clips validated"
+        )
+        plan.add_step(step_validate)
+        
+        # Apply color automation
+        step_color = PlanStep(
+            step_type=StepType.COLOR_AUTOMATION,
+            action="apply_color_grade_with_automation",
+            parameters={
+                "shots": entities.get("shots"),
+                "style": entities.get("style", "cinematic"),
+                "auto_keyframes": entities.get("auto_keyframes", True),
+                "enable_temporal_smoothing": entities.get("enable_temporal_smoothing", True)
+            },
+            dependencies=[step_validate.step_id],
+            expected_outcome="Color grades applied with automated keyframes and smoothing"
+        )
+        plan.add_step(step_color)
+        
+        # Export color metadata
+        step_export = PlanStep(
+            step_type=StepType.RESOLVE_API,
+            action="export_color_metadata",
+            parameters={"timeline_name": entities.get("timeline_name")},
+            dependencies=[step_color.step_id],
+            expected_outcome="Color metadata exported as JSON"
+        )
+        plan.add_step(step_export)
+        
+    async def _plan_fairlight_audio(self, plan: Plan, entities: Dict):
+        """Plan Fairlight Audio Processing"""
+        # Validate audio and timeline
+        step_validate = PlanStep(
+            step_type=StepType.VALIDATION,
+            action="validate_resolve_and_audio",
+            parameters={'require_timeline': True, 'require_audio': True},
+            expected_outcome="Resolve and audio tracks validated"
+        )
+        plan.add_step(step_validate)
+        
+        # Create Fairlight audio chain
+        step_fairlight = PlanStep(
+            step_type=StepType.AUDIO_PROCESSING,
+            action="create_fairlight_audio_chain",
+            parameters={
+                "target_loudness": entities.get("target_loudness", -23.0),
+                "compression_ratio": entities.get("compression_ratio", 4.0),
+                "gate_threshold": entities.get("gate_threshold", -40.0),
+                "eq_profile": entities.get("eq_profile", "neutral")
+            },
+            dependencies=[step_validate.step_id],
+            expected_outcome="Fairlight audio chain created with Gate, Compressor, EQ, and Limiter"
+        )
+        plan.add_step(step_fairlight)
+        
+        # Monitor audio levels
+        step_monitor = PlanStep(
+            step_type=StepType.AUDIO_PROCESSING,
+            action="monitor_audio_levels",
+            parameters={
+                "timeline_name": entities.get("timeline_name"),
+                "duration_seconds": entities.get("duration_seconds", 30)
+            },
+            dependencies=[step_fairlight.step_id],
+            expected_outcome="Audio levels monitored and analyzed (Peak, RMS, LUFS, Range)"
+        )
+        plan.add_step(step_monitor)

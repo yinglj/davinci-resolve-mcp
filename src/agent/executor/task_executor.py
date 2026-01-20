@@ -93,6 +93,12 @@ class TaskExecutor:
                 return await self._execute_validation(step)
             elif step.step_type == StepType.COMPOSITE:
                 return await self._execute_composite(step)
+            elif step.step_type == StepType.FUSION_COMPOSITION:
+                return await self._execute_fusion_composition(step)
+            elif step.step_type == StepType.COLOR_AUTOMATION:
+                return await self._execute_color_automation(step)
+            elif step.step_type == StepType.AUDIO_PROCESSING:
+                return await self._execute_audio_processing(step)
             else:
                 raise ValueError(f"Unknown step type: {step.step_type}")
                 
@@ -225,6 +231,160 @@ class TaskExecutor:
         return {
             'composite_results': sub_results
         }
+        
+    async def _execute_fusion_composition(self, step: PlanStep) -> Any:
+        """Execute Fusion Dynamic Composition operations"""
+        from .skills.fusion_executor import (
+            create_fusion_page,
+            create_effect_chain,
+            add_transition,
+            create_nested_composition,
+            get_fusion_composition_status
+        )
+        from ..planner.skills.fusion_composition import plan_fusion_composition
+        
+        action = step.action
+        params = step.parameters or {}
+        
+        try:
+            if action == "plan_fusion_composition":
+                # Call the planner to generate composition plan
+                result = plan_fusion_composition(
+                    script_summary=params.get("script_summary"),
+                    shot_list=params.get("shot_list"),
+                    style=params.get("style", "modern"),
+                    effect_intensity=params.get("effect_intensity", 0.7),
+                    enable_3d=params.get("enable_3d", False)
+                )
+                logger.info(f"Fusion composition plan generated: {len(result.get('layers', []))} layers")
+                return result
+                
+            elif action == "create_fusion_page":
+                # Create Fusion page and apply the composition from previous step
+                result = create_fusion_page(self.resolve_server)
+                logger.info(f"Fusion page created: {result}")
+                return result
+                
+            elif action == "create_effect_chain":
+                # Apply effect chain
+                result = create_effect_chain(
+                    effect_list=params.get("effect_list", []),
+                    layer_name=params.get("layer_name", "Layer1"),
+                    resolve_obj=self.resolve_server
+                )
+                logger.info(f"Effect chain applied to {params.get('layer_name')}")
+                return result
+                
+            elif action == "add_transition":
+                # Create transition between layers
+                result = add_transition(
+                    transition_type=params.get("transition_type", "Dissolve"),
+                    duration=params.get("duration", 500),
+                    from_layer=params.get("from_layer"),
+                    to_layer=params.get("to_layer"),
+                    parameters=params.get("parameters", {})
+                )
+                logger.info(f"Transition added: {params.get('transition_type')}")
+                return result
+                
+            elif action == "create_nested_composition":
+                # Create nested composition
+                result = create_nested_composition(
+                    comp_name=params.get("comp_name"),
+                    layer_indices=params.get("layer_indices", []),
+                    resolve_obj=self.resolve_server
+                )
+                logger.info(f"Nested composition created: {params.get('comp_name')}")
+                return result
+                
+            elif action == "get_fusion_status":
+                # Get composition status
+                result = get_fusion_composition_status(self.resolve_server)
+                logger.info(f"Fusion composition status retrieved")
+                return result
+                
+            else:
+                raise ValueError(f"Unknown Fusion action: {action}")
+                
+        except Exception as e:
+            logger.error(f"Error executing Fusion composition step: {e}")
+            raise
+            
+    async def _execute_color_automation(self, step: PlanStep) -> Any:
+        """Execute Color Automation operations"""
+        from .skills.resolve_advanced_integration import (
+            apply_color_grade_with_automation,
+            export_color_metadata
+        )
+        
+        action = step.action
+        params = step.parameters or {}
+        
+        try:
+            if action == "apply_color_grade_with_automation":
+                # Apply color grading with automated keyframes
+                result = apply_color_grade_with_automation(
+                    shots=params.get("shots"),
+                    style=params.get("style", "cinematic"),
+                    auto_keyframes=params.get("auto_keyframes", True),
+                    enable_temporal_smoothing=params.get("enable_temporal_smoothing", True)
+                )
+                logger.info(f"Color automation applied: {result.get('keyframes_created', 0)} keyframes created")
+                return result
+                
+            elif action == "export_color_metadata":
+                # Export color metadata
+                result = export_color_metadata(
+                    timeline_name=params.get("timeline_name")
+                )
+                logger.info(f"Color metadata exported")
+                return result
+                
+            else:
+                raise ValueError(f"Unknown Color automation action: {action}")
+                
+        except Exception as e:
+            logger.error(f"Error executing Color automation step: {e}")
+            raise
+            
+    async def _execute_audio_processing(self, step: PlanStep) -> Any:
+        """Execute Audio Processing operations"""
+        from .skills.resolve_advanced_integration import (
+            create_fairlight_audio_chain,
+            monitor_audio_levels
+        )
+        
+        action = step.action
+        params = step.parameters or {}
+        
+        try:
+            if action == "create_fairlight_audio_chain":
+                # Create Fairlight audio chain
+                result = create_fairlight_audio_chain(
+                    target_loudness=params.get("target_loudness", -23.0),
+                    compression_ratio=params.get("compression_ratio", 4.0),
+                    gate_threshold=params.get("gate_threshold", -40.0),
+                    eq_profile=params.get("eq_profile", "neutral"),
+                    resolve_obj=self.resolve_server
+                )
+                logger.info(f"Fairlight audio chain created with EQ profile: {params.get('eq_profile')}")
+                return result
+                
+            elif action == "monitor_audio_levels":
+                # Monitor audio levels
+                result = monitor_audio_levels(
+                    timeline_name=params.get("timeline_name"),
+                    duration_seconds=params.get("duration_seconds", 30)
+                )
+                logger.info(f"Audio levels monitored: LUFS={result.get('lufs', 'N/A')}")
+                return result
+                
+            else:
+                raise ValueError(f"Unknown Audio processing action: {action}")
+                
+        except Exception as e:
+            logger.error(f"Error executing Audio processing step: {e}")
+            raise
         
     def cleanup(self):
         """Cleanup resources"""
