@@ -1,8 +1,8 @@
-# DaVinci Resolve MCP Server v1.2.0 Release Notes
+# DaVinci Resolve MCP Server v1.4.0 Release Notes
 
 **Release Date**: January 20, 2026  
 **Status**: Production Ready ✅  
-**Version**: 1.2.0
+**Version**: 1.4.0
 
 ---
 

@@ -9,7 +9,7 @@
 ✓ P2-01: TaskPlanner/Executor 集成 (9/9 测试通过)
 ✓ P2-02: 真实Resolve测试 (36/36 测试通过)  
 ✓ P2-03: PR创建和CI/CD设置 (完成)
-✓ 版本号更新: 1.2.0
+✓ 版本号更新: 1.4.0
 ✓ CHANGELOG 和 VERSION.md 更新
 ✓ 发布说明生成
 ```
@@ -158,15 +158,15 @@ Closes #P1-02, #P1-03, #P2-01, #P2-02
 - .github/workflows/p2-03-ci-cd.yml
 - scripts/demo_p2_03.py
 - docs/VERSION.md
-- RELEASE_NOTES_v1.2.0.md
-- pyproject.toml (version updated to 1.2.0)
+- RELEASE_NOTES_v1.4.0.md
+- pyproject.toml (version updated to 1.4.0)
 
 ## Next Steps
 
 1. ✅ Code review by 2-3 maintainers
 2. ✅ Address any review comments
 3. ✅ Merge to main branch
-4. ✅ Create release tag v1.2.0
+4. ✅ Create release tag v1.4.0
 5. ✅ Generate release notes
 6. ✅ Publish release
 
@@ -196,7 +196,7 @@ Please request review from:
 - `ready-for-review`
 
 **Milestone** (设置里程碑):
-- v1.2.0
+- v1.4.0
 
 **Assignees** (分配人):
 - (可选) 自己或维护者
@@ -282,12 +282,12 @@ git push origin main
 1. **在GitHub上创建Release**:
    - 转到 "Releases" 标签
    - 点击 "Create a new release"
-   - Tag: `v1.2.0`
-   - Title: `v1.2.0 - Phase 2 Complete`
+   - Tag: `v1.4.0`
+   - Title: `v1.4.0 - Phase 2 Complete`
 
-2. **发布说明** (使用 [RELEASE_NOTES_v1.2.0.md](../RELEASE_NOTES_v1.2.0.md) 内容):
+2. **发布说明** (使用 [RELEASE_NOTES_v1.4.0.md](../RELEASE_NOTES_v1.4.0.md) 内容):
 ```markdown
-## v1.2.0 - Phase 2 Complete
+## v1.4.0 - Phase 2 Complete
 
 ### Overview
 Phase 2 completion with Fusion Composition, AutoColor & Audio Enhancement, and comprehensive testing.
@@ -320,7 +320,7 @@ Phase 2 completion with Fusion Composition, AutoColor & Audio Enhancement, and c
 - 15+ new files
 - 10+ modified files
 
-[Complete Release Notes](RELEASE_NOTES_v1.2.0.md)
+[Complete Release Notes](RELEASE_NOTES_v1.4.0.md)
 ```
 
 3. **发布选项**:
@@ -336,14 +336,14 @@ Phase 2 completion with Fusion Composition, AutoColor & Audio Enhancement, and c
 ```bash
 # 验证标签
 git tag
-# 应该显示: v1.2.0
+# 应该显示: v1.4.0
 
 # 验证发布
 git log --oneline -5
 # 应该显示最新的提交和标签
 
 # 检查GitHub版本
-# https://github.com/YourUsername/davinci-resolve-mcp/releases/tag/v1.2.0
+# https://github.com/YourUsername/davinci-resolve-mcp/releases/tag/v1.4.0
 ```
 
 ---
@@ -358,7 +358,7 @@ git log --oneline -5
 
 **通知模板**:
 ```
-🎉 DaVinci Resolve MCP Server v1.2.0 Released!
+🎉 DaVinci Resolve MCP Server v1.4.0 Released!
 
 ✨ New Features:
 - Fusion Dynamic Composition
@@ -370,7 +370,7 @@ git log --oneline -5
 - ~90% code coverage
 - Production ready
 
-🔗 Download: https://github.com/YourUsername/davinci-resolve-mcp/releases/tag/v1.2.0
+🔗 Download: https://github.com/YourUsername/davinci-resolve-mcp/releases/tag/v1.4.0
 📖 Docs: https://github.com/YourUsername/davinci-resolve-mcp
 ```
 
@@ -424,7 +424,7 @@ git log --oneline -5
                    ↓
 ┌─────────────────────────────────────────┐
 │ Step 8: Create Release                  │
-│ • Tag: v1.2.0                           │
+│ • Tag: v1.4.0                           │
 │ • Release notes: [Use template]         │
 │ • Publish ✅                            │
 └─────────────────────────────────────────┘
@@ -457,8 +457,8 @@ git status
 git log --oneline -5
 
 # 本地标签创建 (如需要)
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.4.0
+git push origin v1.4.0
 
 # 查看更改
 git diff main feat/script-to-shots-placeholder-timeline --stat
@@ -476,7 +476,7 @@ git diff main feat/script-to-shots-placeholder-timeline --stat
 
 ---
 
-**现在您已准备好创建PR并发布v1.2.0！🚀**
+**现在您已准备好创建PR并发布v1.4.0！🚀**
 
 下一步:
 1. 推送分支: `git push origin feat/script-to-shots-placeholder-timeline`
@@ -484,4 +484,4 @@ git diff main feat/script-to-shots-placeholder-timeline --stat
 3. 使用上面的PR模板
 4. 监控CI/CD
 5. 等待审查和合并
-6. 创建Release v1.2.0
+6. 创建Release v1.4.0

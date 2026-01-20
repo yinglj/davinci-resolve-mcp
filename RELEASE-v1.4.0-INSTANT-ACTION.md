@@ -1,4 +1,4 @@
-# 🚀 v1.2.0 发布 - 即时行动指南
+# 🚀 v1.4.0 发布 - 即时行动指南
 
 ## ⚡ 3步快速启动
 
@@ -21,7 +21,7 @@ git branch -v
 
 **PR标题**:
 ```
-feat(p2): Release v1.2.0 - Fusion Composition, AutoColor & Audio Enhancement
+feat(p2): Release v1.4.0 - Phase 2 Complete with P0/P1/P2 Integration (Fusion Composition, AutoColor & Audio Enhancement)
 ```
 
 **PR描述** (完整模板):
@@ -29,7 +29,7 @@ feat(p2): Release v1.2.0 - Fusion Composition, AutoColor & Audio Enhancement
 ## 📋 Pull Request Summary
 
 ### Overview
-Release v1.2.0 of DaVinci Resolve MCP Server with Phase 2 completion:
+Release v1.4.0 of DaVinci Resolve MCP Server with complete Phase 0, Phase 1, and Phase 2 integration:
 - **P2-01**: TaskPlanner/Executor Integration (✅ 9/9 tests)
 - **P2-02**: Real Resolve Environment Testing (✅ 36/36 tests)
 - **P2-03**: PR Creation & CI/CD Automation (✅ Complete)
@@ -58,16 +58,16 @@ Release v1.2.0 of DaVinci Resolve MCP Server with Phase 2 completion:
 - **Backward Compatibility**: 100%
 
 ### 📝 Related Documentation
-- Release Notes: [RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md)
+- Release Notes: [RELEASE_NOTES_v1.4.0.md](RELEASE_NOTES_v1.4.0.md)
 - PR Descriptions: [P1-02](docs/PR-001-P1-02-FUSION-COMPOSITION.md) | [P1-03](docs/PR-002-P1-03-AUTOCOLOR-AUDIO.md)
 - Review Checklist: [CODE-REVIEW-CHECKLIST.md](docs/CODE-REVIEW-CHECKLIST.md)
-- Release Guide: [RELEASE-GUIDE-v1.2.0.md](docs/RELEASE-GUIDE-v1.2.0.md)
+- Release Guide: [RELEASE-GUIDE-v1.4.0.md](docs/RELEASE-GUIDE-v1.4.0.md)
 
 ### ✅ Checklist
 - [x] All 45 tests passing
 - [x] Code coverage verified (~90%)
 - [x] Documentation complete
-- [x] Version updated to 1.2.0
+- [x] Version updated to 1.4.0
 - [x] CI/CD pipeline configured
 - [x] Backward compatibility maintained
 - [x] Performance benchmarks acceptable
@@ -110,7 +110,7 @@ Stage 7: Artifact Collection     → ✅ PASS
 - 审查者评审代码
 - 处理任何反馈 (如有)
 - 获得批准后合并到main分支
-- 创建release标签 v1.2.0
+- 创建release标签 v1.4.0
 - 发布Release说明
 
 ---
@@ -120,8 +120,8 @@ Stage 7: Artifact Collection     → ✅ PASS
 最近的10个提交:
 
 ```
-131dff6 docs(release): add final release ready checklist for v1.2.0
-09d9f83 chore(release): prepare v1.2.0 release
+131dff6 docs(release): add final release ready checklist for v1.4.0
+09d9f83 chore(release): prepare v1.4.0 release
 b91f2d5 docs: add Phase 2 final completion report
 28019c3 feat(p2-03): complete PR creation, code review, and CI/CD setup
 305ac39 feat(p2-02): add comprehensive real Resolve testing suite
@@ -140,7 +140,7 @@ b91f2d5 docs: add Phase 2 final completion report
 
 **本地验证** ✅
 - [x] 所有测试通过 (45/45)
-- [x] 版本号更新到 1.2.0
+- [x] 版本号更新到 1.4.0
 - [x] 文档完成
 - [x] 代码已提交
 
@@ -151,7 +151,7 @@ b91f2d5 docs: add Phase 2 final completion report
 - [ ] 所有对话已解决
 
 **发布检查** (合并后)
-- [ ] 创建git标签 `v1.2.0`
+- [ ] 创建git标签 `v1.4.0`
 - [ ] 推送标签到GitHub
 - [ ] 创建GitHub Release
 - [ ] 编写Release说明
@@ -190,9 +190,9 @@ git push origin feat/script-to-shots-placeholder-timeline --force-with-lease
 
 | 文档 | 位置 | 用途 |
 |------|------|------|
-| 发布指南 | `docs/RELEASE-GUIDE-v1.2.0.md` | 详细步骤 |
-| 发布说明 | `RELEASE_NOTES_v1.2.0.md` | 功能列表 |
-| 检查清单 | `docs/RELEASE-READY-CHECKLIST-v1.2.0.md` | 发布准备 |
+| 发布指南 | `docs/RELEASE-GUIDE-v1.4.0.md` | 详细步骤 |
+| 发布说明 | `RELEASE_NOTES_v1.4.0.md` | 功能列表 |
+| 检查清单 | `docs/RELEASE-READY-CHECKLIST-v1.4.0.md` | 发布准备 |
 | Fusion PR | `docs/PR-001-P1-02-FUSION-COMPOSITION.md` | 技术细节 |
 | Audio PR | `docs/PR-002-P1-03-AUTOCOLOR-AUDIO.md` | 技术细节 |
 | 审查清单 | `docs/CODE-REVIEW-CHECKLIST.md` | 质量标准 |
@@ -230,7 +230,7 @@ git push origin feat/script-to-shots-placeholder-timeline --force-with-lease
 今天           → 创建Pull Request
 明天 (1-2天)  → 代码审查
 后天 (2-3天)  → 批准和合并
-后天 (2-3天)  → 发布v1.2.0到GitHub Release
+后天 (2-3天)  → 发布v1.4.0到GitHub Release
 ```
 
 ---

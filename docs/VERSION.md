@@ -1,10 +1,10 @@
 # DaVinci Resolve MCP Server
 
-Current Version: 1.2.0
+Current Version: 1.4.0
 
 ## Release Information
 
-### 1.2.0 Changes - Phase 2 Complete (2026-01-20)
+### 1.4.0 Changes - Phase 2 Complete with P0/P1/P2 Integration (2026-01-20)
 
 **Major Release - Production Ready**
 
