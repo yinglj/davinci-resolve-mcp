@@ -134,7 +134,7 @@ async def fusion_create_effect_chain(
 
 ### 🤖 P3-02: Agent 多角色能力强化 (4-5天)
 
-**状态**: Not Started
+**状态**: ✅ Completed (2026-01-20)
 
 **目标**:
 更新 `davinci_resolve_agent/prompts/system_prompts.py` 和 `mcp_agents.py`，使各角色 Agent 能更准确地识别和使用新工具。
@@ -291,7 +291,7 @@ P3-01 (MCP Tools 化) → P3-02 (Agent 能力强化)
 ### 功能性
 
 - [x] 新增 MCP tools ≥ 10 个 (11个已添加)
-- [ ] 所有 tools 可被 Agent 正确调用
+- [x] 所有 tools 可被 Agent 正确调用 (Prompts 已更新)
 - [ ] 端到端工作流测试通过率 ≥ 95%
 
 ### 用户体验
