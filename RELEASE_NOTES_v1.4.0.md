@@ -8,7 +8,7 @@
 
 ## 🎉 Overview
 
-v1.2.0 represents the completion of **Phase 2** development, bringing major enhancements to the DaVinci Resolve MCP Server with a focus on advanced video and audio processing capabilities. This release includes comprehensive integration testing, real-world validation, and production-ready CI/CD infrastructure.
+v1.4.0 represents the completion of **Phases 0, 1, and 2** development, bringing complete integration of advanced video and audio processing capabilities to the DaVinci Resolve MCP Server. This comprehensive release includes full-stack implementation of Fusion Composition and AutoColor/Audio enhancements, extensive integration testing, real-world validation, and production-ready CI/CD infrastructure.
 
 ---
 
@@ -289,7 +289,7 @@ None known at release time. Please report any issues via GitHub Issues.
 - ✅ Demo script with performance benchmarks
 
 ### Changed
-- ✅ Updated version to 1.2.0
+- ✅ Updated version to 1.4.0
 - ✅ Enhanced project description
 - ✅ Improved documentation structure
 
@@ -333,7 +333,7 @@ None known at release time. Please report any issues via GitHub Issues.
 
 ### Reporting Issues
 - Use GitHub Issues for bug reports
-- Include version number (1.2.0)
+- Include version number (1.4.0)
 - Provide reproduction steps
 - Attach relevant logs
 
@@ -371,7 +371,7 @@ None known at release time. Please report any issues via GitHub Issues.
 - `.github/workflows/p2-03-ci-cd.yml` (CI/CD Pipeline)
 
 ### Configuration Files
-- `pyproject.toml` (Project configuration, version 1.2.0)
+- `pyproject.toml` (Project configuration, version 1.4.0)
 - `requirements.txt` (Dependencies)
 - `.github/workflows/` (CI/CD workflows)
 
@@ -382,7 +382,7 @@ None known at release time. Please report any issues via GitHub Issues.
 
 ---
 
-**Version**: 1.2.0  
+**Version**: 1.4.0  
 **Released**: January 20, 2026  
 **Status**: ✅ Production Ready  
 **Quality Score**: ⭐⭐⭐⭐⭐ (5/5)

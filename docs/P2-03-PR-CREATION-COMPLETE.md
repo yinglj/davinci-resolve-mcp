@@ -190,7 +190,7 @@ Day 2 (2026-01-21): Peer Code Review
 Day 3 (2026-01-22): Merge & Release
   ⏳ PR approval
   ⏳ Branch merge to main
-  ⏳ Release tagging (v1.2.0)
+  ⊳ Release tagging (v1.4.0)
 ```
 
 ---
@@ -234,7 +234,7 @@ Day 3 (2026-01-22): Merge & Release
 
 ### Deployment Readiness
 - [x] Backward compatibility verified
-- [x] Version update ready (v1.2.0)
+- [x] Version update ready (v1.4.0)
 - [x] CHANGELOG prepared
 - [x] Release notes drafted
 - [x] Deployment documentation complete
@@ -301,7 +301,7 @@ Day 3 (2026-01-22): Merge & Release
    - All reviewers approve
    - CI/CD pipeline passes
    - Merge PR to main branch
-   - Create release tag v1.2.0
+   - Create release tag v1.4.0
    - Generate CHANGELOG
    - Publish release notes
    ```
@@ -469,7 +469,7 @@ For questions about P2-03 deliverables:
 
 **Status**: ✅ READY FOR MERGE  
 **Target Merge Date**: 2026-01-22  
-**Release Target**: v1.2.0  
+**Release Target**: v1.4.0  
 **Next Phase**: Phase 3 (Future Planning)
 
 ---
