@@ -68,7 +68,7 @@ Phase 3 的核心目标是将 Phase 1/2 中实现的高级功能（Fusion 动态
 
 ### 🔧 P3-01: 高级功能 MCP Tools 化 (5-7天)
 
-**状态**: Not Started
+**状态**: ✅ Completed (2026-01-20)
 
 **目标**:
 将 `src/agent/executor/skills/` 下的核心功能注册为 MCP tools，使其可被外部 AI 客户端和 Agent 调用。
@@ -290,7 +290,7 @@ P3-01 (MCP Tools 化) → P3-02 (Agent 能力强化)
 
 ### 功能性
 
-- [ ] 新增 MCP tools ≥ 10 个
+- [x] 新增 MCP tools ≥ 10 个 (11个已添加)
 - [ ] 所有 tools 可被 Agent 正确调用
 - [ ] 端到端工作流测试通过率 ≥ 95%
 
@@ -312,7 +312,7 @@ P3-01 (MCP Tools 化) → P3-02 (Agent 能力强化)
 
 ### 短期 (2-3 周)
 
-1. [ ] P3-01 MCP tools 实现
+1. [x] P3-01 MCP tools 实现 ✅
 2. [ ] 单元测试编写
 3. [ ] 初步集成测试
 

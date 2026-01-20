@@ -7702,8 +7702,289 @@ def register_mcp_resources(mcp: FastMCP):
         return capture_resolve_window_mac(output_path)
 
     # ------------------
+    # P3-01: Advanced Skills as MCP Tools
+    # Fusion Effects, Color Grading, Audio Processing
+    # ------------------
+
+    @mcp.tool()
+    def fusion_create_effect_chain(
+        effect_list: List[Dict[str, Any]], layer_name: str = "effect_chain_layer"
+    ) -> Dict[str, Any]:
+        """Create a chain of Fusion effects on a composition layer.
+
+        Args:
+            effect_list: List of effects with names and parameters.
+                         Example: [{"name": "Blur", "params": {"size": 5}}, {"name": "ColorCorrect"}]
+            layer_name: Name of the layer to apply effects to.
+
+        Returns:
+            Dict with chain_id, effects_added count, and status.
+        """
+        logger.info(
+            f"Creating Fusion effect chain with {len(effect_list)} effects on layer '{layer_name}'"
+        )
+        from src.agent.executor.skills.fusion_executor import create_effect_chain
+
+        return create_effect_chain(effect_list, layer_name, resolve)
+
+    @mcp.tool()
+    def fusion_add_transition(
+        transition_type: str,
+        duration: float = 0.3,
+        from_layer: int = 0,
+        to_layer: int = 1,
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Add a transition between two Fusion layers.
+
+        Args:
+            transition_type: Type of transition ('dissolve', 'wipe', 'blur', 'zoom', 'slide').
+            duration: Duration in seconds.
+            from_layer: Source layer index.
+            to_layer: Target layer index.
+            parameters: Transition-specific parameters.
+
+        Returns:
+            Dict with transition_id, type, duration, and status.
+        """
+        logger.info(
+            f"Adding Fusion transition '{transition_type}' (duration: {duration}s) between layers {from_layer} and {to_layer}"
+        )
+        from src.agent.executor.skills.fusion_executor import add_transition
+
+        return add_transition(
+            transition_type, duration, from_layer, to_layer, parameters, resolve
+        )
+
+    @mcp.tool()
+    def fusion_create_nested_comp(
+        comp_name: str, layer_indices: List[int]
+    ) -> Dict[str, Any]:
+        """Create a nested Fusion composition from selected layers.
+
+        Args:
+            comp_name: Name for the new nested composition.
+            layer_indices: List of layer indices to include in the nested comp.
+
+        Returns:
+            Dict with comp_name, comp_id, layers list, and status.
+        """
+        logger.info(
+            f"Creating nested Fusion composition '{comp_name}' with layers {layer_indices}"
+        )
+        from src.agent.executor.skills.fusion_executor import create_nested_composition
+
+        return create_nested_composition(comp_name, layer_indices, resolve)
+
+    @mcp.tool()
+    def fusion_get_status() -> Dict[str, Any]:
+        """Get status of current Fusion composition.
+
+        Returns:
+            Dict with success status, composition state, and details.
+        """
+        logger.info("Getting Fusion composition status")
+        from src.agent.executor.skills.fusion_executor import (
+            get_fusion_composition_status,
+        )
+
+        return get_fusion_composition_status(resolve)
+
+    @mcp.tool()
+    def color_apply_style(
+        style: str = "cinematic",
+        target_clip: Optional[str] = None,
+        apply_to_all_clips: bool = False,
+    ) -> Dict[str, Any]:
+        """Apply a preset color grading style to clips.
+
+        Args:
+            style: Color style to apply. Options: 'cinematic', 'documentary', 'vibrant',
+                   'cool', 'warm', 'noir', 'solarize'.
+            target_clip: Target clip name (None = current clip).
+            apply_to_all_clips: If True, apply to all clips in timeline.
+
+        Returns:
+            Dict with nodes_created count, style info, and status.
+        """
+        logger.info(f"Applying color style '{style}' (all_clips: {apply_to_all_clips})")
+        from src.agent.executor.skills.resolve_color_and_audio import (
+            create_color_grade_from_style,
+        )
+
+        return create_color_grade_from_style(
+            resolve, style, target_clip, apply_to_all_clips
+        )
+
+    @mcp.tool()
+    def color_auto_grade_shots(
+        shots: List[Dict[str, Any]], style: str = "auto", adjust_per_shot: bool = False
+    ) -> Dict[str, Any]:
+        """Apply automatic color grading to multiple shots.
+
+        Args:
+            shots: List of shots with 'id', 'in', 'out', optional 'shot_type'.
+                   Example: [{"id": "shot_1", "in": 0.0, "out": 5.0, "shot_type": "wide"}]
+            style: Style code ('cinematic', 'documentary', etc.) or 'auto' for auto-detection.
+            adjust_per_shot: If True, adjust color style individually per shot.
+
+        Returns:
+            Dict with shots_graded count, details per shot, and summary.
+        """
+        logger.info(f"Auto grading {len(shots)} shots with style '{style}'")
+        from src.agent.executor.skills.resolve_color_and_audio import (
+            apply_auto_color_to_shots,
+        )
+
+        return apply_auto_color_to_shots(resolve, shots, style, adjust_per_shot)
+
+    @mcp.tool()
+    def color_grade_with_keyframes(
+        shots: List[Dict[str, Any]],
+        style: str = "cinematic",
+        auto_keyframes: bool = True,
+        enable_temporal_smoothing: bool = True,
+    ) -> Dict[str, Any]:
+        """Apply color grading with optional temporal automation and keyframes.
+
+        Args:
+            shots: List of shots with timing metadata.
+            style: Color style to apply.
+            auto_keyframes: If True, auto-generate keyframes at in/out points.
+            enable_temporal_smoothing: If True, smooth parameter changes over time.
+
+        Returns:
+            Dict with shots_processed, keyframes_created, and status.
+        """
+        logger.info(f"Applying color grade with keyframes to {len(shots)} shots")
+        from src.agent.executor.skills.resolve_advanced_integration import (
+            apply_color_grade_with_automation,
+        )
+
+        return apply_color_grade_with_automation(
+            shots, style, auto_keyframes, enable_temporal_smoothing, resolve
+        )
+
+    @mcp.tool()
+    def audio_normalize_loudness(
+        target_loudness: float = -23.0,
+        timeline_name: Optional[str] = None,
+        compression_ratio: float = 4.0,
+        attack_ms: float = 10.0,
+        release_ms: float = 100.0,
+    ) -> Dict[str, Any]:
+        """Normalize audio loudness following EBU R128 broadcast standard.
+
+        Args:
+            target_loudness: Target loudness in LUFS (recommended -23.0 for broadcast).
+            timeline_name: Timeline name (None = current timeline).
+            compression_ratio: Compression ratio (e.g., 4.0 = 4:1).
+            attack_ms: Compressor attack time in milliseconds.
+            release_ms: Compressor release time in milliseconds.
+
+        Returns:
+            Dict with applied_loudness, settings, and status.
+        """
+        logger.info(f"Normalizing audio loudness to {target_loudness} LUFS")
+        from src.agent.executor.skills.resolve_color_and_audio import (
+            normalize_audio_loudness,
+        )
+
+        return normalize_audio_loudness(
+            resolve,
+            target_loudness,
+            timeline_name,
+            compression_ratio,
+            attack_ms,
+            release_ms,
+        )
+
+    @mcp.tool()
+    def audio_generate_tts(
+        text: str,
+        voice: str = "default",
+        output_path: str = "/tmp/voiceover.wav",
+        language: str = "en-US",
+        rate: float = 1.0,
+        pitch: float = 1.0,
+    ) -> Dict[str, Any]:
+        """Generate TTS (Text-to-Speech) voiceover audio.
+
+        Args:
+            text: Text to convert to speech.
+            voice: Voice choice ('default', 'male', 'female', 'neutral', 'child').
+            output_path: Output file path for the generated audio.
+            language: Language code ('en-US', 'zh-CN', 'ja-JP', 'fr-FR', 'de-DE', 'es-ES', 'ru-RU').
+            rate: Speech rate multiplier (0.5 = half speed, 2.0 = double speed).
+            pitch: Pitch multiplier.
+
+        Returns:
+            Dict with output_path, estimated duration, and metadata.
+        """
+        logger.info(
+            f"Generating TTS voiceover: {len(text)} chars, voice='{voice}', lang='{language}'"
+        )
+        from src.agent.executor.skills.resolve_color_and_audio import (
+            generate_tts_voiceover,
+        )
+
+        return generate_tts_voiceover(text, voice, output_path, language, rate, pitch)
+
+    @mcp.tool()
+    def audio_create_fairlight_chain(
+        target_loudness: float = -23.0,
+        compression_ratio: float = 4.0,
+        gate_threshold: float = -40.0,
+        eq_profile: str = "neutral",
+    ) -> Dict[str, Any]:
+        """Create an advanced Fairlight audio processing chain.
+
+        Creates a signal chain with Gate -> Compressor -> EQ -> Limiter.
+
+        Args:
+            target_loudness: Target loudness in LUFS.
+            compression_ratio: Compressor ratio (4.0 = 4:1).
+            gate_threshold: Gate threshold in dB.
+            eq_profile: EQ preset ('neutral', 'warmth', 'presence', 'clarity').
+
+        Returns:
+            Dict with chain_id, processors list, and configuration status.
+        """
+        logger.info(
+            f"Creating Fairlight audio chain: loudness={target_loudness}LUFS, ratio={compression_ratio}:1, gate={gate_threshold}dB, eq={eq_profile}"
+        )
+        from src.agent.executor.skills.resolve_advanced_integration import (
+            create_fairlight_audio_chain,
+        )
+
+        return create_fairlight_audio_chain(
+            target_loudness, compression_ratio, gate_threshold, eq_profile, resolve
+        )
+
+    @mcp.tool()
+    def audio_monitor_levels(
+        timeline_name: Optional[str] = None, duration_seconds: float = 5.0
+    ) -> Dict[str, Any]:
+        """Monitor and analyze audio levels in real-time.
+
+        Args:
+            timeline_name: Timeline to monitor (None = current timeline).
+            duration_seconds: Duration to monitor in seconds.
+
+        Returns:
+            Dict with peak_level, rms_level, loudness_lufs, loudness_range, and status.
+        """
+        logger.info(f"Monitoring audio levels for {duration_seconds}s")
+        from src.agent.executor.skills.resolve_advanced_integration import (
+            monitor_audio_levels,
+        )
+
+        return monitor_audio_levels(timeline_name, duration_seconds, resolve)
+
+    # ------------------
     # Finalize Proxy Tools Registration
     # ------------------
+
     # This must be at the end of register_mcp_resources to catch all tools
     # defined inside this function using the @proxy_tool decorator.
     for name, info in proxy.tool_registry.items():
