@@ -19,6 +19,7 @@ class StepType(Enum):
     FUSION_COMPOSITION = "fusion_composition"
     COLOR_AUTOMATION = "color_automation"
     AUDIO_PROCESSING = "audio_processing"
+    TTS_GENERATION = "tts_generation"
 
 
 @dataclass

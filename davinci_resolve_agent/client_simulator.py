@@ -198,7 +198,7 @@ class ClientSimulator:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    self.rpc_url, json=request, headers=headers, timeout=self.timeout
+                    self.stream_url, json=request, headers=headers, timeout=self.timeout
                 ) as response:
                     if response.status != 200:
                         yield {"error": f"HTTP {response.status}"}

@@ -99,6 +99,8 @@ class TaskExecutor:
                 return await self._execute_color_automation(step)
             elif step.step_type == StepType.AUDIO_PROCESSING:
                 return await self._execute_audio_processing(step)
+            elif step.step_type == StepType.TTS_GENERATION:
+                return await self._execute_tts_generation(step)
             else:
                 raise ValueError(f"Unknown step type: {step.step_type}")
                 
@@ -385,7 +387,34 @@ class TaskExecutor:
         except Exception as e:
             logger.error(f"Error executing Audio processing step: {e}")
             raise
-        
+
+    async def _execute_tts_generation(self, step: PlanStep) -> Any:
+        """Execute TTS Generation operations"""
+        from .skills.resolve_color_and_audio import generate_tts_voiceover
+
+        action = step.action
+        params = step.parameters or {}
+
+        try:
+            if action == "generate_tts_voiceover":
+                # Generate TTS voiceover
+                result = generate_tts_voiceover(
+                    text=params.get("text"),
+                    voice=params.get("voice", "en-US-Neural2-F"),
+                    speed=params.get("speed", 1.0),
+                    output_path=params.get("output_path"),
+                    resolve_obj=self.resolve_server
+                )
+                logger.info(f"TTS voiceover generated: {result.get('output_path', 'unknown')}")
+                return result
+
+            else:
+                raise ValueError(f"Unknown TTS generation action: {action}")
+
+        except Exception as e:
+            logger.error(f"Error executing TTS generation step: {e}")
+            raise
+
     def cleanup(self):
         """Cleanup resources"""
         self.executor.shutdown(wait=True)

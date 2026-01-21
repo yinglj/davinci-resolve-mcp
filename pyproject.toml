@@ -39,4 +39,5 @@ dependencies = [
     "markdown>=3.8.2",
     "fastmcp >= 2.14",
     "sqlalchemy>=2.0.43",
+    "pytest>=9.0.2",
 ]
