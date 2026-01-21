@@ -220,7 +220,15 @@ Phase 2 关注将P1-02和P1-03的已完成功能集成到主系统中，进行�
 
 ---
 
-### 🎬 P2-04: 文档和培训 (3-4天)
+### 🎬 P2-04: Phase 3 方向与 Agent 事业发展 (2-3天)
+
+**状态**: Ready for Review
+
+**相关文档**: [📄 PHASE-3-AGENT-SCENARIOS-ROADMAP.md](PHASE-3-AGENT-SCENARIOS-ROADMAP.md)
+
+**殖民目标**: 提供整序 Phase 3 不一样新的事业方向，基于 client → agent → server 架构和 AI 视频制作实战场景。
+
+### 🎬 P2-05: 文档和培训 (3-4天)
 
 **状态**: Planning
 

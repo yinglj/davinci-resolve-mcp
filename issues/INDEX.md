@@ -35,7 +35,7 @@
 |------|------|------|---------|
 | [PHASE-1-COMPLETION-SUMMARY.md](PHASE-1-COMPLETION-SUMMARY.md) | Phase 1成果总结 | 中等 | 所有人 |
 | [PHASE-2-ROADMAP.md](PHASE-2-ROADMAP.md) | Phase 2完整计划 | 重等 | 项目经理、架构师 |
-| [PHASE-3-ROADMAP.md](PHASE-3-ROADMAP.md) | Phase 3: MCP Tools 扩展 | 重等 | 架构师、开发者 |
+| [PHASE-3-AGENT-SCENARIOS-ROADMAP.md](PHASE-3-AGENT-SCENARIOS-ROADMAP.md) | Phase 3: Agent事业发展与实战场景 | 重等 | 架构师、开发者 |
 | [README-PHASE-2.md](README-PHASE-2.md) | Phase 2快速入门 | 轻等 | 新人、开发者 |
 
 ### 🔧 具体任务文档
@@ -52,8 +52,10 @@
 |------|------|--------|
 | P1-02-FusionDynamicComposition.md | ✅ 完成 | ⭐⭐⭐ |
 | P1-03-AutoColorAndAudio.md | ✅ 完成 | ⭐⭐⭐ |
+| PHASE-3-AGENT-SCENARIOS-ROADMAP.md | 📋 计划中 | ⭐⭐⭐ |
 | P3-05-MCP-Tools-Production.md | 📋 计划中 | ⭐⭐⭐ |
 | TOOLS-INTEGRATION-PLAN.md | 📋 计划中 | ⭐⭐⭐ |
+| TOOLS-SCHEMA-CI-PR-CHECKLIST.md | 📋 计划中 | ⭐⭐⭐ |
 | P0-01-ScriptToShots.md | ✅ 参考 | ⭐⭐ |
 | P0-02-CreatePlaceholderTimeline.md | ✅ 参考 | ⭐⭐ |
 

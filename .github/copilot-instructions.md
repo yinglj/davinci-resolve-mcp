@@ -31,6 +31,35 @@ proxy.register_tool("fusion.create_composition", create_fusion_composition, cate
 - Pattern for POC fallback: attempt to import planner/executor functions under try/except and fall back to simple deterministic responses (see `src/api/tools_operations.py`).
 - Long-running tasks: schedule a job and return a `job_id`; implement `jobs.status` and `jobs.cancel` to manage lifecycle.
 
+JSON Schema validation (example) — add this to a tool implementation and unit tests:
+
+```python
+# Example: use jsonschema to validate tool parameters
+from jsonschema import validate, ValidationError
+
+FUSION_CREATE_SCHEMA = {
+  "type": "object",
+  "properties": {
+    "script_summary": {"type": "string"},
+    "shot_list": {"type": "array"},
+    "style": {"type": "string", "enum": ["modern", "cinematic", "abstract", "minimal"]}
+  },
+  "required": ["script_summary", "shot_list"],
+  "additionalProperties": False,
+}
+
+def create_fusion_composition(**params):
+    try:
+        validate(instance=params, schema=FUSION_CREATE_SCHEMA)
+    except ValidationError as e:
+        return {"success": False, "error": "invalid_parameters", "details": str(e)}
+    # Normal implementation follows...
+```
+
+Notes:
+- Store the schema alongside the tool implementation (e.g., `src/api/tools_schemas.py`) and expose it in `proxy.register_tool(..., parameters=SCHEMA)` for discoverability.
+- Add unit tests that assert invalid payloads trigger `invalid_parameters` errors and add CI jobs to run these tests.
+
 ## Tests & CI ✅
 - Unit tests: `tests/test_*.py`. Run `pytest -q` or `python -m pytest tests/test_tools_operations.py -q` for tools.
 - Real Resolve tests: files named `tests/test_real_*.py` require DaVinci Resolve running and proper env vars (RESOLVE_SCRIPT_API, RESOLVE_SCRIPT_LIB). Run these only when Resolve is available.
@@ -44,6 +73,22 @@ proxy.register_tool("fusion.create_composition", create_fusion_composition, cate
   - Network: `python src/main.py --mode streamable-http --port 8020`
   - Short helper: `./run-now.sh` or client-specific scripts in `scripts/`
 - Logs: standard output and the logger `davinci-resolve-mcp`; check `logs/` for historical runs.
+
+Cursor quick commands (from `.cursorrules`):
+- View project structure: `ls -la`
+- Show main server file: `cat resolve_mcp_server.py`
+- Edit main server file: open `resolve_mcp_server.py` in your editor
+- Run server in dev mode: `./run-now.sh`
+- Setup server: `./setup.sh`
+- Check Resolve environment variables:
+  ```bash
+  echo "RESOLVE_SCRIPT_API = $RESOLVE_SCRIPT_API"
+  echo "RESOLVE_SCRIPT_LIB = $RESOLVE_SCRIPT_LIB"
+  echo "PYTHONPATH = $PYTHONPATH"
+  ```
+- Is Resolve running?: `ps -ef | grep -i "[D]aVinci Resolve"`
+
+
 
 ## Project conventions & style ✍️
 - API surface: tools should be small, idempotent when possible, and return structured dictionaries (see `success_response` / `error_response` helpers in `src/utils/response.py`).

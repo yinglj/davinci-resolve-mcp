@@ -161,6 +161,20 @@ Closes #P1-02, #P1-03, #P2-01, #P2-02
 - RELEASE_NOTES_v1.4.0.md
 - pyproject.toml (version updated to 1.4.0)
 
+### One-Page PR Checklist (quick) ✅
+
+- [ ] PR title uses `type(scope): short description` (e.g., `feat(agent): add tools CLI`)
+- [ ] Short summary and a clear "Why" at top of PR description
+- [ ] List of files changed and a short section "What changed"
+- [ ] Tests: local unit tests and `test_real_*` tests added or marked
+- [ ] If adding tools: include JSON Schema for inputs and unit tests for validation
+- [ ] Docs: `docs/` and `README.md` updated with usage examples
+- [ ] CI: workflows updated if new tests or platforms are required
+- [ ] Version bump and release notes updated if applicable
+- [ ] Add reviewers, labels, and milestone before requesting review
+- [ ] Add a demo script or short usage example (in `examples/` or `scripts/`)
+- [ ] Confirm CI artifacts and test reports are attached to the PR
+
 ## Next Steps
 
 1. ✅ Code review by 2-3 maintainers
