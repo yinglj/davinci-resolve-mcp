@@ -53,6 +53,7 @@
 | P1-02-FusionDynamicComposition.md | ✅ 完成 | ⭐⭐⭐ |
 | P1-03-AutoColorAndAudio.md | ✅ 完成 | ⭐⭐⭐ |
 | P3-05-MCP-Tools-Production.md | 📋 计划中 | ⭐⭐⭐ |
+| TOOLS-INTEGRATION-PLAN.md | 📋 计划中 | ⭐⭐⭐ |
 | P0-01-ScriptToShots.md | ✅ 参考 | ⭐⭐ |
 | P0-02-CreatePlaceholderTimeline.md | ✅ 参考 | ⭐⭐ |
 

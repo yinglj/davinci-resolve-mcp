@@ -41,6 +41,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from termcolor import colored
 
+
 class ClientSimulator:
     """A client simulator for interacting with MCP server.
 
@@ -63,22 +64,28 @@ class ClientSimulator:
         bindings (KeyBindings): Keyboard shortcut bindings
         prompt_session (PromptSession): Interactive prompt handler
     """
-    def __init__(self, rpc_url: str = "http://localhost:8080/rpc", api_key: str = None, timeout: int = 120):
+
+    def __init__(
+        self,
+        rpc_url: str = "http://localhost:8080/rpc",
+        api_key: str = None,
+        timeout: int = 120,
+    ):
         self.rpc_url = rpc_url
         self.stream_url = f"{rpc_url}/stream"
         self.api_key = api_key or "sk-1234567890abcdef"
         self.session_id: Optional[str] = None
         self.request_id = 0
         self.timeout = aiohttp.ClientTimeout(total=timeout, sock_read=120)
-        
+
         # Create history directory if it doesn't exist
         history_dir = os.path.expanduser("~/.mcp_client")
         os.makedirs(history_dir, exist_ok=True)
-        
+
         # Set up history file
         self.history_file = os.path.join(history_dir, "command_history.txt")
         self.command_history = self._load_history_from_file()
-        
+
         # Use FileHistory instead of InMemoryHistory
         self.history = FileHistory(self.history_file)
         self.bindings = KeyBindings()
@@ -86,22 +93,24 @@ class ClientSimulator:
             message="> [Session: None] ",
             history=self.history,
             key_bindings=self.bindings,
-            multiline=False
+            multiline=False,
         )
 
     def _load_history_from_file(self) -> List[str]:
         """Load command history from file, filtering duplicates and system markers."""
         try:
             if os.path.exists(self.history_file):
-                with open(self.history_file, 'r', encoding='utf-8') as f:
+                with open(self.history_file, "r", encoding="utf-8") as f:
                     # Filter out system markers and duplicates while preserving order
                     seen = set()
                     filtered_history = []
                     for line in f:
                         line = line.strip()
-                        if (line and 
-                            not line.startswith(('#', '+')) and 
-                            line not in seen):
+                        if (
+                            line
+                            and not line.startswith(("#", "+"))
+                            and line not in seen
+                        ):
                             seen.add(line)
                             filtered_history.append(line)
                     return filtered_history
@@ -114,12 +123,14 @@ class ClientSimulator:
         """Save a command to the history file, avoiding duplicates."""
         try:
             # Skip empty lines, system markers, and duplicates
-            if (not command.strip() or 
-                command.strip().startswith(('#', '+')) or
-                (self.command_history and command == self.command_history[-1])):
+            if (
+                not command.strip()
+                or command.strip().startswith(("#", "+"))
+                or (self.command_history and command == self.command_history[-1])
+            ):
                 return
-                
-            with open(self.history_file, 'a', encoding='utf-8') as f:
+
+            with open(self.history_file, "a", encoding="utf-8") as f:
                 f.write(f"{command}\n")
             self.command_history.append(command)
         except Exception as e:
@@ -131,22 +142,38 @@ class ClientSimulator:
             "jsonrpc": "2.0",
             "method": method,
             "params": params,
-            "id": self.request_id
+            "id": self.request_id,
         }
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
             async with aiohttp.ClientSession() as session:
-                logger.debug(f"Sending RPC request: {json.dumps(request, indent=2, ensure_ascii=False)}")
-                logger.print(colored(f"Sending request:\n{json.dumps(request, indent=2, ensure_ascii=False)}", "magenta"))
-                async with session.post(self.rpc_url, json=request, headers=headers, timeout=self.timeout) as response:
+                logger.debug(
+                    f"Sending RPC request: {json.dumps(request, indent=2, ensure_ascii=False)}"
+                )
+                logger.print(
+                    colored(
+                        f"Sending request:\n{json.dumps(request, indent=2, ensure_ascii=False)}",
+                        "magenta",
+                    )
+                )
+                async with session.post(
+                    self.rpc_url, json=request, headers=headers, timeout=self.timeout
+                ) as response:
                     logger.info(f"RPC response status: {response.status}")
                     if response.status != 200:
                         error_msg = f"RPC request failed with status {response.status}"
                         logger.error(error_msg)
                         return {"error": error_msg}
                     result = await response.json()
-                    logger.debug(f"RPC response: {json.dumps(result, indent=2, ensure_ascii=False)}")
-                    logger.print(colored(f"Received response:\n{json.dumps(result, indent=2, ensure_ascii=False)}", "yellow"))
+                    logger.debug(
+                        f"RPC response: {json.dumps(result, indent=2, ensure_ascii=False)}"
+                    )
+                    logger.print(
+                        colored(
+                            f"Received response:\n{json.dumps(result, indent=2, ensure_ascii=False)}",
+                            "yellow",
+                        )
+                    )
                     return result
         except asyncio.TimeoutError:
             error_msg = f"RPC request timed out after {self.timeout.total} seconds"
@@ -157,20 +184,22 @@ class ClientSimulator:
             logger.error(error_msg)
             return {"error": error_msg}
 
-    async def send_stream_request(self, method: str, params: Dict) -> AsyncGenerator[Dict, None]:
+    async def send_stream_request(
+        self, method: str, params: Dict
+    ) -> AsyncGenerator[Dict, None]:
         self.request_id += 1
         request = {
             "jsonrpc": "2.0",
             "method": method,
             "params": params,
-            "id": self.request_id
+            "id": self.request_id,
         }
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        } if self.api_key else {}
+        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(self.rpc_url, json=request, headers=headers, timeout=self.timeout) as response:
+                async with session.post(
+                    self.rpc_url, json=request, headers=headers, timeout=self.timeout
+                ) as response:
                     if response.status != 200:
                         yield {"error": f"HTTP {response.status}"}
                         return
@@ -191,112 +220,6 @@ class ClientSimulator:
         params = {"tool_name": tool_name, "arguments": arguments}
         return await self.send_rpc_request("execute_tool", params)
 
-            "Authorization": f"Bearer {self.api_key}" if self.api_key else "",
-            "Accept": "text/event-stream"
-        }
-        try:
-            async with aiohttp.ClientSession() as session:
-                logger.info(f"Sending stream RPC request with ID {self.request_id}")
-                logger.debug(f"Request details: {json.dumps(request, indent=2, ensure_ascii=False)}")
-                logger.print(colored(f"Sending stream request:\n{json.dumps(request, indent=2, ensure_ascii=False)}", "magenta"))
-                async with session.post(self.stream_url, json=request, headers=headers, timeout=self.timeout) as response:
-                    logger.info("Received stream response: status=%s, headers=%s", response.status, response.headers)
-                    if response.status != 200:
-                        error_msg = f"Stream request failed with status {response.status}"
-                        logger.error(error_msg)
-                        yield {"error": error_msg}
-                        return
-
-                    # Check if the response is JSON (non-streaming error)
-                    content_type = response.headers.get("Content-Type", "")
-                    if "application/json" in content_type:
-                        try:
-                            result = await response.json()
-                            logger.info(f"Received JSON response: {json.dumps(result, indent=2, ensure_ascii=False)}")
-                            yield result
-                            return
-                        except json.JSONDecodeError as e:
-                            logger.error(f"Failed to decode JSON response: {str(e)}")
-                            yield {"error": {"message": f"Invalid JSON response: {str(e)}"}}
-                            return
-
-                    # Handle streaming response
-                    logger.info("Starting stream content iteration")
-                    try:
-                        initial_wait = 5
-                        start_time = asyncio.get_event_loop().time()
-                        while asyncio.get_event_loop().time() - start_time < initial_wait:
-                            logger.info(f"Waiting for stream data, elapsed: {asyncio.get_event_loop().time() - start_time:.2f}s")
-                            async for line in response.content.iter_any():
-                                line_str = line.decode("utf-8").strip()
-                                logger.info(f"Received stream data: '{line_str}'")
-                                if not line_str:
-                                    logger.debug("Ignored empty line")
-                                    continue
-                                if line_str == ": keepalive":
-                                    logger.info("Received keepalive signal")
-                                    continue
-                                if line_str.startswith("data: "):
-                                    data = line_str[6:]
-                                    data_parts = data.split("data: ")
-                                    result = None
-                                    for i, part in enumerate(data_parts):
-                                        if not part:
-                                            continue
-                                        logger.info(f"Parsed event data part {i+1}: '{part}'")
-                                        if part == "[DONE]":
-                                            logger.info("Received legacy stream end signal [DONE]")
-                                            return
-                                        try:
-                                            part_result = json.loads(part)
-                                            if result is None:
-                                                result = part_result
-                                            else:
-                                                if "result" in part_result:
-                                                    result["result"] = {**result.get("result", {}), **part_result.get("result", {})}
-                                                if "error" in part_result:
-                                                    result["error"] = part_result["error"]
-                                            logger.info(f"Parsed stream event part {i+1}: {json.dumps(part_result, indent=2, ensure_ascii=False)}")
-                                        except json.JSONDecodeError as e:
-                                            logger.error(f"Invalid stream event data: {part}, error: {str(e)}")
-                                            yield {"error": {"message": f"Invalid stream event data: {part}, error: {str(e)}"}}
-                                            continue
-                                    if result:
-                                        logger.info(f"Combined stream event: {json.dumps(result, indent=2, ensure_ascii=False)}")
-                                        if "result" in result and result["result"].get("type") == "stream_complete":
-                                            logger.info("Received stream end signal")
-                                            return
-                                        yield result
-                                else:
-                                    logger.debug(f"Ignored non-data line: '{line_str}'")
-                            logger.info("Stream iteration paused, waiting 0.5s before retry")
-                            await asyncio.sleep(0.5)
-                        logger.info(f"Initial wait timeout after {initial_wait}s, no data received")
-                    except aiohttp.ClientConnectionError as e:
-                        logger.error(f"Stream connection error: {str(e)}")
-                        yield {"error": {"message": f"Stream connection error: {str(e)}"}}
-                        return
-                    except asyncio.TimeoutError:
-                        logger.error(f"Stream read timeout after {self.timeout.sock_read} seconds")
-                        yield {"error": {"message": f"Stream read timeout after {self.timeout.sock_read} seconds"}}
-                        return
-                    except Exception as e:
-                        logger.error(f"Stream iteration error: {str(e)}")
-                        yield {"error": {"message": f"Stream iteration error: {str(e)}"}}
-                        return
-                    finally:
-                        logger.info("Stream content iteration completed")
-        except asyncio.TimeoutError:
-            error_msg = f"Stream request timed out after {self.timeout.total} seconds"
-            logger.error(error_msg)
-            yield {"error": {"message": error_msg}}
-        except Exception as e:
-            error_msg = f"Stream request error: {str(e)}"
-            logger.error(error_msg)
-            yield {"error": {"message": error_msg}}
-        finally:
-            logger.info("Stream request processing finished")
-
     async def start_session(self) -> bool:
         params = {}
         response = await self.send_rpc_request("start_session", params)
@@ -304,7 +227,9 @@ class ClientSimulator:
             self.session_id = response["result"]["session_id"]
             logger.info(f"Session started: {self.session_id}")
             return True
-        logger.error(f"Failed to start session: {response.get('error', 'Unknown error')}")
+        logger.error(
+            f"Failed to start session: {response.get('error', 'Unknown error')}"
+        )
         return False
 
     async def process_query(self, query: str) -> Dict:
@@ -315,13 +240,19 @@ class ClientSimulator:
 
     async def process_query_stream(self, query: str) -> AsyncGenerator[Dict, None]:
         if not self.session_id:
-            yield {"error": {"message": "No active session. Please use 'start session' to begin."}}
+            yield {
+                "error": {
+                    "message": "No active session. Please use 'start session' to begin."
+                }
+            }
             return
         params = {"session_id": self.session_id, "query": query}
         logger.info(f"Starting stream query processing: {query}")
         async for event in self.send_stream_request("process_query_stream", params):
             logger.info(f"Yielding stream event for query: {query}")
-            logger.debug(f"Event details: {json.dumps(event, indent=2, ensure_ascii=False)}")
+            logger.debug(
+                f"Event details: {json.dumps(event, indent=2, ensure_ascii=False)}"
+            )
             yield event
         logger.info(f"Stream query processing completed: {query}")
 
@@ -336,7 +267,7 @@ class ClientSimulator:
 
     def _resolve_bang_command(self, query: str) -> Optional[str]:
         """Resolve history substitution commands like !!, !n, !-n, !string."""
-        if not query.startswith('!'):
+        if not query.startswith("!"):
             return query
         if not self.command_history:
             logger.print(colored("No command history available.", "red"))
@@ -344,44 +275,55 @@ class ClientSimulator:
 
         # Remove leading '!' and get the command specifier
         specifier = query[1:].strip()
-        
+
         try:
             # Handle !! (last command)
-            if specifier == '!':
+            if specifier == "!":
                 if self.command_history:
                     resolved = self.command_history[-1]
-                    logger.print(colored(f"Executing previous command: {resolved}", "yellow"))
+                    logger.print(
+                        colored(f"Executing previous command: {resolved}", "yellow")
+                    )
                     return resolved
-            
+
             # Handle !-n (nth previous command)
-            elif specifier.startswith('-'):
+            elif specifier.startswith("-"):
                 try:
                     n = int(specifier)
                     if abs(n) <= len(self.command_history):
                         resolved = self.command_history[n]
-                        logger.print(colored(f"Executing command !{n}: {resolved}", "yellow"))
+                        logger.print(
+                            colored(f"Executing command !{n}: {resolved}", "yellow")
+                        )
                         return resolved
                 except ValueError:
                     pass
-            
+
             # Handle !n (nth command)
             elif specifier.isdigit():
                 n = int(specifier) - 1
                 if 0 <= n < len(self.command_history):
                     resolved = self.command_history[n]
-                    logger.print(colored(f"Executing command #{specifier}: {resolved}", "yellow"))
+                    logger.print(
+                        colored(f"Executing command #{specifier}: {resolved}", "yellow")
+                    )
                     return resolved
-                    
+
             # Handle !string (most recent command starting with string)
             else:
                 for cmd in reversed(self.command_history):
                     if cmd.startswith(specifier):
-                        logger.print(colored(f"Executing command matching '!{specifier}': {cmd}", "yellow"))
+                        logger.print(
+                            colored(
+                                f"Executing command matching '!{specifier}': {cmd}",
+                                "yellow",
+                            )
+                        )
                         return cmd
-                        
+
             logger.print(colored(f"No matching command found for '{query}'", "red"))
             return None
-            
+
         except Exception as e:
             logger.error(f"Error resolving history command: {str(e)}")
             logger.print(colored(f"Error: {str(e)}", "red"))
@@ -395,7 +337,9 @@ class ClientSimulator:
         logger.print("- 'stream <query>': Process query with streaming response")
         logger.print("- 'history': Show command history")
         logger.print("- '!n': Execute the nth command from history")
-        logger.print("- '!prefix': Execute the most recent command starting with prefix")
+        logger.print(
+            "- '!prefix': Execute the most recent command starting with prefix"
+        )
         logger.print("- 'help': Show this help message")
         logger.print("- 'exit': Quit the simulator")
         logger.print(f"Using API key: {self.api_key}")
@@ -434,7 +378,9 @@ class ClientSimulator:
 
                 if query.lower() == "start session":
                     if self.session_id:
-                        logger.print("A session is already active. End it first with 'end session'.")
+                        logger.print(
+                            "A session is already active. End it first with 'end session'."
+                        )
                     elif await self.start_session():
                         logger.print(f"Session started: {self.session_id}")
                     continue
@@ -460,10 +406,14 @@ class ClientSimulator:
                     logger.print("Commands:")
                     logger.print("- 'start session': Start a new session")
                     logger.print("- 'end session': End the current session")
-                    logger.print("- 'stream <query>': Process query with streaming response")
+                    logger.print(
+                        "- 'stream <query>': Process query with streaming response"
+                    )
                     logger.print("- 'history': Show command history")
                     logger.print("- '!n': Execute the nth command from history")
-                    logger.print("- '!prefix': Execute the most recent command starting with prefix")
+                    logger.print(
+                        "- '!prefix': Execute the most recent command starting with prefix"
+                    )
                     logger.print("- 'help': Show this help message")
                     logger.print("- 'exit': Quit the simulator")
                     continue
@@ -499,12 +449,16 @@ class ClientSimulator:
                     try:
                         if action == "list":
                             category = payload or None
-                            resp = await self.send_rpc_request("list_tools_in_category", {"category": category})
+                            resp = await self.send_rpc_request(
+                                "list_tools_in_category", {"category": category}
+                            )
                             self._print_response({"result": {"response": resp}})
 
                         elif action in ("call", "invoke"):
                             if not payload:
-                                logger.print("Usage: tools call <tool_name> <json-args>")
+                                logger.print(
+                                    "Usage: tools call <tool_name> <json-args>"
+                                )
                                 continue
                             subparts = payload.split(None, 1)
                             tool_name = subparts[0]
@@ -513,9 +467,18 @@ class ClientSimulator:
                                 try:
                                     args = json.loads(subparts[1])
                                 except json.JSONDecodeError:
-                                    logger.print(colored("Invalid JSON for tool arguments", "red"))
+                                    logger.print(
+                                        colored(
+                                            "Invalid JSON for tool arguments", "red"
+                                        )
+                                    )
                                     continue
-                            logger.print(colored(f"Calling tool {tool_name} with args: {args}", "cyan"))
+                            logger.print(
+                                colored(
+                                    f"Calling tool {tool_name} with args: {args}",
+                                    "cyan",
+                                )
+                            )
                             response = await self.send_tool_request(tool_name, args)
                             self._print_response({"result": {"response": response}})
 
@@ -524,7 +487,9 @@ class ClientSimulator:
                             if not job_id:
                                 logger.print("Usage: tools status <job_id>")
                                 continue
-                            response = await self.send_tool_request("jobs.status", {"job_id": job_id})
+                            response = await self.send_tool_request(
+                                "jobs.status", {"job_id": job_id}
+                            )
                             self._print_response({"result": {"response": response}})
 
                         elif action == "cancel":
@@ -532,11 +497,15 @@ class ClientSimulator:
                             if not job_id:
                                 logger.print("Usage: tools cancel <job_id>")
                                 continue
-                            response = await self.send_tool_request("jobs.cancel", {"job_id": job_id})
+                            response = await self.send_tool_request(
+                                "jobs.cancel", {"job_id": job_id}
+                            )
                             self._print_response({"result": {"response": response}})
 
                         else:
-                            logger.print("Tools subcommands:\n - tools list [category]\n - tools call <tool_name> <json-args>\n - tools status <job_id>\n - tools cancel <job_id>")
+                            logger.print(
+                                "Tools subcommands:\n - tools list [category]\n - tools call <tool_name> <json-args>\n - tools status <job_id>\n - tools cancel <job_id>"
+                            )
 
                     except Exception as e:
                         logger.error(f"Tools command failed: {str(e)}")
@@ -557,31 +526,35 @@ class ClientSimulator:
     def _print_response(self, response: Dict, success_msg: str = None) -> None:
         try:
             logger.info("Processing non-stream response")
-            logger.debug(f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}")
-            
+            logger.debug(
+                f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}"
+            )
+
             if "result" in response:
                 result = response["result"]
                 if "error" in result:
                     msg = result["error"]
                     if isinstance(msg, str):
-                        decoded_msg = msg.encode().decode('unicode_escape')
+                        decoded_msg = msg.encode().decode("unicode_escape")
                     else:
                         decoded_msg = str(msg)
                     logger.print(colored(f"Error: {decoded_msg}", "red"))
                 else:
                     msg = success_msg or result.get("response", "Operation successful")
                     if isinstance(msg, str):
-                        decoded_msg = msg.encode().decode('unicode_escape')
+                        decoded_msg = msg.encode().decode("unicode_escape")
                     else:
                         decoded_msg = str(msg)
                     logger.print(colored(decoded_msg, "green"))
 
                 if result.get("complete", False):
-                    logger.print("Task completed. Start a new query or type 'end session'.")
+                    logger.print(
+                        "Task completed. Start a new query or type 'end session'."
+                    )
             else:
                 msg = response.get("error", "Unknown error")
                 if isinstance(msg, str):
-                    decoded_msg = msg.encode().decode('unicode_escape')
+                    decoded_msg = msg.encode().decode("unicode_escape")
                 else:
                     decoded_msg = str(msg)
                 logger.print(colored(f"RPC Error: {decoded_msg}", "red"))
@@ -598,18 +571,30 @@ class ClientSimulator:
     def _print_stream_response(self, response: Dict) -> None:
         try:
             logger.info(f"Processing stream response")
-            logger.debug(f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}")
-            
+            logger.debug(
+                f"Response details: {json.dumps(response, indent=2, ensure_ascii=False)}"
+            )
+
             # Check if the response is a JSON-RPC error response
             if "jsonrpc" in response and "error" in response:
                 error = response["error"]
                 error_message = error.get("message", str(error))
                 request_id = response.get("id", "unknown")
                 logger.error(f"JSON-RPC error (ID: {request_id}): {error_message}")
-                logger.print(colored(f"Error (Request ID: {request_id}): {error_message}", "red"))
+                logger.print(
+                    colored(f"Error (Request ID: {request_id}): {error_message}", "red")
+                )
                 # Suggest starting a new session if the error is about an invalid session
-                if "Invalid session" in error_message or "No active session" in error_message:
-                    logger.print(colored("Please use 'start session' to begin a new session.", "yellow"))
+                if (
+                    "Invalid session" in error_message
+                    or "No active session" in error_message
+                ):
+                    logger.print(
+                        colored(
+                            "Please use 'start session' to begin a new session.",
+                            "yellow",
+                        )
+                    )
                 return
 
             # Handle streaming events
@@ -622,11 +607,22 @@ class ClientSimulator:
                     if isinstance(content, str):
                         try:
                             parsed_content = json.loads(content)
-                            logger.debug(f"Parsed content: {parsed_content.get('content')}")
-                            content_display = json.dumps(parsed_content.get('content'), indent=2, ensure_ascii=False)
+                            logger.debug(
+                                f"Parsed content: {parsed_content.get('content')}"
+                            )
+                            content_display = json.dumps(
+                                parsed_content.get("content"),
+                                indent=2,
+                                ensure_ascii=False,
+                            )
                         except json.JSONDecodeError:
                             # Decode Unicode escape sequences and replace newlines/tabs
-                            content_display = content.encode().decode('unicode_escape').replace("\\n", "\n").replace("\\t", "\t")
+                            content_display = (
+                                content.encode()
+                                .decode("unicode_escape")
+                                .replace("\\n", "\n")
+                                .replace("\\t", "\t")
+                            )
                     else:
                         content_display = str(content)
                 except Exception as e:
@@ -638,15 +634,22 @@ class ClientSimulator:
                     final_content = result.get("response", content_display)
                     if isinstance(final_content, str):
                         # Decode Unicode escape sequences for final response
-                        final_display = final_content.encode().decode('unicode_escape').replace("\\n", "\n").replace("\\t", "\t")
+                        final_display = (
+                            final_content.encode()
+                            .decode("unicode_escape")
+                            .replace("\\n", "\n")
+                            .replace("\\t", "\t")
+                        )
                     else:
-                        final_display = json.dumps(final_content, indent=2, ensure_ascii=False)
+                        final_display = json.dumps(
+                            final_content, indent=2, ensure_ascii=False
+                        )
                     logger.print(colored(f"[Final] {final_display}", "green"))
                 elif event_type == "message":
                     if isinstance(content_display, str):
                         content_display = json.loads(content_display)
                     # print(colored(f"{content_display}", "blue"), end='', flush=True)
-                    logger.print(colored(f"{content_display}", "blue"), end='')
+                    logger.print(colored(f"{content_display}", "blue"), end="")
                 elif event_type == "data":
                     logger.print(colored(f"[Data] {content_display}", "cyan"))
                 elif event_type == "run_item":
@@ -662,12 +665,24 @@ class ClientSimulator:
                 logger.print(colored(f"Stream Error: {error_message}", "red"))
                 # Suggest starting a new session for session-related errors
                 if "No active session" in error_message:
-                    logger.print(colored("Please use 'start session' to begin a new session.", "yellow"))
+                    logger.print(
+                        colored(
+                            "Please use 'start session' to begin a new session.",
+                            "yellow",
+                        )
+                    )
         except Exception as e:
             logger.error(f"Error processing stream response: {str(e)}")
-            logger.print(colored(f"Error processing stream response: {str(e)}, response: {response}", "red"))
+            logger.print(
+                colored(
+                    f"Error processing stream response: {str(e)}, response: {response}",
+                    "red",
+                )
+            )
 
-    def generate_ascii_art(self, text: str, font: str = "slant", color: str = "green") -> str:
+    def generate_ascii_art(
+        self, text: str, font: str = "slant", color: str = "green"
+    ) -> str:
         try:
             ascii_art = pyfiglet.figlet_format(text, font=font)
             return colored(ascii_art, color)
@@ -675,12 +690,14 @@ class ClientSimulator:
             logger.error(f"Font '{font}' not available")
             return f"Error: Font '{font}' not available"
 
+
 async def main() -> None:
     api_key = os.getenv("MCP_API_KEY")
     simulator = ClientSimulator(api_key=api_key)
     text = "Client Simulator v1.0"
     logger.print(simulator.generate_ascii_art(text))
     await simulator.chat_loop()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

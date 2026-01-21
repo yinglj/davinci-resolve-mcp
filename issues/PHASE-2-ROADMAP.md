@@ -216,7 +216,7 @@ Phase 2 关注将P1-02和P1-03的已完成功能集成到主系统中，进行�
 - 代码覆盖率>80%
 - 文档完整清晰
 
-**相关文件**: [P2-03-PR-Creation-Code-Review.md](P2-03-PR-Creation-Code-Review.md)
+**相关文件**: [P2-03-PR-Creation-Code-Review.md](P2-03-PR-Creation-Code-Review.md), [P2-04-TOOLS-INTEGRATION-PLAN.md](TOOLS-INTEGRATION-PLAN.md)
 
 ---
 

@@ -11,8 +11,13 @@ from query_processor import QueryProcessor
 from errors import JSONRPC_ERROR_CODES
 import pyfiglet
 from termcolor import colored
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import src.api.tools_operations as tools_ops
 
 logger.debug("Loading agnomcp_server module")
+
 
 class JSONRPCServer:
     def __init__(self):
@@ -41,7 +46,9 @@ class JSONRPCServer:
         try:
             text = await request.text()
             rpc_request = json.loads(text)
-            logger.info(f"Received RPC request: {rpc_request.get('method')}, id={rpc_request.get('id')}")
+            logger.info(
+                f"Received RPC request: {rpc_request.get('method')}, id={rpc_request.get('id')}"
+            )
             logger.debug(f"Full request: {json.dumps(rpc_request, indent=2)}")
             logger.print(f"Received RPC request: {json.dumps(rpc_request, indent=2)}")
 
@@ -57,9 +64,13 @@ class JSONRPCServer:
                 logger.error("Server not connected to any agent")
                 return self._error_response("NOT_CONNECTED")
 
-            if method != "start_session" and (not self.query_processor or not self.query_processor.agent):
+            if method != "start_session" and (
+                not self.query_processor or not self.query_processor.agent
+            ):
                 logger.error("QueryProcessor or agent not initialized")
-                return self._error_response("SERVER_ERROR", "InitializationError", "No agent available")
+                return self._error_response(
+                    "SERVER_ERROR", "InitializationError", "No agent available"
+                )
 
             if method == "start_session":
                 session_id = self.query_processor.start_session()
@@ -72,8 +83,12 @@ class JSONRPCServer:
                 session_id = params.get("session_id")
                 query = params.get("query")
                 if not session_id or not query:
-                    logger.error(f"Invalid params: session_id={session_id}, query={query}")
-                    return self._error_response("INVALID_PARAMS", {"session_id": session_id, "query": query})
+                    logger.error(
+                        f"Invalid params: session_id={session_id}, query={query}"
+                    )
+                    return self._error_response(
+                        "INVALID_PARAMS", {"session_id": session_id, "query": query}
+                    )
                 if not self.query_processor.is_session_valid(session_id):
                     logger.error(f"Invalid session: {session_id}")
                     return self._error_response("INVALID_SESSION", session_id)
@@ -81,20 +96,29 @@ class JSONRPCServer:
                 result = await self.query_processor.process_query(session_id, query)
                 if "error" in result:
                     logger.error(f"Query processing failed: {result['error']}")
-                    return self._error_response("SERVER_ERROR", "QueryProcessingError", result["error"], request_id)
+                    return self._error_response(
+                        "SERVER_ERROR",
+                        "QueryProcessingError",
+                        result["error"],
+                        request_id,
+                    )
                 logger.info(f"Query processed successfully for session {session_id}")
                 logger.print(f"Sending response: {json.dumps(result, indent=2)}")
                 return self._success_response(result, request_id)
 
             elif method == "process_query_stream":
                 logger.error("Streaming request sent to /rpc; should use /rpc/stream")
-                return self._error_response("INVALID_REQUEST", "Use /rpc/stream for streaming", request_id)
+                return self._error_response(
+                    "INVALID_REQUEST", "Use /rpc/stream for streaming", request_id
+                )
 
             elif method == "end_session":
                 session_id = params.get("session_id")
                 if not session_id:
                     logger.error("Missing session_id for end_session")
-                    return self._error_response("INVALID_PARAMS", {"session_id": session_id})
+                    return self._error_response(
+                        "INVALID_PARAMS", {"session_id": session_id}
+                    )
                 if not self.query_processor.is_session_valid(session_id):
                     logger.error(f"Invalid session for end_session: {session_id}")
                     return self._error_response("INVALID_SESSION", session_id)
@@ -102,6 +126,93 @@ class JSONRPCServer:
                 logger.info(f"Session ended: {session_id}")
                 logger.print(f"Sending response: {json.dumps(result, indent=2)}")
                 return self._success_response(result, request_id)
+
+            elif method == "execute_tool":
+                tool_name = params.get("tool_name")
+                arguments = params.get("arguments", {})
+                logger.info(f"Executing tool: {tool_name} with args: {arguments}")
+
+                try:
+                    # Map tool names to functions in tools_operations
+                    result = None
+                    if tool_name == "fusion.create_composition":
+                        result = tools_ops.create_fusion_composition(**arguments)
+                    elif tool_name == "fusion.apply_to_timeline":
+                        result = tools_ops.apply_fusion_to_timeline(**arguments)
+                    elif tool_name == "audio.create_chain":
+                        result = tools_ops.create_audio_chain(**arguments)
+                    elif tool_name == "color.auto_color_timeline":
+                        result = tools_ops.auto_color_timeline(**arguments)
+                    elif tool_name == "render.preview":
+                        result = tools_ops.render_preview(**arguments)
+                    elif tool_name == "jobs.status":
+                        result = tools_ops.job_status(**arguments)
+                    elif tool_name == "jobs.cancel":
+                        result = tools_ops.cancel_job(**arguments)
+                    else:
+                        return self._error_response(
+                            "METHOD_NOT_FOUND",
+                            f"Tool {tool_name} not found or not mapped",
+                        )
+
+                    logger.print(
+                        f"Tool execution result: {json.dumps(result, indent=2)}"
+                    )
+                    return self._success_response(result, request_id)
+                except TypeError as e:
+                    logger.error(f"Tool arguments mismatch: {e}")
+                    return self._error_response("INVALID_PARAMS", str(e))
+                except Exception as e:
+                    logger.exception(f"Tool execution failed: {e}")
+                    return self._error_response(
+                        "SERVER_ERROR", "ToolExecutionError", str(e), request_id
+                    )
+
+            elif method == "list_tools_in_category":
+                category = params.get("category")
+                # Define available tools metadata (simplified)
+                tools_metadata = [
+                    {
+                        "name": "fusion.create_composition",
+                        "category": "fusion",
+                        "description": "Create Fusion composition",
+                    },
+                    {
+                        "name": "fusion.apply_to_timeline",
+                        "category": "fusion",
+                        "description": "Apply composition to timeline",
+                    },
+                    {
+                        "name": "audio.create_chain",
+                        "category": "audio",
+                        "description": "Create audio processing chain",
+                    },
+                    {
+                        "name": "color.auto_color_timeline",
+                        "category": "color",
+                        "description": "Auto color grade timeline",
+                    },
+                    {
+                        "name": "render.preview",
+                        "category": "render",
+                        "description": "Render preview",
+                    },
+                    {
+                        "name": "jobs.status",
+                        "category": "jobs",
+                        "description": "Get job status",
+                    },
+                    {
+                        "name": "jobs.cancel",
+                        "category": "jobs",
+                        "description": "Cancel job",
+                    },
+                ]
+                if category:
+                    tools_metadata = [
+                        t for t in tools_metadata if t["category"] == category
+                    ]
+                return self._success_response(tools_metadata, request_id)
 
             else:
                 logger.error(f"Unknown method: {method}")
@@ -125,7 +236,9 @@ class JSONRPCServer:
         try:
             text = await request.text()
             rpc_request = json.loads(text)
-            logger.info(f"Received stream request: {rpc_request.get('method')}, id={rpc_request.get('id')}")
+            logger.info(
+                f"Received stream request: {rpc_request.get('method')}, id={rpc_request.get('id')}"
+            )
             logger.debug(f"Full stream request: {json.dumps(rpc_request, indent=2)}")
 
             jsonrpc_version = rpc_request.get("jsonrpc", "2.0")
@@ -142,15 +255,23 @@ class JSONRPCServer:
                 return self._error_response("NOT_CONNECTED")
 
             if not self.query_processor or not self.query_processor.agent:
-                logger.error("Stream request rejected: QueryProcessor or agent not initialized")
-                return self._error_response("SERVER_ERROR", "InitializationError", "No agent available")
+                logger.error(
+                    "Stream request rejected: QueryProcessor or agent not initialized"
+                )
+                return self._error_response(
+                    "SERVER_ERROR", "InitializationError", "No agent available"
+                )
 
             if method == "process_query_stream":
                 session_id = params.get("session_id")
                 query = params.get("query")
                 if not session_id or not query:
-                    logger.error(f"Invalid stream params: session_id={session_id}, query={query}")
-                    return self._error_response("INVALID_PARAMS", {"session_id": session_id, "query": query})
+                    logger.error(
+                        f"Invalid stream params: session_id={session_id}, query={query}"
+                    )
+                    return self._error_response(
+                        "INVALID_PARAMS", {"session_id": session_id, "query": query}
+                    )
                 if not self.query_processor.is_session_valid(session_id):
                     logger.error(f"Invalid session for stream: {session_id}")
                     return self._error_response("INVALID_SESSION", session_id)
@@ -162,11 +283,13 @@ class JSONRPCServer:
                         "Content-Type": "text/event-stream",
                         "Cache-Control": "no-cache",
                         "Connection": "keep-alive",
-                        "X-Accel-Buffering": "no"
-                    }
+                        "X-Accel-Buffering": "no",
+                    },
                 )
                 await response.prepare(request)
-                logger.info(f"Stream response prepared for session {session_id}, request_id={request_id}")
+                logger.info(
+                    f"Stream response prepared for session {session_id}, request_id={request_id}"
+                )
 
                 last_event = asyncio.get_running_loop().time()
                 stream_active = True
@@ -175,31 +298,43 @@ class JSONRPCServer:
                 async def send_sse_event(data: str, is_keepalive: bool = False) -> bool:
                     nonlocal stream_active
                     if not stream_active:
-                        logger.info(f"Skipping send for session {session_id}: stream inactive")
+                        logger.info(
+                            f"Skipping send for session {session_id}: stream inactive"
+                        )
                         return False
                     try:
                         if is_keepalive:
                             event_data = b": keepalive\n\n"
-                            logger.info(f"Sending keepalive for session {session_id}, request_id={request_id}")
+                            logger.info(
+                                f"Sending keepalive for session {session_id}, request_id={request_id}"
+                            )
                         else:
                             event_data = f"data: {data}\n\n".encode("utf-8")
-                            logger.info(f"Sending stream event for session {session_id}, request_id={request_id}: {data[:100]}...")
+                            logger.info(
+                                f"Sending stream event for session {session_id}, request_id={request_id}: {data[:100]}..."
+                            )
                         await response.write(event_data)
                         transport = response._req.transport
-                        if transport and transport.get_extra_info('socket'):
-                            transport.get_extra_info('socket').setsockopt(
+                        if transport and transport.get_extra_info("socket"):
+                            transport.get_extra_info("socket").setsockopt(
                                 socket.IPPROTO_TCP, socket.TCP_NODELAY, 1
                             )
                         await asyncio.sleep(0)
-                        logger.debug(f"Event sent successfully for session {session_id}, request_id={request_id}")
+                        logger.debug(
+                            f"Event sent successfully for session {session_id}, request_id={request_id}"
+                        )
                         return True
                     except (ConnectionResetError, BrokenPipeError) as e:
-                        logger.warning(f"Client disconnected for session {session_id}: {e}")
+                        logger.warning(
+                            f"Client disconnected for session {session_id}: {e}"
+                        )
                         stream_active = False
                         return False
                     except RuntimeError as e:
                         if "Cannot call write() after write_eof()" in str(e):
-                            logger.warning(f"Stream closed for session {session_id}: {e}")
+                            logger.warning(
+                                f"Stream closed for session {session_id}: {e}"
+                            )
                             stream_active = False
                             return False
                         logger.error(f"Failed to send event: {e}")
@@ -210,85 +345,120 @@ class JSONRPCServer:
                         return False
 
                 try:
-                    logger.info(f"Starting stream query processing for session {session_id}, query: {query}")
+                    logger.info(
+                        f"Starting stream query processing for session {session_id}, query: {query}"
+                    )
                     if not await send_sse_event("", is_keepalive=True):
-                        logger.info(f"Stream stopped after initial keepalive for session {session_id}")
+                        logger.info(
+                            f"Stream stopped after initial keepalive for session {session_id}"
+                        )
                         stream_active = False
 
-                    async for event in self.query_processor.process_query_stream(session_id, query, request_id=request_id):
+                    async for event in self.query_processor.process_query_stream(
+                        session_id, query, request_id=request_id
+                    ):
                         if not stream_active:
-                            logger.info(f"Stream stopped for session {session_id}, discarding event")
+                            logger.info(
+                                f"Stream stopped for session {session_id}, discarding event"
+                            )
                             break
-                        logger.debug(f"Generated stream event for session {session_id}, request_id={request_id}: {json.dumps(event, indent=2)}")
+                        logger.debug(
+                            f"Generated stream event for session {session_id}, request_id={request_id}: {json.dumps(event, indent=2)}"
+                        )
                         if not isinstance(event, dict) or "jsonrpc" not in event:
                             logger.error(f"Invalid event format: {event}")
                             error_event = {
                                 "jsonrpc": "2.0",
                                 "error": {
                                     "code": JSONRPC_ERROR_CODES["SERVER_ERROR"]["code"],
-                                    "message": "Invalid event format"
+                                    "message": "Invalid event format",
                                 },
-                                "id": request_id
+                                "id": request_id,
                             }
                             await send_sse_event(json.dumps(error_event))
                             continue
                         event_data = json.dumps(event, ensure_ascii=False)
                         if not await send_sse_event(event_data):
-                            logger.info(f"Stream stopped after sending event for session {session_id}")
+                            logger.info(
+                                f"Stream stopped after sending event for session {session_id}"
+                            )
                             stream_active = False
                             break
                         last_event = asyncio.get_running_loop().time()
-                        if stream_active and asyncio.get_running_loop().time() - last_event >= keepalive_interval:
+                        if (
+                            stream_active
+                            and asyncio.get_running_loop().time() - last_event
+                            >= keepalive_interval
+                        ):
                             if not await send_sse_event("", is_keepalive=True):
-                                logger.info(f"Stream stopped after keepalive for session {session_id}")
+                                logger.info(
+                                    f"Stream stopped after keepalive for session {session_id}"
+                                )
                                 stream_active = False
                                 break
                             last_event = asyncio.get_running_loop().time()
 
                     if stream_active:
-                        logger.info(f"Sending stream end signal for session {session_id}, request_id={request_id}")
+                        logger.info(
+                            f"Sending stream end signal for session {session_id}, request_id={request_id}"
+                        )
                         end_event = {
                             "jsonrpc": "2.0",
-                            "result": {
-                                "type": "stream_complete",
-                                "complete": True
-                            },
-                            "id": request_id
+                            "result": {"type": "stream_complete", "complete": True},
+                            "id": request_id,
                         }
                         if not await send_sse_event(json.dumps(end_event)):
-                            logger.info(f"Stream stopped after sending end signal for session {session_id}")
+                            logger.info(
+                                f"Stream stopped after sending end signal for session {session_id}"
+                            )
                         else:
-                            logger.info(f"Stream end signal sent for session {session_id}, request_id={request_id}")
+                            logger.info(
+                                f"Stream end signal sent for session {session_id}, request_id={request_id}"
+                            )
 
                 except asyncio.CancelledError:
-                    logger.warning(f"Stream processing cancelled for session {session_id}")
+                    logger.warning(
+                        f"Stream processing cancelled for session {session_id}"
+                    )
                     stream_active = False
                     try:
                         await response.write_eof()
                     except Exception as e:
                         logger.warning(f"Failed to close stream on cancellation: {e}")
                 except Exception as e:
-                    logger.error(f"Stream processing error for session {session_id}, request_id={request_id}: {str(e)}")
+                    logger.error(
+                        f"Stream processing error for session {session_id}, request_id={request_id}: {str(e)}"
+                    )
                     if stream_active:
                         error_event = {
                             "jsonrpc": "2.0",
                             "error": {
                                 "code": JSONRPC_ERROR_CODES["SERVER_ERROR"]["code"],
-                                "message": f"Stream error: {str(e)}"
+                                "message": f"Stream error: {str(e)}",
                             },
-                            "id": request_id
+                            "id": request_id,
                         }
                         await send_sse_event(json.dumps(error_event))
                         stream_active = False
                 finally:
                     if stream_active:
                         try:
-                            logger.info(f"Closing stream for session {session_id}, request_id={request_id}")
+                            logger.info(
+                                f"Closing stream for session {session_id}, request_id={request_id}"
+                            )
                             await response.write_eof()
-                            logger.info(f"Stream closed normally for session {session_id}, request_id={request_id}")
-                        except (RuntimeError, ConnectionResetError, BrokenPipeError) as e:
+                            logger.info(
+                                f"Stream closed normally for session {session_id}, request_id={request_id}"
+                            )
+                        except (
+                            RuntimeError,
+                            ConnectionResetError,
+                            BrokenPipeError,
+                        ) as e:
                             logger.warning(f"Failed to close stream: {e}")
-                    logger.info(f"Stream query processing completed for session {session_id}, request_id={request_id}")
+                    logger.info(
+                        f"Stream query processing completed for session {session_id}, request_id={request_id}"
+                    )
                 return response
 
             else:
@@ -302,17 +472,19 @@ class JSONRPCServer:
             logger.exception("Stream RPC handling error")
             error_type = type(e).__name__
             error_detail = str(e)
-            return self._error_response("SERVER_ERROR", error_type, error_detail, request_id)
+            return self._error_response(
+                "SERVER_ERROR", error_type, error_detail, request_id
+            )
 
-    def _success_response(self, result: Dict, request_id: Optional[int]) -> web.Response:
-        response = {
-            "jsonrpc": "2.0",
-            "result": result,
-            "id": request_id
-        }
+    def _success_response(
+        self, result: Dict, request_id: Optional[int]
+    ) -> web.Response:
+        response = {"jsonrpc": "2.0", "result": result, "id": request_id}
         return web.json_response(response)
 
-    def _error_response(self, error_key: str, *message_details: str, request_id: Optional[int] = None) -> web.Response:
+    def _error_response(
+        self, error_key: str, *message_details: str, request_id: Optional[int] = None
+    ) -> web.Response:
         error_info = JSONRPC_ERROR_CODES[error_key]
         message = error_info["message"]
         if message_details:
@@ -323,33 +495,38 @@ class JSONRPCServer:
                 message = error_info["message"]
         response = {
             "jsonrpc": "2.0",
-            "error": {
-                "code": error_info["code"],
-                "message": message
-            },
-            "id": request_id
+            "error": {"code": error_info["code"], "message": message},
+            "id": request_id,
         }
         return web.json_response(response)
 
     async def handle_options(self, request: web.Request) -> web.Response:
         response = web.Response(status=204)
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, api_key'
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = (
+            "Content-Type, Authorization, api_key"
+        )
         return response
 
     async def start(self) -> None:
         try:
             logger.info("start JSON-RPC server")
-            if 'ipykernel' in sys.modules:
-                logger.warning("Detected Jupyter environment, may cause event loop conflicts, consider running in standard Python environment")
+            if "ipykernel" in sys.modules:
+                logger.warning(
+                    "Detected Jupyter environment, may cause event loop conflicts, consider running in standard Python environment"
+                )
 
             # Load server configurations
             server_configs = load_server_config()
             if not server_configs:
-                logger.warning("No valid server configurations found, continuing startup")
+                logger.warning(
+                    "No valid server configurations found, continuing startup"
+                )
             else:
-                logger.info(f"Loaded server configurations: {[s['name'] for s in server_configs]}")
+                logger.info(
+                    f"Loaded server configurations: {[s['name'] for s in server_configs]}"
+                )
 
             # Modify this part of the initialization code
             self.query_processor = QueryProcessor()
@@ -358,7 +535,9 @@ class JSONRPCServer:
                 logger.info("QueryProcessor initialization complete")
 
                 if self.query_processor.agent:
-                    logger.info(f"Agent initialization complete: {self.query_processor.agent.name}")
+                    logger.info(
+                        f"Agent initialization complete: {self.query_processor.agent.name}"
+                    )
                     self.is_connected = True
                 else:
                     logger.warning("No valid agent found")
@@ -372,7 +551,7 @@ class JSONRPCServer:
             # Check port availability
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 try:
-                    s.bind(('localhost', 8080))
+                    s.bind(("localhost", 8080))
                 except OSError as e:
                     logger.error(f"Port 8080 is already in use: {e}")
                     raise RuntimeError(f"Port 8080 is already in use: {e}")
@@ -388,11 +567,13 @@ class JSONRPCServer:
             self.runner = runner
             await runner.setup()
             logger.info("Runner server setup complete")
-            site = web.TCPSite(runner, 'localhost', 8080)
+            site = web.TCPSite(runner, "localhost", 8080)
             try:
                 await site.start()
                 logger.print("JSON-RPC server started on http://localhost:8080/rpc")
-                logger.info("Streaming endpoint available at http://localhost:8080/rpc/stream")
+                logger.info(
+                    "Streaming endpoint available at http://localhost:8080/rpc/stream"
+                )
             except Exception as e:
                 logger.error(f"Failed to start TCPSite: {e}")
                 raise
@@ -426,6 +607,7 @@ class JSONRPCServer:
         self.is_connected = False
         logger.info("JSONRPCServer cleanup complete")
 
+
 def generate_ascii_art(text: str, font: str = "slant", color: str = "green") -> str:
     try:
         ascii_art = pyfiglet.figlet_format(text, font=font)
@@ -436,6 +618,7 @@ def generate_ascii_art(text: str, font: str = "slant", color: str = "green") -> 
     except Exception as e:
         logger.error(f"Error generating ASCII art: {e}")
         return f"Error generating ASCII art: {e}"
+
 
 async def main() -> None:
     server = JSONRPCServer()
@@ -448,6 +631,7 @@ async def main() -> None:
         logger.error(f"Server startup failed: {str(e)}")
         await server.cleanup()
         raise
+
 
 if __name__ == "__main__":
     text = "JSON-RPC Server"
