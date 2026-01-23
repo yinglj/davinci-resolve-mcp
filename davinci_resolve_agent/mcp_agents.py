@@ -17,7 +17,8 @@ from prompts.system_prompts import (
 
 
 async def create_multi_agent(
-    server_name: str = "Davinci_resolve", role: str = "director"
+    server_name: str = "Davinci_resolve", role: str = "director",
+    knowledge_base = None, vector_db = None, content_db = None
 ) -> Optional[Agent]:
     """
     Create a MultiMCPAgent based on server configuration.
@@ -25,6 +26,9 @@ async def create_multi_agent(
     Args:
         server_name (str): Name of the server to initialize the agent for.
         role (str): The persona/role of the agent (director, editor, colorist, sound_engineer).
+        knowledge_base: Pre-initialized Knowledge instance (optional).
+        vector_db: Pre-initialized vector database (optional).
+        content_db: Pre-initialized content database (optional).
 
     Returns:
         Optional[Agent]: The initialized agent or None if creation fails.
@@ -77,13 +81,17 @@ async def create_multi_agent(
         logger.warning("No valid server configurations available for MultiMCPTools")
         return None
 
-    # Initialize embedder and vector database
-    vector_db, content_db, embedder = initialize_embedder_and_vector_db(server_name)
-    if not vector_db or not content_db or not embedder:
-        return None
-
-    # Initialize knowledge base
-    knowledge_base = await initialize_knowledge_base(server_name, vector_db, content_db)
+    # Initialize embedder and vector database if not provided
+    if vector_db is None or content_db is None:
+        vector_db, content_db, embedder = initialize_embedder_and_vector_db(server_name)
+        if not vector_db or not content_db:
+            return None
+    
+    # Initialize knowledge base if not provided
+    if knowledge_base is None:
+        knowledge_base = await initialize_knowledge_base(server_name, vector_db, content_db)
+    else:
+        logger.info("Using pre-initialized knowledge base")
 
     # Determine LLM model based on preference
     try:

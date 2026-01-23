@@ -21,16 +21,22 @@ class AgentDelegator:
         self.agents = {}  # role -> agent mapping
         self.delegation_history = []  # Track delegations for debugging
 
-    async def initialize_agents(self) -> bool:
+    async def initialize_agents(self, shared_knowledge_base=None, shared_vector_db=None, shared_content_db=None) -> bool:
         """
         Initialize all role-based agents.
+        Accepts shared knowledge base and databases to avoid re-initialization.
         Returns True if at least the Director agent was initialized successfully.
         """
         roles = ["director", "editor", "colorist", "sound_engineer"]
 
         for role in roles:
             try:
-                agent = await create_multi_agent(role=role)
+                agent = await create_multi_agent(
+                    role=role,
+                    knowledge_base=shared_knowledge_base,
+                    vector_db=shared_vector_db,
+                    content_db=shared_content_db
+                )
                 if agent:
                     self.agents[role] = agent
                     logger.info(f"Initialized {role} agent: {agent.name}")
@@ -41,17 +47,18 @@ class AgentDelegator:
 
         # At minimum, we need a director agent
         if "director" not in self.agents:
-            logger.error("Director agent initialization failed - delegation framework unavailable")
+            logger.error(
+                "Director agent initialization failed - delegation framework unavailable"
+            )
             return False
 
-        logger.info(f"Agent delegation framework initialized with {len(self.agents)} agents")
+        logger.info(
+            f"Agent delegation framework initialized with {len(self.agents)} agents"
+        )
         return True
 
     async def delegate_task(
-        self,
-        role: str,
-        task_description: str,
-        context: Optional[Dict[str, Any]] = None
+        self, role: str, task_description: str, context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Delegate a task to a specific role agent.
@@ -69,7 +76,7 @@ class AgentDelegator:
                 "success": False,
                 "error": f"No {role} agent available",
                 "role": role,
-                "task": task_description
+                "task": task_description,
             }
 
         agent = self.agents[role]
@@ -91,7 +98,7 @@ Please execute this task using available tools and provide a detailed response.
                 "role": role,
                 "task": task_description,
                 "context": context,
-                "timestamp": asyncio.get_event_loop().time()
+                "timestamp": asyncio.get_event_loop().time(),
             }
             self.delegation_history.append(delegation_record)
 
@@ -100,7 +107,7 @@ Please execute this task using available tools and provide a detailed response.
                 input=full_task,
                 stream=False,
                 markdown=True,
-                stream_intermediate_steps=False
+                stream_intermediate_steps=False,
             )
 
             result = {
@@ -110,8 +117,8 @@ Please execute this task using available tools and provide a detailed response.
                 "response": str(response),
                 "metadata": {
                     "agent_name": agent.name,
-                    "delegation_id": len(self.delegation_history) - 1
-                }
+                    "delegation_id": len(self.delegation_history) - 1,
+                },
             }
 
             logger.info(f"Task delegated to {role} agent completed successfully")
@@ -124,15 +131,77 @@ Please execute this task using available tools and provide a detailed response.
                 "success": False,
                 "error": str(e),
                 "role": role,
-                "task": task_description
+                "task": task_description,
             }
 
-    async def delegate_multiple_tasks(
+    async def delegate_sequence(
         self,
-        delegations: List[Dict[str, Any]]
+        tasks: List[Dict[str, Any]],
+        initial_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute multiple tasks in sequential order.
+        Stops execution if a task fails.
+
+        Args:
+            tasks: List of task definitions
+            initial_context: Initial context to start with
+
+        Returns:
+            Dict containing success status and list of results
+        """
+        results = []
+        context = initial_context or {}
+
+        for i, task_def in enumerate(tasks):
+            role = task_def.get("role")
+            task_desc = task_def.get("task", "")
+
+            # 1. Prepare Context
+            # Merge global context with specific task context
+            task_context = task_def.get("context", {}).copy()
+            task_context.update(context)
+
+            logger.info(
+                f"Executing sequence step {i+1}/{len(tasks)}: {role} -> {task_desc}"
+            )
+
+            # 2. Dynamic Variable Substitution
+            # Try to format task description with current context
+            # This allows passing variables like IDs between steps if they exist in context
+            try:
+                task_desc = task_desc.format(**context)
+            except (KeyError, ValueError):
+                # If keys are missing (which is common if context doesn't have them yet),
+                # we assume the placeholders are managed by WorkflowTemplate.get_tasks
+                # or are meant for the Agent to interpret.
+                pass
+
+            # 3. Execute Step
+            result = await self.delegate_task(role, task_desc, task_context)
+            results.append(result)
+
+            # 4. Handle Failure (Fail Fast)
+            if not result.get("success", False):
+                logger.error(f"Workflow sequence stopped at step {i+1} due to failure")
+                return {
+                    "success": False,
+                    "results": results,
+                    "stopped_at_index": i,
+                    "error": result.get("error", "Unknown error in step execution"),
+                }
+
+        logger.info(
+            f"Workflow sequence completed successfully with {len(results)} steps"
+        )
+        return {"success": True, "results": results}
+
+    async def delegate_multiple_tasks(
+        self, delegations: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
         Delegate multiple tasks in parallel.
+        Not recommended for dependent tasks. Use delegate_sequence instead.
 
         Args:
             delegations: List of delegation requests, each with 'role', 'task', 'context'
@@ -160,11 +229,9 @@ Please execute this task using available tools and provide a detailed response.
             processed_results = []
             for i, result in enumerate(results):
                 if isinstance(result, Exception):
-                    processed_results.append({
-                        "success": False,
-                        "error": str(result),
-                        "delegation_index": i
-                    })
+                    processed_results.append(
+                        {"success": False, "error": str(result), "delegation_index": i}
+                    )
                 else:
                     processed_results.append(result)
 

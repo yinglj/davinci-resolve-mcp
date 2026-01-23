@@ -56,25 +56,37 @@ async def initialize_knowledge_base(server_name: str, vector_db: LanceDb, conten
             logger.warning(f"No knowledge files loaded for {server_name}")
             return knowledge
 
+        logger.info(f"Starting to add {len(knowledge_files)} knowledge files for {server_name}")
+        
+        # Track added files to detect duplicates
+        processed_files = set()
+        
         # Add each configured file to the knowledge base
-        for entry in knowledge_files:
+        for index, entry in enumerate(knowledge_files, 1):
             file_path = entry["path"]
             metadata = entry["metadata"]
             
+            # Detect if the same file is being added multiple times
+            if file_path in processed_files:
+                logger.warning(f"Duplicate file detected in knowledge configuration: {file_path}, skipping")
+                continue
+            processed_files.add(file_path)
+            
             try:
-                logger.info(f"Adding content from {file_path} to knowledge base")
+                logger.info(f"[{index}/{len(knowledge_files)}] Adding content from {file_path} to knowledge base")
                 await knowledge.add_content_async(
                     path=file_path,
                     metadata=metadata,
                     upsert=True,
                     skip_if_exists=True
                 )
+                logger.debug(f"Successfully added {file_path}")
             except Exception as e:
                 logger.error(f"Failed to add content from {file_path}: {str(e)}")
                 logger.debug(f"Stack trace: {traceback.format_exc()}")
                 continue
 
-        logger.info(f"Successfully initialized knowledge base for {server_name}")
+        logger.info(f"Successfully initialized knowledge base for {server_name} with {len(processed_files)} unique files")
         return knowledge
 
     except Exception as e:

@@ -4,7 +4,7 @@ import uuid
 import json
 import traceback
 from logger import logger
-from typing import Dict, Optional, AsyncGenerator, Union, cast
+from typing import Dict, Optional, AsyncGenerator, Union, cast, Any
 from agno.agent import Agent, RunOutput
 from mcp_agents import create_multi_agent, run_multimcp_agent, run_multimcp_agent_stream
 from anyio import ClosedResourceError
@@ -46,16 +46,25 @@ class QueryProcessor:
                 self.server_name, self.vector_db, self.content_db
             )
 
-            # Initialize multi-agent
-            self.agent = await create_multi_agent()
+            # Initialize multi-agent, passing pre-initialized knowledge base
+            self.agent = await create_multi_agent(
+                knowledge_base=self.knowledge_base,
+                vector_db=self.vector_db,
+                content_db=self.content_db
+            )
             if not self.agent:
                 logger.warning(
                     f"No valid agent found for {self.server_name}, query functionality may be limited"
                 )
             else:
                 # Initialize agent delegator for multi-agent coordination
+                # Pass shared knowledge base to avoid re-initialization
                 self.agent_delegator = AgentDelegator()
-                delegator_initialized = await self.agent_delegator.initialize_agents()
+                delegator_initialized = await self.agent_delegator.initialize_agents(
+                    shared_knowledge_base=self.knowledge_base,
+                    shared_vector_db=self.vector_db,
+                    shared_content_db=self.content_db
+                )
                 if delegator_initialized:
                     logger.info("Agent delegation framework initialized successfully")
 
@@ -106,19 +115,15 @@ class QueryProcessor:
                                 return f"Error during delegation: {str(e)}"
 
                         # Register tool using Agno's tool registration mechanism
-                        # Assuming Agent class has a way to add tools dynamically or we add it to the tool list
-                        # This part depends on Agno's specific API, here assuming we can append to tools list
-                        # or specifically register it.
-                        # Given mcp_agents.py implementation, tools are [mcp_tools].
-                        # We might need to mix FunctionTools if Agno supports hybrid tools.
-                        # For now, let's assume we can add a FunctionTool.
-                        from agno.tools import FunctionTool
-
-                        delegation_tool = FunctionTool(delegate_task_tool)
-                        if not hasattr(self.agent, "tools"):
-                            self.agent.tools = []
-                        self.agent.tools.append(delegation_tool)
-                        logger.info("Delegation tool registered for Director")
+                        # Agno 2.0 uses function_tools for custom functions
+                        # Add delegation tool to the agent's function tools
+                        try:
+                            if not hasattr(self.agent, "function_tools"):
+                                self.agent.function_tools = []
+                            self.agent.function_tools.append(delegate_task_tool)
+                            logger.info("Delegation tool registered for Director")
+                        except Exception as e:
+                            logger.warning(f"Failed to register delegation tool: {e}")
 
                 else:
                     logger.warning("Agent delegation framework initialization failed")
