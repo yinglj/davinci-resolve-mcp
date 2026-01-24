@@ -20,6 +20,11 @@ type ScenarioDefinition = {
   method: string
   version: number
   requiresPrompt: boolean
+  requiredAssets: {
+    videos?: boolean
+    images?: boolean
+    audios?: boolean
+  }
   buildParams: (prompt: string) => Record<string, unknown>
 }
 
@@ -31,6 +36,7 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     method: "color_apply_style",
     version: 1,
     requiresPrompt: true,
+    requiredAssets: { videos: true },
     buildParams: (prompt) => ({ style: "cinematic", prompt })
   },
   {
@@ -40,6 +46,7 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     method: "audio_normalize_loudness",
     version: 1,
     requiresPrompt: false,
+    requiredAssets: { audios: true },
     buildParams: (prompt) => ({ targetLufs: -14, prompt })
   },
   {
@@ -49,11 +56,29 @@ const scenarioDefinitions: ScenarioDefinition[] = [
     method: "fusion_add_transition",
     version: 1,
     requiresPrompt: true,
+    requiredAssets: { videos: true },
     buildParams: (prompt) => ({ transition: "smooth", prompt })
   }
 ]
 
 const scenarioMap = new Map(scenarioDefinitions.map((item) => [item.id, item]))
+
+const hasAssets = (assets: TaskInput["assets"], key: "videos" | "images" | "audios") =>
+  Boolean(assets?.[key]?.length)
+
+const validateScenarioAssets = (scenario: ScenarioDefinition, assets: TaskInput["assets"]) => {
+  const required = scenario.requiredAssets
+  if (required.videos && !hasAssets(assets, "videos")) {
+    return "videos are required for scenario"
+  }
+  if (required.images && !hasAssets(assets, "images")) {
+    return "images are required for scenario"
+  }
+  if (required.audios && !hasAssets(assets, "audios")) {
+    return "audios are required for scenario"
+  }
+  return null
+}
 
 const applyScenarioToInput = (input: TaskInput) => {
   if (input.scenarioId && input.mcp?.method) {
@@ -72,6 +97,10 @@ const applyScenarioToInput = (input: TaskInput) => {
   const prompt = input.prompt || ""
   if (scenario.requiresPrompt && !prompt) {
     return { input, error: "prompt is required for scenario" }
+  }
+  const assetError = validateScenarioAssets(scenario, input.assets)
+  if (assetError) {
+    return { input, error: assetError }
   }
   return {
     input: {
@@ -93,7 +122,8 @@ tasksRouter.get(
         name: scenario.name,
         description: scenario.description,
         version: scenario.version,
-        requiresPrompt: scenario.requiresPrompt
+        requiresPrompt: scenario.requiresPrompt,
+        requiredAssets: scenario.requiredAssets
       }))
     })
   })

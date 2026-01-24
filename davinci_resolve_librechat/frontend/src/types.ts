@@ -11,6 +11,7 @@ export type Task = {
   prompt?: string
   scenarioId?: string
   scenarioVersion?: number
+  assets?: TaskAssets
   status: TaskStatus
   result?: unknown
   error?: string
@@ -24,7 +25,30 @@ export type TaskInput = {
   title?: string
   prompt?: string
   scenarioId?: string
+  assets?: TaskAssetInput
   mcp?: McpCall
+}
+
+export type TaskAssetInput = {
+  videos?: string[]
+  images?: string[]
+  audios?: string[]
+}
+
+export type TaskAssetItem = {
+  url: string
+  type: "video" | "image" | "audio"
+  source: "url"
+  status: "validated" | "invalid" | "unverified"
+  size?: number
+  mime?: string
+  error?: string
+}
+
+export type TaskAssets = {
+  videos?: TaskAssetItem[]
+  images?: TaskAssetItem[]
+  audios?: TaskAssetItem[]
 }
 
 export type Scenario = {
@@ -33,6 +57,11 @@ export type Scenario = {
   description: string
   version: number
   requiresPrompt: boolean
+  requiredAssets: {
+    videos?: boolean
+    images?: boolean
+    audios?: boolean
+  }
 }
 
 export type User = {

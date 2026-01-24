@@ -1,5 +1,5 @@
 import { useState } from "react"
-import type { Task } from "../types"
+import type { Task, TaskAssetItem } from "../types"
 
 export default function TaskList({
   tasks,
@@ -30,6 +30,13 @@ export default function TaskList({
       return "-"
     }
     return JSON.stringify(value, null, 2)
+  }
+
+  const renderAssetList = (values?: TaskAssetItem[]) => {
+    if (!values || values.length === 0) {
+      return "-"
+    }
+    return values.map((item) => `${item.status} | ${item.url}`).join("\n")
   }
 
   return (
@@ -63,12 +70,26 @@ export default function TaskList({
                 {expandedMap[task._id] ? (
                   <div className="list-details">
                     <div className="detail-row">
-                      <div className="detail-label">MCP 方法</div>
-                      <div className="detail-value">{task.mcp?.method || "-"}</div>
+                      <div className="detail-label">场景ID</div>
+                      <div className="detail-value">{task.scenarioId || "-"}</div>
                     </div>
                     <div className="detail-row">
-                      <div className="detail-label">MCP 参数</div>
-                      <pre className="detail-pre">{renderJson(task.mcp?.params)}</pre>
+                      <div className="detail-label">场景版本</div>
+                      <div className="detail-value">
+                        {task.scenarioVersion === undefined ? "-" : task.scenarioVersion}
+                      </div>
+                    </div>
+                    <div className="detail-row">
+                      <div className="detail-label">视频素材</div>
+                      <pre className="detail-pre">{renderAssetList(task.assets?.videos)}</pre>
+                    </div>
+                    <div className="detail-row">
+                      <div className="detail-label">图片素材</div>
+                      <pre className="detail-pre">{renderAssetList(task.assets?.images)}</pre>
+                    </div>
+                    <div className="detail-row">
+                      <div className="detail-label">音乐素材</div>
+                      <pre className="detail-pre">{renderAssetList(task.assets?.audios)}</pre>
                     </div>
                     <div className="detail-row">
                       <div className="detail-label">结果</div>

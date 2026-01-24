@@ -4,9 +4,7 @@ import type { Conversation } from "../../types"
 
 const navItems = [
   { to: "/chats", label: "对话" },
-  { to: "/tasks", label: "任务" },
-  { to: "/profile", label: "个人信息" },
-  { to: "/settings", label: "设置" }
+  { to: "/tasks", label: "任务" }
 ]
 
 export default function Sidebar({

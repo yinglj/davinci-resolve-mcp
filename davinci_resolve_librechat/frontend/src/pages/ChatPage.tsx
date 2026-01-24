@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import type { Conversation, Scenario } from "../types"
+import type { Conversation, Scenario, TaskAssetInput } from "../types"
 
 export default function ChatPage({
   conversations,
@@ -13,14 +13,14 @@ export default function ChatPage({
   onSend: (input: {
     prompt: string
     scenarioId?: string
-    mcpMethod?: string
-    mcpParams?: string
+    assets?: TaskAssetInput
   }) => Promise<void>
 }) {
   const [input, setInput] = useState("")
-  const [mcpMethod, setMcpMethod] = useState("")
-  const [mcpParams, setMcpParams] = useState("")
   const [scenarioId, setScenarioId] = useState("")
+  const [videoUrls, setVideoUrls] = useState("")
+  const [imageUrls, setImageUrls] = useState("")
+  const [audioUrls, setAudioUrls] = useState("")
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === activeId),
@@ -29,11 +29,13 @@ export default function ChatPage({
 
   const handleScenarioChange = (id: string) => {
     setScenarioId(id)
-    if (id) {
-      setMcpMethod("")
-      setMcpParams("")
-    }
   }
+
+  const parseUrls = (value: string) =>
+    value
+      .split(/[\n,]+/g)
+      .map((item) => item.trim())
+      .filter(Boolean)
 
   const handleSend = async () => {
     const prompt = input.trim()
@@ -41,14 +43,22 @@ export default function ChatPage({
       return
     }
     setInput("")
-    let method = mcpMethod
-    let params = mcpParams
+    const videos = parseUrls(videoUrls)
+    const images = parseUrls(imageUrls)
+    const audios = parseUrls(audioUrls)
     await onSend({
       prompt,
       scenarioId: scenarioId || undefined,
-      mcpMethod: method || undefined,
-      mcpParams: params || undefined
+      assets: {
+        videos: videos.length ? videos : undefined,
+        images: images.length ? images : undefined,
+        audios: audios.length ? audios : undefined
+      }
     })
+    setScenarioId("")
+    setVideoUrls("")
+    setImageUrls("")
+    setAudioUrls("")
   }
 
   return (
@@ -79,16 +89,19 @@ export default function ChatPage({
             ))}
           </select>
           <input
-            placeholder="MCP 方法"
-            value={mcpMethod}
-            onChange={(e) => setMcpMethod(e.target.value)}
-            disabled={Boolean(scenarioId)}
+            placeholder="视频素材URL（逗号或换行分隔）"
+            value={videoUrls}
+            onChange={(e) => setVideoUrls(e.target.value)}
           />
           <input
-            placeholder="MCP 参数(JSON)"
-            value={mcpParams}
-            onChange={(e) => setMcpParams(e.target.value)}
-            disabled={Boolean(scenarioId)}
+            placeholder="图片素材URL（逗号或换行分隔）"
+            value={imageUrls}
+            onChange={(e) => setImageUrls(e.target.value)}
+          />
+          <input
+            placeholder="音乐素材URL（逗号或换行分隔）"
+            value={audioUrls}
+            onChange={(e) => setAudioUrls(e.target.value)}
           />
         </div>
         <button type="button" className="primary" onClick={handleSend}>

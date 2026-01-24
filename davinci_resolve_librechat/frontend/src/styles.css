@@ -514,7 +514,8 @@ body {
   background: #141823;
   border-left: 1px solid #1f232b;
   padding: 18px 16px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 18px;
   min-width: 0;
 }
@@ -566,6 +567,59 @@ body {
 }
 
 .rightbar-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.rightbar-footer {
+  margin-top: auto;
+}
+
+.rightbar-user-card {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 10px;
+  background: #0f1218;
+  border: 1px solid #222834;
+}
+
+.rightbar-user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #1b2130;
+  border: 1px solid #2b3140;
+  display: grid;
+  place-items: center;
+  color: #c2c7d2;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.rightbar-user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rightbar-user-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.rightbar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rightbar-user-email {
+  font-size: 12px;
+  color: #8c93a3;
+}
+
+.rightbar-user-actions {
   display: grid;
   gap: 8px;
 }

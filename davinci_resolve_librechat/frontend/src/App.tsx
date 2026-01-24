@@ -11,7 +11,7 @@ import {
   setAuthToken,
   updateProfile
 } from "./api"
-import type { Conversation, Scenario, Task, TaskStatus, User } from "./types"
+import type { Conversation, Scenario, Task, TaskAssetInput, TaskStatus, User } from "./types"
 import Sidebar from "./components/layout/Sidebar"
 import Topbar from "./components/layout/Topbar"
 import Rightbar from "./components/layout/Rightbar"
@@ -78,21 +78,14 @@ function MainLayout({
   const handleCreate = async (input: {
     title?: string
     prompt?: string
-    mcpMethod?: string
-    mcpParams?: string
+    scenarioId?: string
+    assets?: TaskAssetInput
   }) => {
-    let params: unknown = undefined
-    if (input.mcpParams) {
-      try {
-        params = JSON.parse(input.mcpParams)
-      } catch {
-        params = { raw: input.mcpParams }
-      }
-    }
     await createTask(apiBaseUrl, {
       title: input.title,
       prompt: input.prompt,
-      mcp: input.mcpMethod ? { method: input.mcpMethod, params } : undefined
+      scenarioId: input.scenarioId,
+      assets: input.assets
     })
   }
 
@@ -103,22 +96,13 @@ function MainLayout({
   const handleChatTaskCreate = async (input: {
     prompt: string
     scenarioId?: string
-    mcpMethod?: string
-    mcpParams?: string
+    assets?: TaskAssetInput
   }) => {
-    let params: unknown = undefined
-    if (input.mcpParams) {
-      try {
-        params = JSON.parse(input.mcpParams)
-      } catch {
-        params = { raw: input.mcpParams }
-      }
-    }
     const task = await createTask(apiBaseUrl, {
       title: input.prompt.slice(0, 24),
       prompt: input.prompt,
       scenarioId: input.scenarioId,
-      mcp: input.mcpMethod ? { method: input.mcpMethod, params } : undefined
+      assets: input.assets
     })
     return task
   }
@@ -145,8 +129,7 @@ function MainLayout({
   const handleSendChat = async (input: {
     prompt: string
     scenarioId?: string
-    mcpMethod?: string
-    mcpParams?: string
+    assets?: TaskAssetInput
   }) => {
     const convoId = activeConversationId
     const userMessage = {
@@ -227,7 +210,7 @@ function MainLayout({
         onNewConversation={location.pathname === "/chats" ? handleNewConversation : undefined}
       />
       <div className="layout-main">
-        <Topbar title={title} user={user} onLogout={onLogout} />
+        <Topbar title={title} />
         <div className="layout-body">
           <div className="layout-content">
             <Routes>
@@ -244,7 +227,14 @@ function MainLayout({
               />
               <Route
                 path="/tasks"
-                element={<TasksPage tasks={tasks} onCreate={handleCreate} onRetry={handleRetry} />}
+                element={
+                  <TasksPage
+                    tasks={tasks}
+                    scenarios={scenarios}
+                    onCreate={handleCreate}
+                    onRetry={handleRetry}
+                  />
+                }
               />
               <Route
                 path="/profile"
@@ -254,7 +244,7 @@ function MainLayout({
               <Route path="*" element={<Navigate to="/chats" replace />} />
             </Routes>
           </div>
-          <Rightbar tasks={tasks} />
+          <Rightbar tasks={tasks} user={user} onLogout={onLogout} />
         </div>
       </div>
     </div>
