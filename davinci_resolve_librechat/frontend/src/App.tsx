@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { io } from "socket.io-client"
-import { createTask, listTasks, retryTask, fetchMe, getAuthToken, setAuthToken } from "./api"
+import {
+  createTask,
+  listTasks,
+  retryTask,
+  fetchMe,
+  getAuthToken,
+  setAuthToken,
+  updateProfile
+} from "./api"
 import type { Task, User } from "./types"
 import Sidebar from "./components/layout/Sidebar"
 import Topbar from "./components/layout/Topbar"
@@ -13,9 +21,18 @@ import SettingsPage from "./pages/SettingsPage"
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
 
-function MainLayout({ user, onLogout }: { user: User; onLogout: () => void }) {
+function MainLayout({
+  user,
+  onLogout,
+  onUserUpdate
+}: {
+  user: User
+  onLogout: () => void
+  onUserUpdate: (user: User) => void
+}) {
   const location = useLocation()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [lastTaskUpdate, setLastTaskUpdate] = useState<Task | null>(null)
 
   useEffect(() => {
     listTasks(apiBaseUrl).then((data: Task[]) => setTasks(data))
@@ -32,6 +49,7 @@ function MainLayout({ user, onLogout }: { user: User; onLogout: () => void }) {
         }
         return [task, ...prev]
       })
+      setLastTaskUpdate(task)
     })
     return () => {
       socket.disconnect()
@@ -63,6 +81,34 @@ function MainLayout({ user, onLogout }: { user: User; onLogout: () => void }) {
     await retryTask(apiBaseUrl, id)
   }
 
+  const handleChatTaskCreate = async (input: {
+    prompt: string
+    mcpMethod?: string
+    mcpParams?: string
+  }) => {
+    let params: unknown = undefined
+    if (input.mcpParams) {
+      try {
+        params = JSON.parse(input.mcpParams)
+      } catch {
+        params = { raw: input.mcpParams }
+      }
+    }
+    const task = await createTask(apiBaseUrl, {
+      title: input.prompt.slice(0, 24),
+      prompt: input.prompt,
+      mcp: input.mcpMethod ? { method: input.mcpMethod, params } : undefined
+    })
+    return task
+  }
+
+  const handleProfileUpdate = async (input: { name?: string; avatarUrl?: string | null }) => {
+    const updated = await updateProfile(apiBaseUrl, input)
+    if (updated) {
+      onUserUpdate(updated)
+    }
+  }
+
   const titleMap: Record<string, string> = {
     "/chats": "对话",
     "/tasks": "任务",
@@ -78,12 +124,23 @@ function MainLayout({ user, onLogout }: { user: User; onLogout: () => void }) {
         <Topbar title={title} user={user} onLogout={onLogout} />
         <div className="layout-content">
           <Routes>
-            <Route path="/chats" element={<ChatPage />} />
+            <Route
+              path="/chats"
+              element={
+                <ChatPage
+                  onCreateTask={handleChatTaskCreate}
+                  taskUpdate={lastTaskUpdate}
+                />
+              }
+            />
             <Route
               path="/tasks"
               element={<TasksPage tasks={tasks} onCreate={handleCreate} onRetry={handleRetry} />}
             />
-            <Route path="/profile" element={<ProfilePage user={user} />} />
+            <Route
+              path="/profile"
+              element={<ProfilePage user={user} onUpdate={handleProfileUpdate} />}
+            />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<Navigate to="/chats" replace />} />
           </Routes>
@@ -136,7 +193,13 @@ function AppRoutes() {
       />
       <Route
         path="/*"
-        element={user ? <MainLayout user={user} onLogout={handleLogout} /> : <Navigate to="/login" replace />}
+        element={
+          user ? (
+            <MainLayout user={user} onLogout={handleLogout} onUserUpdate={setUser} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
       />
     </Routes>
   )

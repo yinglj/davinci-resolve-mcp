@@ -1,9 +1,11 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import type { Task } from "../types"
 
 type Message = {
   id: string
   role: "user" | "assistant"
   content: string
+  taskId?: string
 }
 
 type Conversation = {
@@ -22,10 +24,23 @@ const initialConversations: Conversation[] = [
   }
 ]
 
-export default function ChatPage() {
+export default function ChatPage({
+  onCreateTask,
+  taskUpdate
+}: {
+  onCreateTask: (input: {
+    prompt: string
+    mcpMethod?: string
+    mcpParams?: string
+  }) => Promise<Task>
+  taskUpdate: Task | null
+}) {
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
   const [activeId, setActiveId] = useState<string>(initialConversations[0].id)
   const [input, setInput] = useState("")
+  const [mcpMethod, setMcpMethod] = useState("")
+  const [mcpParams, setMcpParams] = useState("")
+  const taskMetaRef = useRef<Record<string, { convoId: string; status?: string }>>({})
 
   const activeConversation = useMemo(
     () => conversations.find((item) => item.id === activeId),
@@ -43,27 +58,94 @@ export default function ChatPage() {
     setActiveId(id)
   }
 
-  const handleSend = () => {
-    if (!input.trim() || !activeConversation) {
+  const handleSend = async () => {
+    const prompt = input.trim()
+    if (!prompt || !activeConversation) {
       return
     }
+    setInput("")
     const userMessage: Message = {
       id: `m-${Date.now()}`,
       role: "user",
-      content: input
+      content: prompt
     }
+    try {
+      const task = await onCreateTask({
+        prompt,
+        mcpMethod: mcpMethod || undefined,
+        mcpParams: mcpParams || undefined
+      })
+      taskMetaRef.current[task._id] = { convoId: activeId, status: task.status }
+      const assistantMessage: Message = {
+        id: `m-${Date.now()}-assistant`,
+        role: "assistant",
+        content: `任务已创建：${task.status}`,
+        taskId: task._id
+      }
+      setConversations((prev) =>
+        prev.map((item) =>
+          item.id === activeId
+            ? { ...item, messages: [...item.messages, userMessage, assistantMessage] }
+            : item
+        )
+      )
+    } catch (error) {
+      const assistantMessage: Message = {
+        id: `m-${Date.now()}-assistant`,
+        role: "assistant",
+        content: error instanceof Error ? error.message : "任务创建失败"
+      }
+      setConversations((prev) =>
+        prev.map((item) =>
+          item.id === activeId
+            ? { ...item, messages: [...item.messages, userMessage, assistantMessage] }
+            : item
+        )
+      )
+    }
+  }
+
+  useEffect(() => {
+    if (!taskUpdate) {
+      return
+    }
+    const meta = taskMetaRef.current[taskUpdate._id]
+    if (!meta) {
+      return
+    }
+    if (meta.status === taskUpdate.status) {
+      return
+    }
+    meta.status = taskUpdate.status
+    const content =
+      taskUpdate.status === "completed"
+        ? `任务完成：${renderTaskResult(taskUpdate)}`
+        : taskUpdate.status === "failed"
+          ? `任务失败：${taskUpdate.error || "未知错误"}`
+          : `任务状态更新：${taskUpdate.status}`
     const assistantMessage: Message = {
       id: `m-${Date.now()}-assistant`,
       role: "assistant",
-      content: "已收到指令，待接入任务规划与执行。"
+      content,
+      taskId: taskUpdate._id
     }
-    const next = conversations.map((item) =>
-      item.id === activeId
-        ? { ...item, messages: [...item.messages, userMessage, assistantMessage] }
-        : item
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.id === meta.convoId
+          ? { ...item, messages: [...item.messages, assistantMessage] }
+          : item
+      )
     )
-    setConversations(next)
-    setInput("")
+  }, [taskUpdate])
+
+  const renderTaskResult = (task: Task) => {
+    if (task.result === undefined) {
+      return "无结果"
+    }
+    if (typeof task.result === "string") {
+      return task.result
+    }
+    return JSON.stringify(task.result, null, 2)
   }
 
   return (
@@ -102,6 +184,18 @@ export default function ChatPage() {
             onChange={(e) => setInput(e.target.value)}
             placeholder="输入剪辑需求或任务指令"
           />
+          <div className="chat-toolbar">
+            <input
+              placeholder="MCP 方法"
+              value={mcpMethod}
+              onChange={(e) => setMcpMethod(e.target.value)}
+            />
+            <input
+              placeholder="MCP 参数(JSON)"
+              value={mcpParams}
+              onChange={(e) => setMcpParams(e.target.value)}
+            />
+          </div>
           <button type="button" className="primary" onClick={handleSend}>
             发送
           </button>

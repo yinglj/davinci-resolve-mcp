@@ -87,3 +87,19 @@ export async function fetchMe(baseUrl: string) {
   }
   return payload.user
 }
+
+export async function updateProfile(
+  baseUrl: string,
+  input: { name?: string; avatarUrl?: string | null }
+) {
+  const response = await fetch(`${baseUrl}/auth/profile`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(input)
+  })
+  const payload = (await response.json()) as { user?: User; error?: string }
+  if (!response.ok) {
+    throw new Error(payload.error || "Update failed")
+  }
+  return payload.user
+}

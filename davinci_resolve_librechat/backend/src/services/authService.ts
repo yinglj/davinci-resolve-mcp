@@ -7,6 +7,7 @@ export type AuthUser = {
   id: string
   email: string
   name: string
+  avatarUrl?: string
 }
 
 export async function registerUser(input: { email: string; password: string; name: string }) {
@@ -41,7 +42,25 @@ export async function getUserById(id: string) {
   return toAuthUser(user)
 }
 
-function buildAuthPayload(user: { _id: unknown; email: string; name: string }) {
+export async function updateUserProfile(
+  id: string,
+  input: { name?: string; avatarUrl?: string | null }
+) {
+  const update: { name?: string; avatarUrl?: string | null } = {}
+  if (input.name) {
+    update.name = input.name
+  }
+  if (input.avatarUrl !== undefined) {
+    update.avatarUrl = input.avatarUrl || null
+  }
+  const user = await User.findByIdAndUpdate(id, update, { new: true })
+  if (!user) {
+    return null
+  }
+  return toAuthUser(user)
+}
+
+function buildAuthPayload(user: { _id: unknown; email: string; name: string; avatarUrl?: string }) {
   const authUser = toAuthUser(user)
   const token = jwt.sign({ sub: authUser.id }, config.jwtSecret, { expiresIn: "7d" })
   return { user: authUser, token }
@@ -51,6 +70,7 @@ function toAuthUser(user: { _id: unknown; email: string; name: string }) {
   return {
     id: String(user._id),
     email: user.email,
-    name: user.name
+    name: user.name,
+    avatarUrl: "avatarUrl" in user ? (user as { avatarUrl?: string }).avatarUrl : undefined
   }
 }
