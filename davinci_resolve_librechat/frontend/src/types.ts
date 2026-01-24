@@ -23,3 +23,9 @@ export type TaskInput = {
   prompt?: string
   mcp?: McpCall
 }
+
+export type User = {
+  id: string
+  email: string
+  name: string
+}

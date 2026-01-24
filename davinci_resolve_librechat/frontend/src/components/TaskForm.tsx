@@ -8,21 +8,25 @@ export default function TaskForm({
     prompt?: string
     mcpMethod?: string
     mcpParams?: string
-  }) => void
+  }) => Promise<void> | void
 }) {
   const [title, setTitle] = useState("")
   const [prompt, setPrompt] = useState("")
   const [mcpMethod, setMcpMethod] = useState("")
   const [mcpParams, setMcpParams] = useState("")
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    onSubmit({
+    await onSubmit({
       title: title || undefined,
       prompt: prompt || undefined,
       mcpMethod: mcpMethod || undefined,
       mcpParams: mcpParams || undefined
     })
+    setTitle("")
+    setPrompt("")
+    setMcpMethod("")
+    setMcpParams("")
   }
 
   return (

@@ -2,6 +2,7 @@ import express, { Request, Response } from "express"
 import cors from "cors"
 import { config } from "./config.js"
 import { tasksRouter } from "./routes/tasks.js"
+import { authRouter } from "./routes/auth.js"
 import { callMcp } from "./services/mcpClient.js"
 
 export function createApp() {
@@ -28,5 +29,6 @@ export function createApp() {
   })
 
   app.use("/tasks", tasksRouter)
+  app.use("/auth", authRouter)
   return app
 }

@@ -2,6 +2,7 @@ import mongoose, { Schema } from "mongoose"
 import type { TaskStatus, TaskStep, McpCall } from "../types.js"
 
 export type TaskDocument = {
+  ownerId?: string
   title?: string
   prompt?: string
   status: TaskStatus
@@ -16,6 +17,7 @@ export type TaskDocument = {
 
 const TaskSchema = new Schema<TaskDocument>(
   {
+    ownerId: { type: String, index: true },
     title: { type: String },
     prompt: { type: String },
     status: { type: String, required: true },

@@ -16,17 +16,20 @@ function emitTaskUpdate(task: TaskDocument) {
   }
 }
 
-export async function listTasks() {
-  return Task.find().sort({ updatedAt: -1 }).lean()
+export async function listTasks(ownerId?: string) {
+  const query = ownerId ? { ownerId } : {}
+  return Task.find(query).sort({ updatedAt: -1 }).lean()
 }
 
-export async function getTaskById(id: string) {
-  return Task.findById(id).lean()
+export async function getTaskById(id: string, ownerId?: string) {
+  const query = ownerId ? { _id: id, ownerId } : { _id: id }
+  return Task.findOne(query).lean()
 }
 
-export async function createTask(input: TaskInput) {
+export async function createTask(input: TaskInput, ownerId?: string) {
   const initialStatus: TaskStatus = input.mcp ? "running" : "pending"
   const task = await Task.create({
+    ownerId,
     title: input.title,
     prompt: input.prompt,
     status: initialStatus,
@@ -42,8 +45,9 @@ export async function createTask(input: TaskInput) {
   return taskObject
 }
 
-export async function retryTask(id: string) {
-  const task = await Task.findById(id)
+export async function retryTask(id: string, ownerId?: string) {
+  const query = ownerId ? { _id: id, ownerId } : { _id: id }
+  const task = await Task.findOne(query)
   if (!task) {
     return null
   }
