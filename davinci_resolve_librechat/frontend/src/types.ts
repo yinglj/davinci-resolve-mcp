@@ -10,6 +10,7 @@ export type Task = {
   title?: string
   prompt?: string
   scenarioId?: string
+  scenarioVersion?: number
   status: TaskStatus
   result?: unknown
   error?: string
@@ -24,6 +25,14 @@ export type TaskInput = {
   prompt?: string
   scenarioId?: string
   mcp?: McpCall
+}
+
+export type Scenario = {
+  id: string
+  name: string
+  description: string
+  version: number
+  requiresPrompt: boolean
 }
 
 export type User = {

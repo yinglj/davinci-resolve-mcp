@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react"
-import type { Conversation } from "../types"
-import { promptToken, scenarios } from "../scenarios"
+import type { Conversation, Scenario } from "../types"
 
 export default function ChatPage({
   conversations,
   activeId,
+  scenarios,
   onSend
 }: {
   conversations: Conversation[]
   activeId: string
+  scenarios: Scenario[]
   onSend: (input: {
     prompt: string
     scenarioId?: string
@@ -26,19 +27,12 @@ export default function ChatPage({
     [conversations, activeId]
   )
 
-  const selectedScenario = useMemo(
-    () => scenarios.find((item) => item.id === scenarioId),
-    [scenarioId]
-  )
-
   const handleScenarioChange = (id: string) => {
     setScenarioId(id)
-    const scenario = scenarios.find((item) => item.id === id)
-    if (!scenario) {
-      return
+    if (id) {
+      setMcpMethod("")
+      setMcpParams("")
     }
-    setMcpMethod(scenario.method)
-    setMcpParams(JSON.stringify(scenario.buildParams(promptToken), null, 2))
   }
 
   const handleSend = async () => {
@@ -49,12 +43,6 @@ export default function ChatPage({
     setInput("")
     let method = mcpMethod
     let params = mcpParams
-    if (selectedScenario) {
-      method = method || selectedScenario.method
-      const baseParams =
-        params || JSON.stringify(selectedScenario.buildParams(promptToken), null, 2)
-      params = baseParams.replaceAll(promptToken, prompt)
-    }
     await onSend({
       prompt,
       scenarioId: scenarioId || undefined,
@@ -94,11 +82,13 @@ export default function ChatPage({
             placeholder="MCP 方法"
             value={mcpMethod}
             onChange={(e) => setMcpMethod(e.target.value)}
+            disabled={Boolean(scenarioId)}
           />
           <input
             placeholder="MCP 参数(JSON)"
             value={mcpParams}
             onChange={(e) => setMcpParams(e.target.value)}
+            disabled={Boolean(scenarioId)}
           />
         </div>
         <button type="button" className="primary" onClick={handleSend}>

@@ -4,13 +4,14 @@ import { io } from "socket.io-client"
 import {
   createTask,
   listTasks,
+  listScenarios,
   retryTask,
   fetchMe,
   getAuthToken,
   setAuthToken,
   updateProfile
 } from "./api"
-import type { Conversation, Task, TaskStatus, User } from "./types"
+import type { Conversation, Scenario, Task, TaskStatus, User } from "./types"
 import Sidebar from "./components/layout/Sidebar"
 import Topbar from "./components/layout/Topbar"
 import Rightbar from "./components/layout/Rightbar"
@@ -33,6 +34,7 @@ function MainLayout({
 }) {
   const location = useLocation()
   const [tasks, setTasks] = useState<Task[]>([])
+  const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([
     {
       id: "convo-1",
@@ -49,6 +51,10 @@ function MainLayout({
 
   useEffect(() => {
     listTasks(apiBaseUrl).then((data: Task[]) => setTasks(data))
+  }, [apiBaseUrl])
+
+  useEffect(() => {
+    listScenarios(apiBaseUrl).then((data: Scenario[]) => setScenarios(data))
   }, [apiBaseUrl])
 
   const socket = useMemo(() => io(apiBaseUrl), [apiBaseUrl])
@@ -231,6 +237,7 @@ function MainLayout({
                   <ChatPage
                     conversations={conversations}
                     activeId={activeConversationId}
+                    scenarios={scenarios}
                     onSend={handleSendChat}
                   />
                 }

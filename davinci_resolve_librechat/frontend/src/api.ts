@@ -1,4 +1,4 @@
-import type { Task, TaskInput, User } from "./types"
+import type { Scenario, Task, TaskInput, User } from "./types"
 
 const tokenKey = "davinci_resolve_librechat_token"
 
@@ -27,6 +27,16 @@ export async function listTasks(baseUrl: string) {
     const response = await fetch(`${baseUrl}/tasks`, { headers: authHeaders() })
     const payload = (await response.json()) as { tasks: Task[] }
     return payload.tasks || []
+  } catch {
+    return []
+  }
+}
+
+export async function listScenarios(baseUrl: string) {
+  try {
+    const response = await fetch(`${baseUrl}/tasks/scenarios`, { headers: authHeaders() })
+    const payload = (await response.json()) as { scenarios: Scenario[] }
+    return payload.scenarios || []
   } catch {
     return []
   }

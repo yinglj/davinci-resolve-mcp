@@ -15,24 +15,40 @@ const asyncHandler =
 
 type ScenarioDefinition = {
   id: string
+  name: string
+  description: string
   method: string
+  version: number
+  requiresPrompt: boolean
   buildParams: (prompt: string) => Record<string, unknown>
 }
 
 const scenarioDefinitions: ScenarioDefinition[] = [
   {
     id: "color-style",
+    name: "自动调色",
+    description: "按风格应用基础调色",
     method: "color_apply_style",
+    version: 1,
+    requiresPrompt: true,
     buildParams: (prompt) => ({ style: "cinematic", prompt })
   },
   {
     id: "audio-normalize",
+    name: "音频标准化",
+    description: "规范响度并清理音轨",
     method: "audio_normalize_loudness",
+    version: 1,
+    requiresPrompt: false,
     buildParams: (prompt) => ({ targetLufs: -14, prompt })
   },
   {
     id: "fusion-transition",
+    name: "转场生成",
+    description: "为片段添加转场效果",
     method: "fusion_add_transition",
+    version: 1,
+    requiresPrompt: true,
     buildParams: (prompt) => ({ transition: "smooth", prompt })
   }
 ]
@@ -40,6 +56,12 @@ const scenarioDefinitions: ScenarioDefinition[] = [
 const scenarioMap = new Map(scenarioDefinitions.map((item) => [item.id, item]))
 
 const applyScenarioToInput = (input: TaskInput) => {
+  if (input.scenarioId && input.mcp?.method) {
+    return { input, error: "mcp is not allowed with scenarioId" }
+  }
+  if (input.scenarioId && input.scenarioVersion !== undefined) {
+    return { input, error: "scenarioVersion is not allowed with scenarioId" }
+  }
   if (!input.scenarioId || input.mcp?.method) {
     return { input }
   }
@@ -48,15 +70,34 @@ const applyScenarioToInput = (input: TaskInput) => {
     return { input, error: "scenarioId is invalid" }
   }
   const prompt = input.prompt || ""
+  if (scenario.requiresPrompt && !prompt) {
+    return { input, error: "prompt is required for scenario" }
+  }
   return {
     input: {
       ...input,
+      scenarioVersion: scenario.version,
       mcp: { method: scenario.method, params: scenario.buildParams(prompt) }
     }
   }
 }
 
 tasksRouter.use(requireAuth)
+
+tasksRouter.get(
+  "/scenarios",
+  asyncHandler(async (_req: AuthedRequest, res) => {
+    res.json({
+      scenarios: scenarioDefinitions.map((scenario) => ({
+        id: scenario.id,
+        name: scenario.name,
+        description: scenario.description,
+        version: scenario.version,
+        requiresPrompt: scenario.requiresPrompt
+      }))
+    })
+  })
+)
 
 tasksRouter.get(
   "/",
