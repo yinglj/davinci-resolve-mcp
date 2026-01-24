@@ -1,0 +1,158 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0f1115;
+  color: #e6e9ef;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-header {
+  padding: 24px 32px;
+  border-bottom: 1px solid #1f232b;
+  background: #141720;
+}
+
+.app-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.app-subtitle {
+  margin-top: 6px;
+  color: #9aa0ab;
+}
+
+.app-main {
+  padding: 24px 32px 48px;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.card {
+  background: #171b24;
+  border: 1px solid #232733;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: #c2c7d2;
+}
+
+.field input,
+.field textarea {
+  background: #0f1115;
+  border: 1px solid #2a2f3a;
+  color: #e6e9ef;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.primary {
+  margin-top: 14px;
+  background: #4f6ef7;
+  border: none;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.list {
+  display: grid;
+  gap: 12px;
+}
+
+.list-item {
+  padding: 12px;
+  border: 1px solid #222834;
+  border-radius: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: #141823;
+}
+
+.list-title {
+  font-weight: 600;
+}
+
+.list-subtitle {
+  color: #98a0af;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.list-error {
+  color: #ff8a80;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.status {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-pending {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.status-running {
+  background: rgba(79, 110, 247, 0.2);
+  color: #7a94ff;
+}
+
+.status-completed {
+  background: rgba(76, 175, 80, 0.2);
+  color: #7ad07d;
+}
+
+.status-failed {
+  background: rgba(244, 67, 54, 0.2);
+  color: #ff8a80;
+}
+
+.empty {
+  color: #8f96a3;
+  font-size: 14px;
+  padding: 12px;
+  border: 1px dashed #2a2f3a;
+  border-radius: 10px;
+}
