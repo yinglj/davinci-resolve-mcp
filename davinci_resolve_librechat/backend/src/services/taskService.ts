@@ -16,28 +16,52 @@ function emitTaskUpdate(task: TaskDocument) {
   }
 }
 
-export async function listTasks() {
-  return Task.find().sort({ updatedAt: -1 }).lean()
+export async function listTasks(ownerId?: string) {
+  const query = ownerId ? { ownerId } : {}
+  return Task.find(query).sort({ updatedAt: -1 }).lean()
 }
 
-export async function getTaskById(id: string) {
-  return Task.findById(id).lean()
+export async function getTaskById(id: string, ownerId?: string) {
+  const query = ownerId ? { _id: id, ownerId } : { _id: id }
+  return Task.findOne(query).lean()
 }
 
-export async function createTask(input: TaskInput) {
+export async function createTask(input: TaskInput, ownerId?: string) {
   const initialStatus: TaskStatus = input.mcp ? "running" : "pending"
   const task = await Task.create({
+    ownerId,
     title: input.title,
     prompt: input.prompt,
     status: initialStatus,
     steps: input.steps || [],
-    mcp: input.mcp
+    mcp: input.mcp,
+    retryCount: 0
   })
   const taskObject = task.toObject()
   emitTaskUpdate(taskObject)
   if (input.mcp) {
     void runMcpTask(taskObject._id.toString(), input.mcp)
   }
+  return taskObject
+}
+
+export async function retryTask(id: string, ownerId?: string) {
+  const query = ownerId ? { _id: id, ownerId } : { _id: id }
+  const task = await Task.findOne(query)
+  if (!task) {
+    return null
+  }
+  if (!task.mcp) {
+    return task.toObject()
+  }
+  task.status = "running"
+  task.error = undefined
+  task.result = undefined
+  task.retryCount = (task.retryCount || 0) + 1
+  await task.save()
+  const taskObject = task.toObject()
+  emitTaskUpdate(taskObject)
+  void runMcpTask(taskObject._id.toString(), task.mcp)
   return taskObject
 }
 
