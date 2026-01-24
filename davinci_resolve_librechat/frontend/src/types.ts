@@ -9,6 +9,7 @@ export type Task = {
   _id: string
   title?: string
   prompt?: string
+  scenarioId?: string
   status: TaskStatus
   result?: unknown
   error?: string
@@ -21,6 +22,7 @@ export type Task = {
 export type TaskInput = {
   title?: string
   prompt?: string
+  scenarioId?: string
   mcp?: McpCall
 }
 

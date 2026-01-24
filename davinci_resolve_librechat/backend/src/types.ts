@@ -14,6 +14,7 @@ export type McpCall = {
 export type TaskInput = {
   title?: string
   prompt?: string
+  scenarioId?: string
   mcp?: McpCall
   steps?: TaskStep[]
 }

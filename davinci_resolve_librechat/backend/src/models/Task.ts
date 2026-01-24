@@ -5,6 +5,7 @@ export type TaskDocument = {
   ownerId?: string
   title?: string
   prompt?: string
+  scenarioId?: string
   status: TaskStatus
   steps?: TaskStep[]
   mcp?: McpCall
@@ -20,6 +21,7 @@ const TaskSchema = new Schema<TaskDocument>(
     ownerId: { type: String, index: true },
     title: { type: String },
     prompt: { type: String },
+    scenarioId: { type: String },
     status: { type: String, required: true },
     steps: { type: [Schema.Types.Mixed], default: [] },
     mcp: { type: Schema.Types.Mixed },

@@ -10,5 +10,6 @@ export const config = {
   mcpBaseUrl: process.env.MCP_BASE_URL || "http://127.0.0.1:8020/mcp",
   mcpApiKey: process.env.MCP_API_KEY || "",
   corsOrigin: process.env.CORS_ORIGIN || "*",
-  jwtSecret: process.env.JWT_SECRET || "dev-secret"
+  jwtSecret: process.env.JWT_SECRET || "dev-secret",
+  mcpHealthMethod: process.env.MCP_HEALTH_METHOD || "list_tools"
 }

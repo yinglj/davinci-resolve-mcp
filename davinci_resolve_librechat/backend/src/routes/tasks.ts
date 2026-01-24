@@ -13,6 +13,49 @@ const asyncHandler =
     })
   }
 
+type ScenarioDefinition = {
+  id: string
+  method: string
+  buildParams: (prompt: string) => Record<string, unknown>
+}
+
+const scenarioDefinitions: ScenarioDefinition[] = [
+  {
+    id: "color-style",
+    method: "color_apply_style",
+    buildParams: (prompt) => ({ style: "cinematic", prompt })
+  },
+  {
+    id: "audio-normalize",
+    method: "audio_normalize_loudness",
+    buildParams: (prompt) => ({ targetLufs: -14, prompt })
+  },
+  {
+    id: "fusion-transition",
+    method: "fusion_add_transition",
+    buildParams: (prompt) => ({ transition: "smooth", prompt })
+  }
+]
+
+const scenarioMap = new Map(scenarioDefinitions.map((item) => [item.id, item]))
+
+const applyScenarioToInput = (input: TaskInput) => {
+  if (!input.scenarioId || input.mcp?.method) {
+    return { input }
+  }
+  const scenario = scenarioMap.get(input.scenarioId)
+  if (!scenario) {
+    return { input, error: "scenarioId is invalid" }
+  }
+  const prompt = input.prompt || ""
+  return {
+    input: {
+      ...input,
+      mcp: { method: scenario.method, params: scenario.buildParams(prompt) }
+    }
+  }
+}
+
 tasksRouter.use(requireAuth)
 
 tasksRouter.get(
@@ -50,7 +93,12 @@ tasksRouter.post(
 tasksRouter.post(
   "/",
   asyncHandler(async (req: AuthedRequest, res) => {
-    const input = req.body as TaskInput
+    const rawInput = req.body as TaskInput
+    const { input, error } = applyScenarioToInput(rawInput)
+    if (error) {
+      res.status(400).json({ error })
+      return
+    }
     if (!input.title && !input.prompt && !input.mcp) {
       res.status(400).json({ error: "title or prompt or mcp is required" })
       return

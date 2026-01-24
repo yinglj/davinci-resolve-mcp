@@ -96,6 +96,7 @@ function MainLayout({
 
   const handleChatTaskCreate = async (input: {
     prompt: string
+    scenarioId?: string
     mcpMethod?: string
     mcpParams?: string
   }) => {
@@ -110,6 +111,7 @@ function MainLayout({
     const task = await createTask(apiBaseUrl, {
       title: input.prompt.slice(0, 24),
       prompt: input.prompt,
+      scenarioId: input.scenarioId,
       mcp: input.mcpMethod ? { method: input.mcpMethod, params } : undefined
     })
     return task
@@ -136,6 +138,7 @@ function MainLayout({
 
   const handleSendChat = async (input: {
     prompt: string
+    scenarioId?: string
     mcpMethod?: string
     mcpParams?: string
   }) => {

@@ -32,6 +32,7 @@ export async function createTask(input: TaskInput, ownerId?: string) {
     ownerId,
     title: input.title,
     prompt: input.prompt,
+    scenarioId: input.scenarioId,
     status: initialStatus,
     steps: input.steps || [],
     mcp: input.mcp,

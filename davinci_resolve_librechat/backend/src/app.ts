@@ -28,6 +28,19 @@ export function createApp() {
     }
   })
 
+  app.get("/mcp/health", async (_req: Request, res: Response) => {
+    try {
+      const result = await callMcp({ method: config.mcpHealthMethod })
+      res.json({ status: "ok", method: config.mcpHealthMethod, result })
+    } catch (error) {
+      res.status(502).json({
+        status: "error",
+        method: config.mcpHealthMethod,
+        error: error instanceof Error ? error.message : "MCP error"
+      })
+    }
+  })
+
   app.use("/tasks", tasksRouter)
   app.use("/auth", authRouter)
   return app
