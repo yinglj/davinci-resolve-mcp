@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { io } from "socket.io-client"
 import {
@@ -10,9 +10,10 @@ import {
   setAuthToken,
   updateProfile
 } from "./api"
-import type { Task, User } from "./types"
+import type { Conversation, Task, TaskStatus, User } from "./types"
 import Sidebar from "./components/layout/Sidebar"
 import Topbar from "./components/layout/Topbar"
+import Rightbar from "./components/layout/Rightbar"
 import AuthPage from "./pages/AuthPage"
 import ChatPage from "./pages/ChatPage"
 import TasksPage from "./pages/TasksPage"
@@ -32,7 +33,19 @@ function MainLayout({
 }) {
   const location = useLocation()
   const [tasks, setTasks] = useState<Task[]>([])
-  const [lastTaskUpdate, setLastTaskUpdate] = useState<Task | null>(null)
+  const [conversations, setConversations] = useState<Conversation[]>([
+    {
+      id: "convo-1",
+      title: "示例对话",
+      messages: [
+        { id: "m1", role: "assistant", content: "欢迎进入 DaVinci Resolve LibreChat。" }
+      ]
+    }
+  ])
+  const [activeConversationId, setActiveConversationId] = useState<string>("convo-1")
+  const taskConversationMap = useRef<Record<string, { convoId: string; status?: TaskStatus }>>(
+    {}
+  )
 
   useEffect(() => {
     listTasks(apiBaseUrl).then((data: Task[]) => setTasks(data))
@@ -49,7 +62,7 @@ function MainLayout({
         }
         return [task, ...prev]
       })
-      setLastTaskUpdate(task)
+      handleTaskUpdate(task)
     })
     return () => {
       socket.disconnect()
@@ -102,6 +115,85 @@ function MainLayout({
     return task
   }
 
+  const appendMessage = (convoId: string, message: Conversation["messages"][number]) => {
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.id === convoId ? { ...item, messages: [...item.messages, message] } : item
+      )
+    )
+  }
+
+  const handleNewConversation = () => {
+    const id = `convo-${Date.now()}`
+    const next: Conversation = {
+      id,
+      title: "新对话",
+      messages: [{ id: `m-${Date.now()}`, role: "assistant", content: "新对话已开始。" }]
+    }
+    setConversations((prev) => [next, ...prev])
+    setActiveConversationId(id)
+  }
+
+  const handleSendChat = async (input: {
+    prompt: string
+    mcpMethod?: string
+    mcpParams?: string
+  }) => {
+    const convoId = activeConversationId
+    const userMessage = {
+      id: `m-${Date.now()}`,
+      role: "user" as const,
+      content: input.prompt
+    }
+    appendMessage(convoId, userMessage)
+    try {
+      const task = await handleChatTaskCreate(input)
+      taskConversationMap.current[task._id] = { convoId, status: task.status }
+      appendMessage(convoId, {
+        id: `m-${Date.now()}-assistant`,
+        role: "assistant",
+        content: `任务已创建：${task.status}`,
+        taskId: task._id
+      })
+    } catch (error) {
+      appendMessage(convoId, {
+        id: `m-${Date.now()}-assistant`,
+        role: "assistant",
+        content: error instanceof Error ? error.message : "任务创建失败"
+      })
+    }
+  }
+
+  const renderTaskResult = (task: Task) => {
+    if (task.result === undefined) {
+      return "无结果"
+    }
+    if (typeof task.result === "string") {
+      return task.result
+    }
+    return JSON.stringify(task.result, null, 2)
+  }
+
+  const handleTaskUpdate = (task: Task) => {
+    const meta = taskConversationMap.current[task._id]
+    if (!meta || meta.status === task.status) {
+      return
+    }
+    meta.status = task.status
+    const content =
+      task.status === "completed"
+        ? `任务完成：${renderTaskResult(task)}`
+        : task.status === "failed"
+          ? `任务失败：${task.error || "未知错误"}`
+          : `任务状态更新：${task.status}`
+    appendMessage(meta.convoId, {
+      id: `m-${Date.now()}-assistant`,
+      role: "assistant",
+      content,
+      taskId: task._id
+    })
+  }
+
   const handleProfileUpdate = async (input: { name?: string; avatarUrl?: string | null }) => {
     const updated = await updateProfile(apiBaseUrl, input)
     if (updated) {
@@ -119,31 +211,40 @@ function MainLayout({
 
   return (
     <div className="layout">
-      <Sidebar />
+      <Sidebar
+        conversations={location.pathname === "/chats" ? conversations : undefined}
+        activeConversationId={activeConversationId}
+        onSelectConversation={location.pathname === "/chats" ? setActiveConversationId : undefined}
+        onNewConversation={location.pathname === "/chats" ? handleNewConversation : undefined}
+      />
       <div className="layout-main">
         <Topbar title={title} user={user} onLogout={onLogout} />
-        <div className="layout-content">
-          <Routes>
-            <Route
-              path="/chats"
-              element={
-                <ChatPage
-                  onCreateTask={handleChatTaskCreate}
-                  taskUpdate={lastTaskUpdate}
-                />
-              }
-            />
-            <Route
-              path="/tasks"
-              element={<TasksPage tasks={tasks} onCreate={handleCreate} onRetry={handleRetry} />}
-            />
-            <Route
-              path="/profile"
-              element={<ProfilePage user={user} onUpdate={handleProfileUpdate} />}
-            />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/chats" replace />} />
-          </Routes>
+        <div className="layout-body">
+          <div className="layout-content">
+            <Routes>
+              <Route
+                path="/chats"
+                element={
+                  <ChatPage
+                    conversations={conversations}
+                    activeId={activeConversationId}
+                    onSend={handleSendChat}
+                  />
+                }
+              />
+              <Route
+                path="/tasks"
+                element={<TasksPage tasks={tasks} onCreate={handleCreate} onRetry={handleRetry} />}
+              />
+              <Route
+                path="/profile"
+                element={<ProfilePage user={user} onUpdate={handleProfileUpdate} />}
+              />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/chats" replace />} />
+            </Routes>
+          </div>
+          <Rightbar tasks={tasks} />
         </div>
       </div>
     </div>

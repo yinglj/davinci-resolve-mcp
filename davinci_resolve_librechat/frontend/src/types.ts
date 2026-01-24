@@ -30,3 +30,16 @@ export type User = {
   name: string
   avatarUrl?: string
 }
+
+export type ChatMessage = {
+  id: string
+  role: "user" | "assistant"
+  content: string
+  taskId?: string
+}
+
+export type Conversation = {
+  id: string
+  title: string
+  messages: ChatMessage[]
+}
