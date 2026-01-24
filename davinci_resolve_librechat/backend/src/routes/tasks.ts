@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express"
-import { createTask, getTaskById, listTasks } from "../services/taskService.js"
+import { createTask, getTaskById, listTasks, retryTask } from "../services/taskService.js"
 import type { TaskInput } from "../types.js"
 
 export const tasksRouter = Router()
@@ -29,6 +29,18 @@ tasksRouter.get(
       return
     }
     res.json({ task })
+  })
+)
+
+tasksRouter.post(
+  "/:id/retry",
+  asyncHandler(async (req, res) => {
+    const task = await retryTask(req.params.id)
+    if (!task) {
+      res.status(404).json({ error: "Task not found" })
+      return
+    }
+    res.status(200).json({ task })
   })
 )
 

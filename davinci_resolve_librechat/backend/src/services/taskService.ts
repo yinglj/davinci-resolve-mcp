@@ -31,13 +31,33 @@ export async function createTask(input: TaskInput) {
     prompt: input.prompt,
     status: initialStatus,
     steps: input.steps || [],
-    mcp: input.mcp
+    mcp: input.mcp,
+    retryCount: 0
   })
   const taskObject = task.toObject()
   emitTaskUpdate(taskObject)
   if (input.mcp) {
     void runMcpTask(taskObject._id.toString(), input.mcp)
   }
+  return taskObject
+}
+
+export async function retryTask(id: string) {
+  const task = await Task.findById(id)
+  if (!task) {
+    return null
+  }
+  if (!task.mcp) {
+    return task.toObject()
+  }
+  task.status = "running"
+  task.error = undefined
+  task.result = undefined
+  task.retryCount = (task.retryCount || 0) + 1
+  await task.save()
+  const taskObject = task.toObject()
+  emitTaskUpdate(taskObject)
+  void runMcpTask(taskObject._id.toString(), task.mcp)
   return taskObject
 }
 

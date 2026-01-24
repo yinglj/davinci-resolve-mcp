@@ -9,6 +9,7 @@ export type TaskDocument = {
   mcp?: McpCall
   result?: unknown
   error?: string
+  retryCount?: number
   createdAt: Date
   updatedAt: Date
 }
@@ -21,7 +22,8 @@ const TaskSchema = new Schema<TaskDocument>(
     steps: { type: [Schema.Types.Mixed], default: [] },
     mcp: { type: Schema.Types.Mixed },
     result: { type: Schema.Types.Mixed },
-    error: { type: String }
+    error: { type: String },
+    retryCount: { type: Number, default: 0 }
   },
   { timestamps: true }
 )

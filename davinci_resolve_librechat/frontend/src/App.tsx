@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { io } from "socket.io-client"
-import { createTask, listTasks } from "./api"
+import { createTask, listTasks, retryTask } from "./api"
 import type { Task } from "./types"
 import TaskForm from "./components/TaskForm"
 import TaskList from "./components/TaskList"
@@ -52,6 +52,10 @@ export default function App() {
     })
   }
 
+  const handleRetry = async (id: string) => {
+    await retryTask(apiBaseUrl, id)
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -60,7 +64,7 @@ export default function App() {
       </header>
       <main className="app-main">
         <TaskForm onSubmit={handleCreate} />
-        <TaskList tasks={tasks} />
+        <TaskList tasks={tasks} onRetry={handleRetry} />
       </main>
     </div>
   )

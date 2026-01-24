@@ -12,6 +12,7 @@ export type Task = {
   status: TaskStatus
   result?: unknown
   error?: string
+  retryCount?: number
   createdAt?: string
   updatedAt?: string
   mcp?: McpCall
