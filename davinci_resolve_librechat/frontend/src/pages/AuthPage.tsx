@@ -6,11 +6,15 @@ import type { User } from "../types"
 export default function AuthPage({
   mode,
   apiBaseUrl,
-  onAuth
+  onAuth,
+  theme,
+  onToggleTheme
 }: {
   mode: "login" | "register"
   apiBaseUrl: string
   onAuth: (user: User) => void
+  theme: "black" | "light"
+  onToggleTheme: () => void
 }) {
   const navigate = useNavigate()
   const [name, setName] = useState("")
@@ -37,7 +41,12 @@ export default function AuthPage({
   return (
     <div className="auth-layout">
       <div className="auth-card">
-        <div className="auth-title">{isRegister ? "注册" : "登录"}</div>
+        <div className="auth-header">
+          <div className="auth-title">{isRegister ? "注册" : "登录"}</div>
+          <button type="button" className="ghost auth-theme" onClick={onToggleTheme}>
+            {theme === "black" ? "🌙" : "☀️"}
+          </button>
+        </div>
         <form className="auth-form" onSubmit={handleSubmit}>
           {isRegister ? (
             <label className="field">

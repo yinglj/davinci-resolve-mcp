@@ -9,10 +9,103 @@ body {
   color: #e6e9ef;
 }
 
+body.theme-light {
+  background: #f6f7fb;
+  color: #1f2430;
+}
+
+body.theme-light .auth-layout {
+  background: #f6f7fb;
+}
+
+body.theme-light .sidebar,
+body.theme-light .topbar,
+body.theme-light .rightbar,
+body.theme-light .chat-panel,
+body.theme-light .card,
+body.theme-light .auth-card,
+body.theme-light .list-item,
+body.theme-light .rightbar-card,
+body.theme-light .rightbar-item,
+body.theme-light .detail-pre,
+body.theme-light .list-details {
+  background: #ffffff;
+  border-color: #e2e6ef;
+}
+
+body.theme-light .layout-body,
+body.theme-light .topbar,
+body.theme-light .sidebar {
+  border-color: #e2e6ef;
+}
+
+body.theme-light .nav-link,
+body.theme-light .sidebar-chat,
+body.theme-light .sidebar-menu-item,
+body.theme-light .field,
+body.theme-light .list-subtitle,
+body.theme-light .list-meta,
+body.theme-light .rightbar-muted,
+body.theme-light .detail-label,
+body.theme-light .settings-row,
+body.theme-light .auth-switch {
+  color: #5b667a;
+}
+
+body.theme-light .sidebar-subtitle,
+body.theme-light .rightbar-item-title,
+body.theme-light .detail-value,
+body.theme-light .chat-bubble {
+  color: #1f2430;
+}
+
+body.theme-light .nav-link.active,
+body.theme-light .sidebar-chat.active,
+body.theme-light .sidebar-menu-item:hover,
+body.theme-light .chat-message.user .chat-bubble {
+  background: #e9eefc;
+  color: #1f2430;
+  border-color: #d6def5;
+}
+
+body.theme-light .sidebar-user-avatar,
+body.theme-light .profile-avatar-preview,
+body.theme-light .topbar-user-avatar,
+body.theme-light .rightbar-user-avatar {
+  background: #eef2f8;
+  border-color: #d9e0ee;
+  color: #3c4656;
+}
+
+body.theme-light .field input,
+body.theme-light .field textarea,
+body.theme-light .chat-input textarea,
+body.theme-light .chat-toolbar input,
+body.theme-light .ghost {
+  background: #f7f9fc;
+  border-color: #dbe1ee;
+  color: #1f2430;
+}
+
+body.theme-light .sidebar-user-menu {
+  background: #ffffff;
+  border-color: #e2e6ef;
+  box-shadow: 0 16px 40px rgba(24, 32, 47, 0.18);
+}
+
+body.theme-light .primary {
+  background: #4f6ef7;
+  color: #ffffff;
+}
+
 .layout {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 260px 1fr;
+}
+
+.layout-collapsed {
+  grid-template-columns: 72px 1fr;
 }
 
 .layout-main {
@@ -37,6 +130,10 @@ body {
   min-height: 0;
 }
 
+.layout-body-full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar {
   background: #11141c;
   border-right: 1px solid #1f232b;
@@ -46,10 +143,20 @@ body {
   gap: 16px;
 }
 
+.sidebar.collapsed {
+  padding: 20px 12px;
+  align-items: center;
+}
+
 .sidebar-logo {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  flex-direction: column;
+  gap: 6px;
 }
 
 .sidebar-logo img {
@@ -62,6 +169,13 @@ body {
   font-weight: 600;
 }
 
+.sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .sidebar-subtitle,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .sidebar-section-title {
+  display: none;
+}
+
 .sidebar-subtitle {
   font-size: 12px;
   color: #8c93a3;
@@ -70,6 +184,11 @@ body {
 .sidebar-nav {
   display: grid;
   gap: 8px;
+}
+
+.sidebar.collapsed .sidebar-nav {
+  width: 100%;
+  justify-items: center;
 }
 
 .sidebar-section {
@@ -113,6 +232,12 @@ body {
 .sidebar-footer {
   margin-top: auto;
   position: relative;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  width: 100%;
+  display: grid;
+  place-items: center;
 }
 
 .sidebar-user-button {
@@ -177,6 +302,18 @@ body {
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  padding: 10px;
+}
+
+.nav-icon {
+  font-size: 16px;
 }
 
 .nav-link.active {
@@ -319,6 +456,22 @@ body {
   padding: 24px;
   display: grid;
   gap: 16px;
+}
+
+.auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.auth-theme {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
 }
 
 .auth-title {

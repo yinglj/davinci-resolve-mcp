@@ -26,13 +26,19 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001"
 function MainLayout({
   user,
   onLogout,
-  onUserUpdate
+  onUserUpdate,
+  theme,
+  onToggleTheme
 }: {
   user: User
   onLogout: () => void
   onUserUpdate: (user: User) => void
+  theme: "black" | "light"
+  onToggleTheme: () => void
 }) {
   const location = useLocation()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showRightbar, setShowRightbar] = useState(true)
   const [tasks, setTasks] = useState<Task[]>([])
   const [scenarios, setScenarios] = useState<Scenario[]>([])
   const [conversations, setConversations] = useState<Conversation[]>([
@@ -202,18 +208,27 @@ function MainLayout({
   const title = titleMap[location.pathname] || "对话"
 
   return (
-    <div className="layout">
+    <div className={`layout ${sidebarCollapsed ? "layout-collapsed" : ""}`}>
       <Sidebar
+        collapsed={sidebarCollapsed}
         conversations={location.pathname === "/chats" ? conversations : undefined}
         activeConversationId={activeConversationId}
         onSelectConversation={location.pathname === "/chats" ? setActiveConversationId : undefined}
         onNewConversation={location.pathname === "/chats" ? handleNewConversation : undefined}
         user={user}
         onLogout={onLogout}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
       />
       <div className="layout-main">
-        <Topbar title={title} />
-        <div className="layout-body">
+        <Topbar
+          title={title}
+          showSidebar={!sidebarCollapsed}
+          showRightbar={showRightbar}
+          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+          onToggleRightbar={() => setShowRightbar((prev) => !prev)}
+        />
+        <div className={`layout-body ${showRightbar ? "" : "layout-body-full"}`}>
           <div className="layout-content">
             <Routes>
               <Route
@@ -247,7 +262,7 @@ function MainLayout({
               <Route path="*" element={<Navigate to="/chats" replace />} />
             </Routes>
           </div>
-          <Rightbar tasks={tasks} />
+          {showRightbar ? <Rightbar tasks={tasks} /> : null}
         </div>
       </div>
     </div>
@@ -257,6 +272,9 @@ function MainLayout({
 function AppRoutes() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [theme, setTheme] = useState<"black" | "light">(
+    (localStorage.getItem("dr_theme") as "black" | "light") || "black"
+  )
 
   useEffect(() => {
     const token = getAuthToken()
@@ -275,6 +293,10 @@ function AppRoutes() {
       })
       .finally(() => setLoading(false))
   }, [])
+  useEffect(() => {
+    document.body.classList.toggle("theme-light", theme === "light")
+    localStorage.setItem("dr_theme", theme)
+  }, [theme])
 
   const handleLogout = () => {
     setAuthToken(null)
@@ -289,17 +311,39 @@ function AppRoutes() {
     <Routes>
       <Route
         path="/login"
-        element={<AuthPage mode="login" apiBaseUrl={apiBaseUrl} onAuth={setUser} />}
+        element={
+          <AuthPage
+            mode="login"
+            apiBaseUrl={apiBaseUrl}
+            onAuth={setUser}
+            theme={theme}
+            onToggleTheme={() => setTheme((prev) => (prev === "black" ? "light" : "black"))}
+          />
+        }
       />
       <Route
         path="/register"
-        element={<AuthPage mode="register" apiBaseUrl={apiBaseUrl} onAuth={setUser} />}
+        element={
+          <AuthPage
+            mode="register"
+            apiBaseUrl={apiBaseUrl}
+            onAuth={setUser}
+            theme={theme}
+            onToggleTheme={() => setTheme((prev) => (prev === "black" ? "light" : "black"))}
+          />
+        }
       />
       <Route
         path="/*"
         element={
           user ? (
-            <MainLayout user={user} onLogout={handleLogout} onUserUpdate={setUser} />
+            <MainLayout
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={setUser}
+              theme={theme}
+              onToggleTheme={() => setTheme((prev) => (prev === "black" ? "light" : "black"))}
+            />
           ) : (
             <Navigate to="/login" replace />
           )
