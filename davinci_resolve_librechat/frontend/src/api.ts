@@ -1,4 +1,4 @@
-import type { Scenario, Task, TaskInput, User } from "./types"
+import type { Scenario, Task, TaskAssetInput, TaskAssetItem, TaskInput, User } from "./types"
 
 const tokenKey = "davinci_resolve_librechat_token"
 
@@ -50,6 +50,38 @@ export async function createTask(baseUrl: string, input: TaskInput) {
   })
   const payload = (await response.json()) as { task: Task }
   return payload.task
+}
+
+export async function uploadAssets(
+  baseUrl: string,
+  files: {
+    videos?: File[]
+    images?: File[]
+    audios?: File[]
+  }
+) {
+  const formData = new FormData()
+  files.videos?.forEach((file) => formData.append("videos", file))
+  files.images?.forEach((file) => formData.append("images", file))
+  files.audios?.forEach((file) => formData.append("audios", file))
+  const response = await fetch(`${baseUrl}/assets/upload`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body: formData
+  })
+  const payload = (await response.json()) as {
+    assets: {
+      videos?: TaskAssetItem[]
+      images?: TaskAssetItem[]
+      audios?: TaskAssetItem[]
+    }
+  }
+  const mapUrls = (items?: TaskAssetItem[]) => items?.map((item) => item.url) || []
+  return {
+    videos: mapUrls(payload.assets.videos),
+    images: mapUrls(payload.assets.images),
+    audios: mapUrls(payload.assets.audios)
+  }
 }
 
 export async function retryTask(baseUrl: string, id: string) {

@@ -11,5 +11,6 @@ export const config = {
   mcpApiKey: process.env.MCP_API_KEY || "",
   corsOrigin: process.env.CORS_ORIGIN || "*",
   jwtSecret: process.env.JWT_SECRET || "dev-secret",
-  mcpHealthMethod: process.env.MCP_HEALTH_METHOD || "list_tools"
+  mcpHealthMethod: process.env.MCP_HEALTH_METHOD || "list_tools",
+  uploadDir: process.env.UPLOAD_DIR || "uploads"
 }

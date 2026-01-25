@@ -26,7 +26,7 @@ export type TaskAssetInput = {
 export type TaskAssetItem = {
   url: string
   type: "video" | "image" | "audio"
-  source: "url"
+  source: "url" | "upload"
   status: "validated" | "invalid" | "unverified"
   size?: number
   mime?: string

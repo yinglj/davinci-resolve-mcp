@@ -1,6 +1,7 @@
-import { NavLink } from "react-router-dom"
+import { NavLink, useNavigate } from "react-router-dom"
+import { useState } from "react"
 import logo from "../../assets/logo.svg"
-import type { Conversation } from "../../types"
+import type { Conversation, User } from "../../types"
 
 const navItems = [
   { to: "/chats", label: "对话" },
@@ -11,13 +12,20 @@ export default function Sidebar({
   conversations,
   activeConversationId,
   onSelectConversation,
-  onNewConversation
+  onNewConversation,
+  user,
+  onLogout
 }: {
   conversations?: Conversation[]
   activeConversationId?: string
   onSelectConversation?: (id: string) => void
   onNewConversation?: () => void
+  user: User
+  onLogout: () => void
 }) {
+  const navigate = useNavigate()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : "U"
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
@@ -64,6 +72,63 @@ export default function Sidebar({
           </div>
         </div>
       ) : null}
+      <div className="sidebar-footer">
+        <button
+          type="button"
+          className="sidebar-user-button"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          <div className="sidebar-user-avatar">
+            {user.avatarUrl ? <img src={user.avatarUrl} alt={user.name} /> : initials}
+          </div>
+        </button>
+        {menuOpen ? (
+          <div className="sidebar-user-menu">
+            <button
+              type="button"
+              className="sidebar-menu-item"
+              onClick={() => {
+                navigate("/settings")
+                setMenuOpen(false)
+              }}
+            >
+              Settings
+            </button>
+            <button
+              type="button"
+              className="sidebar-menu-item"
+              onClick={() => {
+                navigate("/tasks")
+                setMenuOpen(false)
+              }}
+            >
+              Tasks
+            </button>
+            <button type="button" className="sidebar-menu-item" onClick={() => setMenuOpen(false)}>
+              Files
+            </button>
+            <button type="button" className="sidebar-menu-item" onClick={() => setMenuOpen(false)}>
+              Grokipedia
+            </button>
+            <button type="button" className="sidebar-menu-item" onClick={() => setMenuOpen(false)}>
+              Help
+            </button>
+            <button type="button" className="sidebar-menu-item" onClick={() => setMenuOpen(false)}>
+              Upgrade plan
+            </button>
+            <button
+              type="button"
+              className="sidebar-menu-item"
+              onClick={() => {
+                onLogout()
+                setMenuOpen(false)
+              }}
+            >
+              Sign Out
+            </button>
+          </div>
+        ) : null}
+      </div>
     </aside>
   )
 }

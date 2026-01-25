@@ -208,6 +208,8 @@ function MainLayout({
         activeConversationId={activeConversationId}
         onSelectConversation={location.pathname === "/chats" ? setActiveConversationId : undefined}
         onNewConversation={location.pathname === "/chats" ? handleNewConversation : undefined}
+        user={user}
+        onLogout={onLogout}
       />
       <div className="layout-main">
         <Topbar title={title} />
@@ -231,6 +233,7 @@ function MainLayout({
                   <TasksPage
                     tasks={tasks}
                     scenarios={scenarios}
+                    apiBaseUrl={apiBaseUrl}
                     onCreate={handleCreate}
                     onRetry={handleRetry}
                   />
@@ -244,7 +247,7 @@ function MainLayout({
               <Route path="*" element={<Navigate to="/chats" replace />} />
             </Routes>
           </div>
-          <Rightbar tasks={tasks} user={user} onLogout={onLogout} />
+          <Rightbar tasks={tasks} />
         </div>
       </div>
     </div>

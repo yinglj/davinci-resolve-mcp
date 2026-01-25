@@ -1,11 +1,14 @@
 import { useState, type ChangeEvent, type FormEvent } from "react"
+import { uploadAssets } from "../api"
 import type { Scenario, TaskAssetInput } from "../types"
 
 export default function TaskForm({
   scenarios,
+  apiBaseUrl,
   onSubmit
 }: {
   scenarios: Scenario[]
+  apiBaseUrl: string
   onSubmit: (input: {
     title?: string
     prompt?: string
@@ -19,6 +22,11 @@ export default function TaskForm({
   const [videoUrls, setVideoUrls] = useState("")
   const [imageUrls, setImageUrls] = useState("")
   const [audioUrls, setAudioUrls] = useState("")
+  const [videoFiles, setVideoFiles] = useState<File[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([])
+  const [audioFiles, setAudioFiles] = useState<File[]>([])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
 
   const parseUrls = (value: string) =>
     value
@@ -28,25 +36,48 @@ export default function TaskForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    setSubmitting(true)
+    setError("")
     const videos = parseUrls(videoUrls)
     const images = parseUrls(imageUrls)
     const audios = parseUrls(audioUrls)
-    await onSubmit({
-      title: title || undefined,
-      prompt: prompt || undefined,
-      scenarioId: scenarioId || undefined,
-      assets: {
-        videos: videos.length ? videos : undefined,
-        images: images.length ? images : undefined,
-        audios: audios.length ? audios : undefined
+    try {
+      let uploaded: TaskAssetInput | undefined = undefined
+      if (videoFiles.length || imageFiles.length || audioFiles.length) {
+        uploaded = await uploadAssets(apiBaseUrl, {
+          videos: videoFiles,
+          images: imageFiles,
+          audios: audioFiles
+        })
       }
-    })
-    setTitle("")
-    setPrompt("")
-    setScenarioId("")
-    setVideoUrls("")
-    setImageUrls("")
-    setAudioUrls("")
+      const mergeList = (base: string[], extra?: string[]) => {
+        const combined = [...base, ...(extra || [])]
+        return combined.length ? combined : undefined
+      }
+      await onSubmit({
+        title: title || undefined,
+        prompt: prompt || undefined,
+        scenarioId: scenarioId || undefined,
+        assets: {
+          videos: mergeList(videos, uploaded?.videos),
+          images: mergeList(images, uploaded?.images),
+          audios: mergeList(audios, uploaded?.audios)
+        }
+      })
+      setTitle("")
+      setPrompt("")
+      setScenarioId("")
+      setVideoUrls("")
+      setImageUrls("")
+      setAudioUrls("")
+      setVideoFiles([])
+      setImageFiles([])
+      setAudioFiles([])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "素材上传失败")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -87,11 +118,33 @@ export default function TaskForm({
           />
         </label>
         <label className="field">
+          <span>上传视频素材</span>
+          <input
+            type="file"
+            accept="video/*"
+            multiple
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setVideoFiles(e.target.files ? Array.from(e.target.files) : [])
+            }
+          />
+        </label>
+        <label className="field">
           <span>图片素材URL</span>
           <textarea
             value={imageUrls}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setImageUrls(e.target.value)}
             placeholder="支持多条，逗号或换行分隔"
+          />
+        </label>
+        <label className="field">
+          <span>上传图片素材</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setImageFiles(e.target.files ? Array.from(e.target.files) : [])
+            }
           />
         </label>
         <label className="field">
@@ -102,9 +155,21 @@ export default function TaskForm({
             placeholder="支持多条，逗号或换行分隔"
           />
         </label>
+        <label className="field">
+          <span>上传音乐素材</span>
+          <input
+            type="file"
+            accept="audio/*"
+            multiple
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setAudioFiles(e.target.files ? Array.from(e.target.files) : [])
+            }
+          />
+        </label>
       </div>
-      <button type="submit" className="primary">
-        提交
+      {error ? <div className="auth-error">{error}</div> : null}
+      <button type="submit" className="primary" disabled={submitting}>
+        {submitting ? "上传中" : "提交"}
       </button>
     </form>
   )

@@ -1,18 +1,7 @@
-import { useNavigate } from "react-router-dom"
-import type { Task, User } from "../../types"
+import type { Task } from "../../types"
 
-export default function Rightbar({
-  tasks,
-  user,
-  onLogout
-}: {
-  tasks: Task[]
-  user: User
-  onLogout: () => void
-}) {
+export default function Rightbar({ tasks }: { tasks: Task[] }) {
   const recentTasks = tasks.slice(0, 5)
-  const navigate = useNavigate()
-  const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : "U"
   return (
     <aside className="rightbar">
       <div className="rightbar-section">
@@ -52,29 +41,6 @@ export default function Rightbar({
           </button>
           <button type="button" className="ghost">
             工具设置
-          </button>
-        </div>
-      </div>
-      <div className="rightbar-section rightbar-footer">
-        <div className="rightbar-title">账户</div>
-        <div className="rightbar-user-card">
-          <div className="rightbar-user-avatar">
-            {user.avatarUrl ? <img src={user.avatarUrl} alt={user.name} /> : initials}
-          </div>
-          <div className="rightbar-user-meta">
-            <div className="rightbar-user-name">{user.name}</div>
-            <div className="rightbar-user-email">{user.email}</div>
-          </div>
-        </div>
-        <div className="rightbar-user-actions">
-          <button type="button" className="ghost" onClick={() => navigate("/profile")}>
-            个人资料
-          </button>
-          <button type="button" className="ghost" onClick={() => navigate("/settings")}>
-            系统设置
-          </button>
-          <button type="button" className="ghost" onClick={onLogout}>
-            退出登录
           </button>
         </div>
       </div>

@@ -1,14 +1,20 @@
 import express, { Request, Response } from "express"
+import fs from "fs"
+import path from "path"
 import cors from "cors"
 import { config } from "./config.js"
 import { tasksRouter } from "./routes/tasks.js"
 import { authRouter } from "./routes/auth.js"
 import { callMcp } from "./services/mcpClient.js"
+import { assetsRouter } from "./routes/assets.js"
+import { planningRouter } from "./routes/planning.js"
 
 export function createApp() {
   const app = express()
+  fs.mkdirSync(config.uploadDir, { recursive: true })
   app.use(cors({ origin: config.corsOrigin, credentials: true }))
   app.use(express.json({ limit: "10mb" }))
+  app.use(`/${config.uploadDir}`, express.static(path.resolve(config.uploadDir)))
 
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok" })
@@ -41,7 +47,18 @@ export function createApp() {
     }
   })
 
+  app.get("/mcp/tools", async (_req: Request, res: Response) => {
+    try {
+      const result = await callMcp({ method: "list_tools" })
+      res.json({ tools: result })
+    } catch (error) {
+      res.status(502).json({ error: error instanceof Error ? error.message : "MCP error" })
+    }
+  })
+
   app.use("/tasks", tasksRouter)
+  app.use("/assets", assetsRouter)
+  app.use("/planning", planningRouter)
   app.use("/auth", authRouter)
   return app
 }
