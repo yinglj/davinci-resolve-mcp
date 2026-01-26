@@ -52,7 +52,7 @@ def create_placeholder_timeline(shots: List[Dict[str, Any]], project: Optional[s
     resolve = None
     try:
         from src.resolve_mcp_server import get_resolve
-        from src.api.timeline_operations import create_empty_timeline, add_marker, get_current_timeline_info
+        from src.api.timeline_operations import create_timeline, add_marker, get_current_timeline_info
 
         resolve = get_resolve()
     except Exception:
@@ -62,7 +62,7 @@ def create_placeholder_timeline(shots: List[Dict[str, Any]], project: Optional[s
         # Try to create a real timeline via timeline_operations helper
         try:
             # Use provided frame_rate or fallback to project/timeline default
-            res = create_empty_timeline(resolve, timeline_name, frame_rate=frame_rate)
+            res = create_timeline(resolve, timeline_name, frame_rate=frame_rate)
 
             # If frame_rate not provided, try to read it from timeline info
             if frame_rate is None:

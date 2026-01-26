@@ -6,7 +6,7 @@ This PR adds a POC for converting natural-language scripts to shot lists and cre
 Changes:
 - Register `ScriptToShots` detection in `TaskPlanner` and add `_plan_script_to_shots` step.
 - Add `parse_script_to_shots` POC parser with unit tests and example: `src/agent/planner/skills/script_to_shots.py`.
-- Implement `create_placeholder_timeline` that attempts to use Resolve API (`create_empty_timeline` + `add_marker`) when available, otherwise returns a deterministic local representation: `src/agent/executor/skills/create_placeholder_timeline.py`.
+- Implement `create_placeholder_timeline` that attempts to use Resolve API (`create_timeline` + `add_marker`) when available, otherwise returns a deterministic local representation: `src/agent/executor/skills/create_placeholder_timeline.py`.
 - Enhance `TaskExecutor` to resolve parameters referencing previous steps (e.g., `shots_reference_step`) and execute dependent steps in order.
 - Add detailed Resolve mock for tests: `tests/mocks/resolve_mock.py`.
 - Add unit & integration tests: `tests/test_script_to_shots.py`, `tests/test_create_placeholder_timeline*.py`, `tests/test_executor_integration.py`, `tests/test_resolve_mocks.py`.

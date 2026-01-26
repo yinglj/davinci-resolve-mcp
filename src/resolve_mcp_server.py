@@ -1092,56 +1092,7 @@ def register_mcp_resources(mcp: FastMCP):
             return {"error": f"Failed to get track structure: {str(e)}"}
 
     @mcp.tool()
-    def create_timeline(name: str) -> str:
-        """Create a new timeline with the given name.
-
-        Args:
-            name: The name for the new timeline.
-
-        Returns:
-            str: A message indicating the success or failure of the operation.
-                 - On success: A message confirming the timeline was created.
-                 - On failure: An error message describing the issue.
-        """
-        # Log the attempt to create a timeline
-        logger.debug(f"Attempting to create timeline: {name}")
-        if resolve is None:
-            logger.error("Not connected to DaVinci Resolve")
-            return "Error: Not connected to DaVinci Resolve"
-
-        if not name:
-            logger.error("Timeline name cannot be empty")
-            return "Error: Timeline name cannot be empty"
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            logger.error("Failed to get Project Manager")
-            return "Error: Failed to get Project Manager"
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            logger.info("No project currently open")
-            return "Error: No project currently open"
-
-        media_pool = current_project.GetMediaPool()
-        if not media_pool:
-            logger.error("Failed to get Media Pool")
-            return "Error: Failed to get Media Pool"
-
-        try:
-            timeline = media_pool.CreateEmptyTimeline(name)
-            if timeline:
-                logger.info(f"Successfully created timeline '{name}'")
-                return f"Successfully created timeline '{name}'"
-            else:
-                logger.error(f"Failed to create timeline '{name}'")
-                return f"Failed to create timeline '{name}'"
-        except Exception as e:
-            logger.error(f"Error creating timeline '{name}': {str(e)}")
-            return f"Error creating timeline '{name}': {str(e)}"
-
-    @mcp.tool()
-    def create_empty_timeline(
+    def create_timeline(
         name: str,
         frame_rate: str = None,
         resolution_width: int = None,
@@ -1150,7 +1101,7 @@ def register_mcp_resources(mcp: FastMCP):
         video_tracks: int = None,
         audio_tracks: int = None,
     ) -> str:
-        """Create a new timeline with the given name and custom settings.
+        """Create a new timeline with the given name and optional custom settings.
 
         Args:
             name: The name for the new timeline.
@@ -1166,16 +1117,14 @@ def register_mcp_resources(mcp: FastMCP):
                  - On success: A message confirming the timeline was created.
                  - On failure: An error message describing the issue.
         """
-        # Log the attempt to create an empty timeline with custom settings
+        # Log the attempt to create a timeline
         logger.debug(
-            f"Attempting to create empty timeline '{name}' with settings: frame_rate={frame_rate}, resolution={resolution_width}x{resolution_height}, start_timecode={start_timecode}, video_tracks={video_tracks}, audio_tracks={audio_tracks}"
+            f"Attempting to create timeline '{name}' with settings: frame_rate={frame_rate}, resolution={resolution_width}x{resolution_height}, start_timecode={start_timecode}, video_tracks={video_tracks}, audio_tracks={audio_tracks}"
         )
-        from api.timeline_operations import (
-            create_empty_timeline as create_empty_timeline_func,
-        )
+        from api.timeline_operations import create_timeline as create_timeline_func
 
         try:
-            result = create_empty_timeline_func(
+            result = create_timeline_func(
                 resolve,
                 name,
                 frame_rate,
@@ -1185,11 +1134,12 @@ def register_mcp_resources(mcp: FastMCP):
                 video_tracks,
                 audio_tracks,
             )
-            logger.info(f"Create empty timeline result: {result}")
+            logger.info(f"Create timeline result: {result}")
             return result
         except Exception as e:
-            logger.error(f"Error creating empty timeline '{name}': {str(e)}")
-            return f"Error creating empty timeline '{name}': {str(e)}"
+            logger.error(f"Error creating timeline '{name}': {str(e)}")
+            return f"Error creating timeline '{name}': {str(e)}"
+
 
     @mcp.tool()
     def delete_timeline(name: str) -> str:
@@ -3722,115 +3672,6 @@ def register_mcp_resources(mcp: FastMCP):
         except Exception as e:
             logger.error(f"Error listing timeline items: {str(e)}")
             return [{"error": f"Error listing timeline items: {str(e)}"}]
-
-    @mcp.tool()
-    def set_timeline_item_transform(
-        timeline_item_id: str, property_name: str, property_value: float
-    ) -> str:
-        """Set a transform property for a timeline item.
-
-        Args:
-            timeline_item_id: The ID of the timeline item to modify.
-            property_name: The name of the property to set. Options include:
-                         'Pan', 'Tilt', 'ZoomX', 'ZoomY', 'Rotation', 'AnchorPointX',
-                         'AnchorPointY', 'Pitch', 'Yaw'.
-            property_value: The value to set for the property.
-
-        Returns:
-            str: A message indicating the success or failure of the operation.
-                 - On success: A message confirming the transform property was set.
-                 - On failure: An error message describing the issue.
-        """
-        # Log the attempt to set timeline item transform
-        logger.debug(
-            f"Attempting to set transform property '{property_name}' to {property_value} for timeline item ID: {timeline_item_id}"
-        )
-        if resolve is None:
-            logger.error("Not connected to DaVinci Resolve")
-            return "Error: Not connected to DaVinci Resolve"
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            logger.error("Failed to get Project Manager")
-            return "Error: Failed to get Project Manager"
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            logger.info("No project currently open")
-            return "Error: No project currently open"
-
-        current_timeline = current_project.GetCurrentTimeline()
-        if not current_timeline:
-            logger.info("No timeline currently active")
-            return "Error: No timeline currently active"
-
-        # Validate property name
-        valid_properties = [
-            "Pan",
-            "Tilt",
-            "ZoomX",
-            "ZoomY",
-            "Rotation",
-            "AnchorPointX",
-            "AnchorPointY",
-            "Pitch",
-            "Yaw",
-        ]
-
-        if property_name not in valid_properties:
-            logger.error(
-                f"Invalid property name '{property_name}'. Must be one of: {', '.join(valid_properties)}"
-            )
-            return f"Error: Invalid property name. Must be one of: {', '.join(valid_properties)}"
-
-        try:
-            # Find the timeline item by ID
-            video_track_count = current_timeline.GetTrackCount("video")
-
-            timeline_item = None
-
-            # Search video tracks
-            for track_index in range(1, video_track_count + 1):
-                items = current_timeline.GetItemListInTrack("video", track_index)
-                if items:
-                    for item in items:
-                        if str(item.GetUniqueId()) == timeline_item_id:
-                            timeline_item = item
-                            break
-                if timeline_item:
-                    break
-
-            if not timeline_item:
-                logger.error(
-                    f"Video timeline item with ID '{timeline_item_id}' not found"
-                )
-                return (
-                    f"Error: Video timeline item with ID '{timeline_item_id}' not found"
-                )
-
-            if timeline_item.GetType() != "Video":
-                logger.error(
-                    f"Timeline item with ID '{timeline_item_id}' is not a video item"
-                )
-                return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
-
-            # Set the property
-            result = timeline_item.SetProperty(property_name, property_value)
-            if result:
-                logger.info(
-                    f"Successfully set {property_name} to {property_value} for timeline item '{timeline_item.GetName()}'"
-                )
-                return f"Successfully set {property_name} to {property_value} for timeline item '{timeline_item.GetName()}'"
-            else:
-                logger.error(
-                    f"Failed to set {property_name} for timeline item '{timeline_item.GetName()}'"
-                )
-                return f"Failed to set {property_name} for timeline item '{timeline_item.GetName()}'"
-        except Exception as e:
-            logger.error(
-                f"Error setting transform property for timeline item ID '{timeline_item_id}': {str(e)}"
-            )
-            return f"Error setting timeline item property: {str(e)}"
 
     @mcp.tool()
     def set_timeline_item_crop(

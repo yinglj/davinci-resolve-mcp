@@ -216,7 +216,7 @@ class FeedbackLoop:
         # Create a new timeline
         recovery_plan.add_step(PlanStep(
             step_type=StepType.RESOLVE_API,
-            action="create_empty_timeline",
+            action="create_timeline",
             parameters={'name': 'Recovery Timeline'},
             expected_outcome="Timeline created"
         ))

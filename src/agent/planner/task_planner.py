@@ -266,7 +266,7 @@ class TaskPlanner:
         """Plan timeline creation"""
         step = PlanStep(
             step_type=StepType.RESOLVE_API,
-            action="create_empty_timeline",
+            action="create_timeline",
             parameters=entities,
             expected_outcome="New timeline created"
         )

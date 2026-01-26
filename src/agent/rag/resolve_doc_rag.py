@@ -105,13 +105,13 @@ class ResolveDocRAG:
             'title': 'Timeline Operations',
             'content': '''
             Timeline operations in DaVinci Resolve:
-            - Create timeline: create_empty_timeline(name, frame_rate, width, height)
+            - Create timeline: create_timeline(name, frame_rate, width, height)
             - List timelines: list_timelines() returns all timelines in current project
             - Set current timeline: set_current_timeline(name) to switch timelines
             - Add clips: add_clip_to_timeline(clip_name, timeline_name)
             ''',
             'parameters': {
-                'create_empty_timeline': [
+                'create_timeline': [
                     'name: str - Timeline name',
                     'frame_rate: str - Frame rate (e.g., "24", "25", "30")',
                     'width: int - Resolution width',

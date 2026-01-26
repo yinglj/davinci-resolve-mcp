@@ -64,40 +64,7 @@ def get_current_timeline_info(resolve) -> Dict[str, Any]:
     return info
 
 
-def create_timeline(resolve, name: str) -> str:
-    """Create a new timeline with the given name."""
-    if resolve is None:
-        return "Error: Not connected to DaVinci Resolve"
-
-    if not name:
-        return "Error: Timeline name cannot be empty"
-
-    project_manager = resolve.GetProjectManager()
-    if not project_manager:
-        return "Error: Failed to get Project Manager"
-
-    current_project = project_manager.GetCurrentProject()
-    if not current_project:
-        return "Error: No project currently open"
-
-    media_pool = current_project.GetMediaPool()
-    if not media_pool:
-        return "Error: Failed to get Media Pool"
-
-    # Check if timeline already exists to avoid duplicates
-    existing_timelines = list_timelines(resolve)
-    if name in existing_timelines:
-        return f"Error: Timeline '{name}' already exists"
-
-    # Create the timeline
-    timeline = media_pool.CreateEmptyTimeline(name)
-    if timeline:
-        return f"Successfully created timeline '{name}'"
-    else:
-        return f"Failed to create timeline '{name}'"
-
-
-def create_empty_timeline(
+def create_timeline(
     resolve,
     name: str,
     frame_rate: str = None,
@@ -107,7 +74,7 @@ def create_empty_timeline(
     video_tracks: int = None,
     audio_tracks: int = None,
 ) -> str:
-    """Create a new timeline with the given name and custom settings.
+    """Create a new timeline with the given name and optional custom settings.
 
     Args:
         resolve: The DaVinci Resolve instance

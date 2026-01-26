@@ -77,7 +77,7 @@ def test_custom_timeline_creation():
         "start_timecode": "01:00:00:00"
     }
     
-    result = send_request("mcp_davinci_resolve_create_empty_timeline", params)
+    result = send_request("mcp_davinci_resolve_create_timeline", params)
     
     if "error" in result and result.get("error"):
         logger.error(f"❌ Custom timeline creation failed: {result.get('error')}")
