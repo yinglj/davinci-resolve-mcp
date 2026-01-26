@@ -47,6 +47,8 @@ For a comprehensive list of implemented and planned features, see [docs/FEATURES
 
 ## 🤖 AI Agent Copilot (New!)
 
+探索我们革新性的 DaVinci Resolve AI 视频创作平台：[项目概览](docs/PROJECT_OVERVIEW_GROK_STYLE.md)
+
 The DaVinci Resolve MCP Server now includes an intelligent AI agent that can understand complex natural language requests and automatically execute multi-step workflows. This transforms your AI assistant into a powerful video editing copilot.
 
 ### Key AI Agent Capabilities
