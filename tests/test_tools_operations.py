@@ -1,5 +1,5 @@
 import asyncio
-from src.api import tools_operations
+from src.utils import tools_operations
 from src.proxy import get_proxy
 
 

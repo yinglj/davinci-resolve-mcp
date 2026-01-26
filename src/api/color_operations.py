@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-DaVinci Resolve Color Page Operations
-"""
+DaVinci Resolve MCP Server - Color Operations Utilities
 
+This module provides functions for working with DaVinci Resolve color operations.
+"""
 import logging
 from typing import Dict, Any, List, Optional, Tuple, Union
 
-logger = logging.getLogger("davinci-resolve-mcp.color")
+# Configure logging
+logger = logging.getLogger("davinci-resolve-mcp.color_operations")
 
 def get_current_node(resolve) -> Dict[str, Any]:
     """Get information about the current node in the color page.

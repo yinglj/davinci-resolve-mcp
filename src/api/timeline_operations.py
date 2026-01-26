@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 """
-DaVinci Resolve Timeline Operations
+DaVinci Resolve MCP Server - Timeline Operations Utilities
+
+This module provides functions for working with DaVinci Resolve timelines:
+- Creating and managing timelines
+- Timeline navigation and editing
+- Track management
+- Marker operations
 """
 
 import logging
 from typing import List, Dict, Any, Optional, Union
 
-logger = logging.getLogger("davinci-resolve-mcp.timeline")
+# Configure logging
+logger = logging.getLogger("davinci-resolve-mcp.timeline_operations")
 
 
 def list_timelines(resolve) -> List[str]:
@@ -594,8 +601,11 @@ def set_current_frame(resolve, frame: int) -> str:
     """Set the current playhead position to a specific frame.
 
     Args:
-        resolve: The DaVinci Resolve instance
-        frame: The absolute frame number to move to
+        resolve: The DaVinci Resolve instance.
+        frame: The absolute frame number to move to.
+
+    Returns:
+        str: A message indicating the success or failure of the operation.
     """
     if resolve is None:
         return "Error: Not connected to DaVinci Resolve"
@@ -644,8 +654,11 @@ def razor_timeline(resolve, frame: int = None) -> str:
     """Cut all clips at the current playhead position or a specified frame.
 
     Args:
-        resolve: The DaVinci Resolve instance
-        frame: Optional absolute frame number to cut at
+        resolve: The DaVinci Resolve instance.
+        frame: Optional absolute frame number to cut at.
+
+    Returns:
+        str: A message indicating the success or failure of the operation.
     """
     if resolve is None:
         return "Error: Not connected to DaVinci Resolve"
@@ -687,12 +700,13 @@ def get_timeline_items(resolve, track_type: str = "video", track_index: int = 1)
     """Get list of items in a specific track with their IDs and time ranges.
 
     Args:
-        resolve: The DaVinci Resolve instance
-        track_type: 'video', 'audio', or 'subtitle'
-        track_index: The index of the track (1-based)
+        resolve: The DaVinci Resolve instance.
+        track_type: 'video', 'audio', or 'subtitle'.
+        track_index: The index of the track (1-based).
 
     Returns:
-        List of item dictionaries or error string
+        List[Dict[str, Any]]: List of item dictionaries with id, name, start, end,
+        duration, type; or an error string.
     """
     if resolve is None:
         return "Error: Not connected to DaVinci Resolve"
@@ -774,3 +788,211 @@ def get_timeline_items(resolve, track_type: str = "video", track_index: int = 1)
         import traceback
 
         return f"Error getting timeline items: {str(e)} \nTraceback: {traceback.format_exc()}"
+
+
+# Advanced timeline operations migrated from timeline_advanced.py
+
+def export_timeline(
+    file_path: str,
+    export_type: str,
+    export_subtype: Optional[str] = None,
+    resolve=None,
+) -> Dict[str, Any]:
+    """Export timeline to various formats (AAF, EDL, XML, FCP XML, etc.).
+
+    Args:
+        file_path: Destination file path.
+        export_type: Export format (AAF, EDL, FCPXML_1_10, etc.).
+        export_subtype: Optional subtype.
+        resolve: Optional DaVinci Resolve instance. If omitted, tries to use
+            `get_resolve()` from `src.resolve_mcp_server`.
+
+    Returns:
+        Dict[str, Any]: Result dictionary.
+    """
+    if resolve is None:
+        try:
+            from ..resolve_mcp_server import get_resolve
+
+            resolve = get_resolve()
+        except Exception:
+            resolve = None
+
+    if resolve is None:
+        return {"success": False, "error": "Not connected to DaVinci Resolve"}
+
+    project_manager = resolve.GetProjectManager()
+    if not project_manager:
+        return {"success": False, "error": "Failed to get Project Manager"}
+
+    current_project = project_manager.GetCurrentProject()
+    if not current_project:
+        return {"success": False, "error": "No project currently open"}
+
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return {"success": False, "error": "No timeline currently active"}
+
+    try:
+        # map export type string to Resolve constant if needed
+        # For simplicity, pass directly as Resolve API supports strings for these
+        result = current_timeline.Export(file_path, export_type, export_subtype or "")
+        return {
+            "success": bool(result),
+            "file_path": file_path,
+            "export_type": export_type,
+            "message": f"Timeline {'exported' if result else 'export failed'}",
+        }
+    except Exception as e:
+        logger.error(f"Error exporting timeline: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def duplicate_timeline(timeline_name: str, resolve=None) -> Dict[str, Any]:
+    """Duplicate the current timeline with a new name.
+
+    Args:
+        timeline_name: New timeline name.
+        resolve: Optional DaVinci Resolve instance. If omitted, tries to use
+            `get_resolve()` from `src.resolve_mcp_server`.
+
+    Returns:
+        Dict[str, Any]: Result dictionary.
+    """
+    if resolve is None:
+        try:
+            from ..resolve_mcp_server import get_resolve
+
+            resolve = get_resolve()
+        except Exception:
+            resolve = None
+
+    if resolve is None:
+        return {"success": False, "error": "Not connected to DaVinci Resolve"}
+
+    project_manager = resolve.GetProjectManager()
+    if not project_manager:
+        return {"success": False, "error": "Failed to get Project Manager"}
+
+    current_project = project_manager.GetCurrentProject()
+    if not current_project:
+        return {"success": False, "error": "No project currently open"}
+
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return {"success": False, "error": "No timeline currently active"}
+
+    try:
+        result = current_project.DuplicateTimeline(current_timeline, timeline_name)
+        return {
+            "success": bool(result),
+            "new_timeline_name": timeline_name,
+            "message": f"Timeline {'duplicated' if result else 'duplication failed'}",
+        }
+    except Exception as e:
+        logger.error(f"Error duplicating timeline: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def insert_fusion_title(title_name: str, resolve=None) -> Dict[str, Any]:
+    """Insert a Fusion title into the timeline.
+
+    Args:
+        title_name: Fusion title name.
+        resolve: Optional DaVinci Resolve instance. If omitted, tries to use
+            `get_resolve()` from `src.resolve_mcp_server`.
+
+    Returns:
+        Dict[str, Any]: Result dictionary.
+    """
+    if resolve is None:
+        try:
+            from ..resolve_mcp_server import get_resolve
+
+            resolve = get_resolve()
+        except Exception:
+            resolve = None
+
+    if resolve is None:
+        return {"success": False, "error": "Not connected to DaVinci Resolve"}
+
+    project_manager = resolve.GetProjectManager()
+    if not project_manager:
+        return {"success": False, "error": "Failed to get Project Manager"}
+
+    current_project = project_manager.GetCurrentProject()
+    if not current_project:
+        return {"success": False, "error": "No project currently open"}
+
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return {"success": False, "error": "No timeline currently active"}
+
+    try:
+        result = current_timeline.InsertFusionTitleIntoTimeline(title_name)
+        return {"success": bool(result), "title_name": title_name}
+    except Exception as e:
+        logger.error(f"Error inserting Fusion title: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def register_tools(proxy) -> int:
+    """Register timeline tools with the given proxy (ToolProxy)."""
+    try:
+        from ..resolve_mcp_server import get_resolve
+    except Exception:
+        get_resolve = None
+
+    def _already_registered(name: str) -> bool:
+        return bool(getattr(proxy, "tool_registry", {}).get(name))
+
+    count = 0
+
+    # Keep names compatible with previously-registered tools (timeline_advanced.py)
+    if not _already_registered("export_timeline"):
+        proxy.register_tool(
+            "export_timeline",
+            lambda file_path, export_type, export_subtype=None: export_timeline(
+                file_path,
+                export_type,
+                export_subtype,
+                get_resolve() if get_resolve else None,
+            ),
+            "timeline",
+            "Export timeline to various formats (AAF, EDL, XML, FCP XML, DRT)",
+            {
+                "file_path": {"type": "string", "description": "Destination file path"},
+                "export_type": {
+                    "type": "string",
+                    "description": "Export format (AAF, EDL, FCPXML_1_10, etc.)",
+                },
+                "export_subtype": {"type": "string", "description": "Optional subtype"},
+            },
+        )
+        count += 1
+
+    if not _already_registered("duplicate_timeline"):
+        proxy.register_tool(
+            "duplicate_timeline",
+            lambda timeline_name: duplicate_timeline(
+                timeline_name, get_resolve() if get_resolve else None
+            ),
+            "timeline",
+            "Duplicate the current timeline with a new name",
+            {"timeline_name": {"type": "string", "description": "New timeline name"}},
+        )
+        count += 1
+
+    if not _already_registered("insert_fusion_title"):
+        proxy.register_tool(
+            "insert_fusion_title",
+            lambda title_name: insert_fusion_title(
+                title_name, get_resolve() if get_resolve else None
+            ),
+            "fusion",
+            "Insert a Fusion title into the timeline",
+            {"title_name": {"type": "string", "description": "Fusion title name"}},
+        )
+        count += 1
+
+    return count

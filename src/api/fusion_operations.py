@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-DaVinci Resolve Fusion Operations
-Ported from samuelgursky commit 8ea53b8
+DaVinci Resolve MCP Server - Fusion Operations Utilities
+
+This module provides functions for working with DaVinci Resolve Fusion operations:
+- Add Fusion effects and generators to timeline items
+- Set timeline item properties (transform/crop/composite/etc.)
 """
 
 from typing import Dict, Any, Optional, List
 import logging
 
-logger = logging.getLogger("davinci-resolve-mcp.fusion")
+# Configure logging
+logger = logging.getLogger("davinci-resolve-mcp.fusion_operations")
 
 
 def get_item_by_id(resolve, timeline_item_id: str):
@@ -45,7 +49,17 @@ def get_item_by_id(resolve, timeline_item_id: str):
 def set_timeline_item_property(
     resolve, timeline_item_id: str, property_name: str, property_value: Any
 ) -> Dict[str, Any]:
-    """Set a property for a timeline item (transform, crop, composite, etc.)"""
+    """Set a property for a timeline item (transform, crop, composite, etc.).
+
+    Args:
+        resolve: The DaVinci Resolve instance.
+        timeline_item_id: Clip ID or Name.
+        property_name: Property name (e.g., 'Pan', 'ZoomX').
+        property_value: New value.
+
+    Returns:
+        Dict[str, Any]: Result dictionary.
+    """
     item = get_item_by_id(resolve, timeline_item_id)
     if not item:
         return {
@@ -134,15 +148,16 @@ def register_tools(proxy):
 def add_fusion_effect(
     resolve, timeline_item_id: str, effect_name: str, settings: Dict[str, Any] = None
 ) -> str:
-    """Adds a Fusion effect node to the specified timeline item's composition.
+    """Add a Fusion effect to a timeline item.
+
     Args:
-        resolve: DaVinci Resolve instance.
-        timeline_item_id: ID of the timeline item (usually the unique ID).
-        effect_name: Name of the Fusion effect tool (e.g., "Vignette").
-        settings: Optional dictionary of settings. Supports simple key/value pairs and
-            keyframe specifications in the form {"param": {"keyframes": {frame: value}}}.
+        resolve: The DaVinci Resolve instance.
+        timeline_item_id: The unique ID of the timeline item.
+        effect_name: The name of the effect (e.g., 'Blur').
+        settings: Optional dictionary of settings to apply to the effect.
+
     Returns:
-        Human‑readable status string.
+        str: A message indicating success or failure.
     """
     item = get_item_by_id(resolve, timeline_item_id)
     if not item:
@@ -240,11 +255,16 @@ def add_fusion_effect(
 def add_fusion_generator(
     resolve, timeline_item_id: str, generator_name: str, settings: Dict[str, Any] = None
 ) -> str:
-    """Adds a Generator tool (e.g., Text+, Background) via a Merge node.
-    The resulting flow is:
-        MediaIn → Merge.Background
-        Generator → Merge.Foreground
-        Merge → MediaOut
+    """Add a Fusion generator to a timeline item.
+
+    Args:
+        resolve: The DaVinci Resolve instance.
+        timeline_item_id: The unique ID of the timeline item.
+        generator_name: The name of the generator (e.g., 'Text+').
+        settings: Optional dictionary of settings to apply to the generator.
+
+    Returns:
+        str: A message indicating success or failure.
     """
     project = resolve.GetProjectManager().GetCurrentProject()
     timeline = project.GetCurrentTimeline()

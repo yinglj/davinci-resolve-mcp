@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-DaVinci Resolve Media Operations
-"""
+DaVinci Resolve MCP Server - Color Operations Utilities
 
+This module provides functions for working with DaVinci Resolve color operations.
+"""
 import logging
 import os
 from typing import List, Dict, Any
 
+# Configure logging
 logger = logging.getLogger("davinci-resolve-mcp.media")
 
 

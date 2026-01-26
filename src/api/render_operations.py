@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-DaVinci Resolve Render/Delivery Operations
-Ported from samuelgursky commit 8ea53b8
+DaVinci Resolve MCP Server - Color Operations Utilities
+
+This module provides functions for working with DaVinci Resolve color operations.
 """
 
 import logging
 from typing import Dict, Any, List, Optional
 
+# Configure logging
 logger = logging.getLogger("davinci-resolve-mcp.render")
 
 

@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-DaVinci Resolve Delivery Page Operations
-"""
+DaVinci Resolve MCP Server - Delivery Operations Utilities
 
+This module provides functions for working with DaVinci Resolve Deliver page operations:
+- Query render presets
+- Add timelines to the render queue
+- Start/monitor render jobs (where supported)
+"""
 import logging
 from typing import Dict, Any, List, Optional, Union, Tuple
 
-logger = logging.getLogger("davinci-resolve-mcp.delivery")
+# Configure logging
+logger = logging.getLogger("davinci-resolve-mcp.delivery_operations")
 
 
 def get_render_presets(resolve) -> List[Dict[str, Any]]:

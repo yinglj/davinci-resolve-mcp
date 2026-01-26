@@ -60,7 +60,7 @@ from src.utils.layout_presets import (
     import_layout_preset,
     delete_layout_preset,
 )
-from src.utils.app_control import (
+from src.api.app_operations import (
     quit_resolve_app,
     get_app_state,
     restart_resolve_app,
@@ -76,7 +76,7 @@ from src.utils.cloud_operations import (
     add_user_to_cloud_project,
     remove_user_from_cloud_project,
 )
-from src.utils.project_properties import (
+from src.api.project_operations import (
     get_all_project_properties,
     get_project_property,
     set_project_property,
@@ -275,7 +275,7 @@ else:
 
 # Import modular tools
 from src.api import (
-    timeline_advanced,
+    timeline_operations,
     fusion_operations,
     media_operations,
     app_operations,
@@ -363,7 +363,7 @@ def register_mcp_resources(mcp: FastMCP):
     # ------------------
     # Register Modular Tools
     # ------------------
-    timeline_advanced.register_tools(proxy)
+    timeline_operations.register_tools(proxy)
     fusion_operations.register_tools(proxy)
     media_operations.register_tools(proxy)
     app_operations.register_tools(proxy)
@@ -1077,7 +1077,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Fetching track structure for timeline: {timeline_name or 'current'}"
         )
-        from api.timeline_operations import get_timeline_tracks as get_tracks_func
+        from src.api.timeline_operations import get_timeline_tracks as get_tracks_func
 
         try:
             result = get_tracks_func(resolve, timeline_name)
@@ -1121,7 +1121,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to create timeline '{name}' with settings: frame_rate={frame_rate}, resolution={resolution_width}x{resolution_height}, start_timecode={start_timecode}, video_tracks={video_tracks}, audio_tracks={audio_tracks}"
         )
-        from api.timeline_operations import create_timeline as create_timeline_func
+        from src.api.timeline_operations import create_timeline as create_timeline_func
 
         try:
             result = create_timeline_func(
@@ -1155,7 +1155,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to delete a timeline
         logger.debug(f"Attempting to delete timeline: {name}")
-        from api.timeline_operations import delete_timeline as delete_timeline_func
+        from src.api.timeline_operations import delete_timeline as delete_timeline_func
 
         try:
             result = delete_timeline_func(resolve, name)
@@ -1235,7 +1235,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to add marker at frame {frame}, color: {color}, note: {note}"
         )
-        from api.timeline_operations import add_marker as add_marker_func
+        from src.api.timeline_operations import add_marker as add_marker_func
 
         try:
             result = add_marker_func(resolve, frame, color, note)
@@ -1301,7 +1301,7 @@ def register_mcp_resources(mcp: FastMCP):
             Dict[str, Any]: Result dictionary.
         """
         logger.debug(f"Exporting timeline to {file_path} ({export_type})")
-        from src.api.timeline_advanced import export_timeline as export_func
+        from src.api.timeline_operations import export_timeline as export_func
 
         try:
             result = export_func(file_path, export_type, export_subtype)
@@ -1322,7 +1322,7 @@ def register_mcp_resources(mcp: FastMCP):
             Dict[str, Any]: Result dictionary.
         """
         logger.debug(f"Duplicating timeline to '{timeline_name}'")
-        from src.api.timeline_advanced import duplicate_timeline as dup_func
+        from src.api.timeline_operations import duplicate_timeline as dup_func
 
         try:
             result = dup_func(timeline_name)
@@ -1343,7 +1343,7 @@ def register_mcp_resources(mcp: FastMCP):
             Dict[str, Any]: Result dictionary.
         """
         logger.debug(f"Inserting Fusion title '{title_name}'")
-        from src.api.timeline_advanced import insert_fusion_title as insert_title_func
+        from src.api.timeline_operations import insert_fusion_title as insert_title_func
 
         try:
             result = insert_title_func(title_name)
@@ -1543,7 +1543,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to import media
         logger.debug(f"Attempting to import media: {file_path}")
-        from api.media_operations import import_media as import_media_func
+        from src.api.media_operations import import_media as import_media_func
 
         try:
             result = import_media_func(resolve, file_path)
@@ -1567,7 +1567,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to delete a media clip
         logger.debug(f"Attempting to delete media clip: {clip_name}")
-        from api.media_operations import delete_media as delete_media_func
+        from src.api.media_operations import delete_media as delete_media_func
 
         try:
             result = delete_media_func(resolve, clip_name)
@@ -1592,7 +1592,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to move a media clip
         logger.debug(f"Attempting to move media clip '{clip_name}' to bin '{bin_name}'")
-        from api.media_operations import move_media_to_bin as move_media_func
+        from src.api.media_operations import move_media_to_bin as move_media_func
 
         try:
             result = move_media_func(resolve, clip_name, bin_name)
@@ -1630,7 +1630,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to sync audio for clips {clip_names} using method '{sync_method}', append_mode={append_mode}, target_bin={target_bin}"
         )
-        from api.media_operations import auto_sync_audio as auto_sync_audio_func
+        from src.api.media_operations import auto_sync_audio as auto_sync_audio_func
 
         try:
             result = auto_sync_audio_func(
@@ -1656,7 +1656,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to unlink clips
         logger.debug(f"Attempting to unlink clips: {clip_names}")
-        from api.media_operations import unlink_clips as unlink_clips_func
+        from src.api.media_operations import unlink_clips as unlink_clips_func
 
         try:
             result = unlink_clips_func(resolve, clip_names)
@@ -1690,7 +1690,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to relink clips {clip_names}, media_paths={media_paths}, folder_path={folder_path}, recursive={recursive}"
         )
-        from api.media_operations import relink_clips as relink_clips_func
+        from src.api.media_operations import relink_clips as relink_clips_func
 
         try:
             result = relink_clips_func(
@@ -1775,7 +1775,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to create a bin
         logger.debug(f"Attempting to create bin: {name}")
-        from api.media_operations import create_bin as create_bin_func
+        from src.api.media_operations import create_bin as create_bin_func
 
         try:
             result = create_bin_func(resolve, name)
@@ -1795,7 +1795,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to list media pool bins
         logger.debug("Listing all bins in the media pool")
-        from api.media_operations import list_bins as list_bins_func
+        from src.api.media_operations import list_bins as list_bins_func
 
         try:
             result = list_bins_func(resolve)
@@ -1818,7 +1818,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to get bin contents
         logger.debug(f"Fetching contents of bin: {bin_name}")
-        from api.media_operations import get_bin_contents as get_bin_contents_func
+        from src.api.media_operations import get_bin_contents as get_bin_contents_func
 
         try:
             result = get_bin_contents_func(resolve, bin_name)
@@ -1956,7 +1956,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to add clip '{clip_name}' to timeline '{timeline_name or 'current'}'"
         )
-        from api.media_operations import add_clip_to_timeline as add_clip_func
+        from src.api.media_operations import add_clip_to_timeline as add_clip_func
 
         try:
             result = add_clip_func(resolve, clip_name, timeline_name)
@@ -1982,7 +1982,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to fetch current node information
         logger.debug("Fetching current node information in the color page")
-        from api.color_operations import get_current_node as get_node_func
+        from src.api.color_operations import get_current_node as get_node_func
 
         try:
             result = get_node_func(resolve)
@@ -2007,7 +2007,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Fetching color wheel parameters for node index: {node_index or 'current'}"
         )
-        from api.color_operations import get_color_wheels as get_wheels_func
+        from src.api.color_operations import get_color_wheels as get_wheels_func
 
         try:
             result = get_wheels_func(resolve, node_index)
@@ -2038,7 +2038,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to apply LUT '{lut_path}' to node index: {node_index or 'current'}"
         )
-        from api.color_operations import apply_lut as apply_lut_func
+        from src.api.color_operations import apply_lut as apply_lut_func
 
         try:
             result = apply_lut_func(resolve, lut_path, node_index)
@@ -2071,7 +2071,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to set color wheel parameter: wheel={wheel}, param={param}, value={value}, node_index={node_index or 'current'}"
         )
-        from api.color_operations import set_color_wheel_param as set_param_func
+        from src.api.color_operations import set_color_wheel_param as set_param_func
 
         try:
             result = set_param_func(resolve, wheel, param, value, node_index)
@@ -2098,7 +2098,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to add a node
         logger.debug(f"Attempting to add node: type={node_type}, label={label}")
-        from api.color_operations import add_node as add_node_func
+        from src.api.color_operations import add_node as add_node_func
 
         try:
             result = add_node_func(resolve, node_type, label)
@@ -2128,7 +2128,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Attempting to copy grade: source={source_clip_name or 'current'}, target={target_clip_name or 'current'}, mode={mode}"
         )
-        from api.color_operations import copy_grade as copy_grade_func
+        from src.api.color_operations import copy_grade as copy_grade_func
 
         try:
             result = copy_grade_func(resolve, source_clip_name, target_clip_name, mode)
@@ -2154,7 +2154,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to fetch render presets
         logger.debug("Fetching all render presets")
-        from api.delivery_operations import get_render_presets as get_presets_func
+        from src.api.delivery_operations import get_render_presets as get_presets_func
 
         try:
             result = get_presets_func(resolve)
@@ -2183,7 +2183,7 @@ def register_mcp_resources(mcp: FastMCP):
         logger.debug(
             f"Adding to render queue: preset={preset_name}, timeline={timeline_name or 'current'}, use_in_out={use_in_out_range}"
         )
-        from api.delivery_operations import add_to_render_queue as add_queue_func
+        from src.api.delivery_operations import add_to_render_queue as add_queue_func
 
         try:
             result = add_queue_func(
@@ -2241,7 +2241,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to start rendering
         logger.debug("Starting render queue")
-        from api.delivery_operations import start_render as start_render_func
+        from src.api.delivery_operations import start_render as start_render_func
 
         try:
             result = start_render_func(resolve)
@@ -2261,7 +2261,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to fetch render queue status
         logger.debug("Fetching render queue status")
-        from api.delivery_operations import get_render_queue_status as get_status_func
+        from src.api.delivery_operations import get_render_queue_status as get_status_func
 
         try:
             result = get_status_func(resolve)
@@ -2281,7 +2281,7 @@ def register_mcp_resources(mcp: FastMCP):
         """
         # Log the attempt to clear render queue
         logger.debug("Clearing render queue")
-        from api.delivery_operations import clear_render_queue as clear_queue_func
+        from src.api.delivery_operations import clear_render_queue as clear_queue_func
 
         try:
             result = clear_queue_func(resolve)

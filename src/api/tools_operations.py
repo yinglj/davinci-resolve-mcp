@@ -1,8 +1,9 @@
-"""Tools Operations - Bridge between MCP and Planner/Executor
+#!/usr/bin/env python3
+"""
+DaVinci Resolve MCP Server - Tools Operations Utilities
 
-This module registers a set of high-level "tools" with the proxy. Each tool
-provides a small, well-defined operation that can be executed via the ToolProxy
-(`proxy.execute_tool`). Tools support POC fallback (when Resolve is not
+This module provides high-level tool operations that bridge between MCP and
+Planner/Executor modules. Tools support POC fallback (when Resolve is not
 connected) and integrate with existing planner and executor modules when
 available.
 
