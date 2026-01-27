@@ -8,88 +8,7 @@ from typing import List, Dict, Any
 
 
 def register_timeline_tools(mcp, resolve, logger):
-    """Register timeline MCP tools and resources."""
-
-    @mcp.resource("resolve://timelines")
-    def list_timelines() -> List[str]:
-        """List all timelines in the current project.
-
-        Returns:
-            List[str]: A list of timeline names.
-        """
-        if resolve is None:
-            return ["Error: Not connected to DaVinci Resolve"]
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return ["Error: Failed to get Project Manager"]
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return ["Error: No project currently open"]
-
-        timeline_count = current_project.GetTimelineCount()
-        timelines = []
-
-        for i in range(1, timeline_count + 1):
-            timeline = current_project.GetTimelineByIndex(i)
-            if timeline:
-                timelines.append(timeline.GetName())
-
-        if not timelines:
-            return ["No timelines found in the current project"]
-
-        return timelines
-
-    @mcp.resource("resolve://current-timeline")
-    def get_current_timeline() -> Dict[str, Any]:
-        """Get detailed information about the currently active timeline.
-
-        Returns:
-            Dict[str, Any]: Basic timeline info including name, FPS, resolution, and duration.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        current_timeline = current_project.GetCurrentTimeline()
-        if not current_timeline:
-            return {"error": "No timeline currently active"}
-
-        result = {
-            "name": current_timeline.GetName(),
-            "fps": current_timeline.GetSetting("timelineFrameRate"),
-            "resolution": {
-                "width": current_timeline.GetSetting("timelineResolutionWidth"),
-                "height": current_timeline.GetSetting("timelineResolutionHeight"),
-            },
-            "duration": current_timeline.GetEndFrame()
-            - current_timeline.GetStartFrame()
-            + 1,
-        }
-
-        return result
-
-    @mcp.resource("resolve://timeline-tracks/{timeline_name}")
-    def get_timeline_tracks(timeline_name: str = None) -> Dict[str, Any]:
-        """Get the track structure of a timeline.
-
-        Args:
-            timeline_name: The name of the timeline to get tracks for.
-
-        Returns:
-            Dict[str, Any]: Dictionary of track information.
-        """
-        from src.api.timeline_operations import get_timeline_tracks as get_tracks_func
-
-        return get_tracks_func(resolve, timeline_name)
+    """Register timeline MCP tools."""
 
     @mcp.tool()
     def create_timeline(name: str) -> str:
@@ -232,11 +151,26 @@ def register_timeline_tools(mcp, resolve, logger):
 
     @mcp.tool()
     def list_timelines_tool() -> List[str]:
-        """List all timelines in the current project as a tool.
+        """List all timelines in the current project as a tool."""
+        if resolve is None:
+            return ["Error: Not connected to DaVinci Resolve"]
 
-        Returns:
-            List[str]: A list of timeline names.
-        """
-        return list_timelines()
+        project_manager = resolve.GetProjectManager()
+        if not project_manager:
+            return ["Error: Failed to get Project Manager"]
+
+        current_project = project_manager.GetCurrentProject()
+        if not current_project:
+            return ["Error: No project currently open"]
+
+        timeline_count = current_project.GetTimelineCount()
+        timelines = []
+
+        for i in range(1, timeline_count + 1):
+            timeline = current_project.GetTimelineByIndex(i)
+            if timeline:
+                timelines.append(timeline.GetName())
+
+        return timelines if timelines else ["No timelines found"]
 
     logger.info("Registered timeline tools")

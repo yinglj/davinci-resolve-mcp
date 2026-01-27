@@ -70,12 +70,17 @@ except ImportError as e:
 except Exception as e:
     logger.error(f"Error connecting to DaVinci Resolve: {e}")
 
-# Register all MCP tools and resources
+# Register all MCP tools
 from .mcp_tools import register_all_tools
+from .mcp_resources import register_all_resources
 from .mcp_prompts import register_all_prompts
 
 register_all_tools(mcp, resolve, logger)
 logger.info("All MCP tools registered successfully")
+
+# Register all MCP resources
+register_all_resources(mcp, resolve, logger)
+logger.info("All MCP resources registered successfully")
 
 # Register all MCP prompts
 register_all_prompts(mcp, resolve, logger)

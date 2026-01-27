@@ -9,40 +9,7 @@ from typing import Dict, Any
 
 
 def register_lut_tools(mcp, resolve, logger):
-    """Register LUT MCP tools and resources."""
-
-    @mcp.resource("resolve://color/lut-formats")
-    def get_lut_formats() -> Dict[str, Any]:
-        """Get available LUT export formats and sizes."""
-        return {
-            "formats": [
-                {
-                    "name": "Cube",
-                    "extension": ".cube",
-                    "description": "Industry standard LUT format",
-                },
-                {
-                    "name": "Davinci",
-                    "extension": ".ilut",
-                    "description": "DaVinci Resolve native format",
-                },
-                {
-                    "name": "3dl",
-                    "extension": ".3dl",
-                    "description": "ASSIMILATE SCRATCH format",
-                },
-                {
-                    "name": "Panasonic",
-                    "extension": ".vlut",
-                    "description": "Panasonic VariCam format",
-                },
-            ],
-            "sizes": [
-                {"name": "17Point", "description": "Smaller file size (17x17x17)"},
-                {"name": "33Point", "description": "Standard size (33x33x33)"},
-                {"name": "65Point", "description": "Highest precision (65x65x65)"},
-            ],
-        }
+    """Register LUT MCP tools."""
 
     @mcp.tool()
     def export_lut(

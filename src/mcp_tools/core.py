@@ -6,30 +6,7 @@ Version info and page navigation
 
 
 def register_core_tools(mcp, resolve, logger):
-    """Register core MCP tools and resources."""
-
-    @mcp.resource("resolve://version")
-    def get_resolve_version() -> str:
-        """Get DaVinci Resolve version information.
-
-        Returns:
-            str: The product name and version string of DaVinci Resolve,
-                 or an error message if not connected.
-        """
-        if resolve is None:
-            return "Error: Not connected to DaVinci Resolve"
-        return f"{resolve.GetProductName()} {resolve.GetVersionString()}"
-
-    @mcp.resource("resolve://current-page")
-    def get_current_page() -> str:
-        """Get the current page open in DaVinci Resolve (Edit, Color, Fusion, etc.).
-
-        Returns:
-            str: The current page name, or an error message if not connected.
-        """
-        if resolve is None:
-            return "Error: Not connected to DaVinci Resolve"
-        return resolve.GetCurrentPage()
+    """Register core MCP tools."""
 
     @mcp.tool()
     def switch_page(page: str) -> str:

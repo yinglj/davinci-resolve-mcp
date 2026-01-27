@@ -9,41 +9,7 @@ from typing import List, Dict, Any
 
 
 def register_delivery_tools(mcp, resolve, logger):
-    """Register delivery page MCP tools and resources."""
-
-    def get_all_media_pool_clips(media_pool):
-        """Get all clips from media pool recursively including subfolders.
-
-        Args:
-            media_pool: Media pool object from DaVinci Resolve.
-
-        Returns:
-            List[Clip]: List of all clips in the media pool.
-        """
-        clips = []
-        root_folder = media_pool.GetRootFolder()
-
-        def process_folder(folder):
-            folder_clips = folder.GetClipList()
-            if folder_clips:
-                clips.extend(folder_clips)
-            sub_folders = folder.GetSubFolderList()
-            for sub_folder in sub_folders:
-                process_folder(sub_folder)
-
-        process_folder(root_folder)
-        return clips
-
-    @mcp.resource("resolve://delivery/render-presets")
-    def get_render_presets() -> List[Dict[str, Any]]:
-        """Get all available render presets in the current project.
-
-        Returns:
-            List[Dict[str, Any]]: List of render presets.
-        """
-        from src.api.delivery_operations import get_render_presets as get_presets_func
-
-        return get_presets_func(resolve)
+    """Register delivery page MCP tools."""
 
     @mcp.tool()
     def add_to_render_queue(
@@ -92,19 +58,6 @@ def register_delivery_tools(mcp, resolve, logger):
         from src.api.delivery_operations import start_render as start_render_func
 
         return start_render_func(resolve)
-
-    @mcp.resource("resolve://delivery/render-queue/status")
-    def get_render_queue_status() -> Dict[str, Any]:
-        """Get the status of jobs in the render queue.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the result of the operation.
-        """
-        from src.api.delivery_operations import (
-            get_render_queue_status as get_status_func,
-        )
-
-        return get_status_func(resolve)
 
     @mcp.tool()
     def clear_render_queue() -> Dict[str, Any]:

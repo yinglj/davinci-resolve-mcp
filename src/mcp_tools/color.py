@@ -8,32 +8,7 @@ from typing import Dict, Any
 
 
 def register_color_tools(mcp, resolve, logger):
-    """Register color page MCP tools and resources."""
-
-    @mcp.resource("resolve://color/current-node")
-    def get_current_color_node() -> Dict[str, Any]:
-        """Get information about the current node in the color page.
-
-        Returns:
-            Dict[str, Any]: Information about the current node.
-        """
-        from src.api.color_operations import get_current_node as get_node_func
-
-        return get_node_func(resolve)
-
-    @mcp.resource("resolve://color/wheels/{node_index}")
-    def get_color_wheel_params(node_index: int = None) -> Dict[str, Any]:
-        """Get the current color wheel parameters (Lift, Gamma, Gain, Offset) for a specified node.
-
-        Args:
-            node_index: Index of the node to inspect (None for current node).
-
-        Returns:
-            Dict[str, Any]: Values for Red, Green, Blue, and Master for each wheel.
-        """
-        from src.api.color_operations import get_color_wheels as get_wheels_func
-
-        return get_wheels_func(resolve, node_index)
+    """Register color page MCP tools."""
 
     @mcp.tool()
     def apply_lut(lut_path: str, node_index: int = None) -> str:

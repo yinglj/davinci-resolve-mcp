@@ -18,19 +18,7 @@ from src.utils.layout_presets import (
 
 
 def register_layout_tools(mcp, resolve, logger):
-    """Register layout preset MCP tools and resources."""
-
-    @mcp.resource("resolve://layout-presets")
-    def get_layout_presets() -> List[Dict[str, Any]]:
-        """Get all available layout presets for DaVinci Resolve.
-
-        Returns:
-            List[Dict[str, Any]]: List of available layout presets.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        return list_layout_presets(layout_type="ui")
+    """Register layout preset MCP tools."""
 
     @mcp.tool()
     def save_layout_preset_tool(preset_name: str) -> str:

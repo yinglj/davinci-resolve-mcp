@@ -8,61 +8,7 @@ from typing import List, Dict, Any
 
 
 def register_color_preset_tools(mcp, resolve, logger):
-    """Register color preset MCP tools and resources."""
-
-    @mcp.resource("resolve://color/presets")
-    def get_color_presets() -> List[Dict[str, Any]]:
-        """Get all available color presets in the current project."""
-        if resolve is None:
-            return [{"error": "Not connected to DaVinci Resolve"}]
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return [{"error": "Failed to get Project Manager"}]
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return [{"error": "No project currently open"}]
-
-        current_page = resolve.GetCurrentPage()
-        if current_page != "color":
-            resolve.OpenPage("color")
-
-        try:
-            gallery = current_project.GetGallery()
-            if not gallery:
-                return [{"error": "Failed to get gallery"}]
-
-            albums = gallery.GetAlbums()
-            if not albums:
-                return [{"info": "No albums found in gallery"}]
-
-            result = []
-            for album in albums:
-                stills = album.GetStills()
-                album_info = {"name": album.GetName(), "stills": []}
-
-                if stills:
-                    for still in stills:
-                        still_info = {
-                            "id": still.GetUniqueId(),
-                            "label": still.GetLabel(),
-                            "timecode": still.GetTimecode(),
-                            "isGrabbed": still.IsGrabbed(),
-                        }
-                        album_info["stills"].append(still_info)
-
-                result.append(album_info)
-
-            if current_page != "color":
-                resolve.OpenPage(current_page)
-
-            return result
-
-        except Exception as e:
-            if current_page != "color":
-                resolve.OpenPage(current_page)
-            return [{"error": f"Error retrieving color presets: {str(e)}"}]
+    """Register color preset MCP tools."""
 
     @mcp.tool()
     def save_color_preset(

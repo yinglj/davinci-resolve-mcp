@@ -23,51 +23,7 @@ from src.utils.project_properties import (
 
 
 def register_property_tools(mcp, resolve, logger):
-    """Register project property MCP tools and resources."""
-
-    @mcp.resource("resolve://project/properties")
-    def get_project_properties_endpoint() -> Dict[str, Any]:
-        """Get all project properties for the current project.
-
-        Returns:
-            Dict[str, Any]: Dictionary of project properties.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        return get_all_project_properties(current_project)
-
-    @mcp.resource("resolve://project/property/{property_name}")
-    def get_project_property_endpoint(property_name: str) -> Dict[str, Any]:
-        """Get a specific project property value.
-
-        Args:
-            property_name: Name of the property to get
-
-        Returns:
-            Dict[str, Any]: Dictionary of project properties.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        value = get_project_property(current_project, property_name)
-        return {property_name: value}
+    """Register project property MCP tools."""
 
     @mcp.tool()
     def set_project_property_tool(property_name: str, property_value: Any) -> str:
@@ -100,26 +56,6 @@ def register_property_tools(mcp, resolve, logger):
             )
         else:
             return f"Failed to set project property '{property_name}'"
-
-    @mcp.resource("resolve://project/timeline-format")
-    def get_timeline_format() -> Dict[str, Any]:
-        """Get timeline format settings for the current project.
-
-        Returns:
-            Dict[str, Any]: Dictionary of timeline format settings.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        return get_timeline_format_settings(current_project)
 
     @mcp.tool()
     def set_timeline_format_tool(
@@ -160,26 +96,6 @@ def register_property_tools(mcp, resolve, logger):
         else:
             return "Failed to set timeline format"
 
-    @mcp.resource("resolve://project/superscale")
-    def get_superscale_settings_endpoint() -> Dict[str, Any]:
-        """Get SuperScale settings for the current project.
-
-        Returns:
-            Dict[str, Any]: Dictionary of SuperScale settings.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        return get_superscale_settings(current_project)
-
     @mcp.tool()
     def set_superscale_settings_tool(enabled: bool, quality: int = 0) -> str:
         """Set SuperScale settings for the current project.
@@ -214,26 +130,6 @@ def register_property_tools(mcp, resolve, logger):
             )
         else:
             return "Failed to set SuperScale settings"
-
-    @mcp.resource("resolve://project/color-settings")
-    def get_color_settings_endpoint() -> Dict[str, Any]:
-        """Get color science and color space settings for the current project.
-
-        Returns:
-            Dict[str, Any]: Dictionary of color science and color space settings.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        return get_color_settings(current_project)
 
     @mcp.tool()
     def set_color_science_mode_tool(mode: str) -> str:
@@ -299,45 +195,5 @@ def register_property_tools(mcp, resolve, logger):
                 return f"Successfully set timeline color space to '{color_space}'"
         else:
             return "Failed to set timeline color space"
-
-    @mcp.resource("resolve://project/metadata")
-    def get_project_metadata_endpoint() -> Dict[str, Any]:
-        """Get metadata for the current project.
-
-        Returns:
-            Dict[str, Any]: Dictionary of project metadata.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        return get_project_metadata(current_project)
-
-    @mcp.resource("resolve://project/info")
-    def get_project_info_endpoint() -> Dict[str, Any]:
-        """Get comprehensive information about the current project.
-
-        Returns:
-            Dict[str, Any]: Dictionary of project information.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return {"error": "Failed to get Project Manager"}
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return {"error": "No project currently open"}
-
-        return get_project_info(current_project)
 
     logger.info("Registered property tools")
