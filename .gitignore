@@ -97,6 +97,7 @@ logs/*
 # Cursor
 .cursor/
 .github/skills/
+.agent/
 
 tmp/
 knowledge/
