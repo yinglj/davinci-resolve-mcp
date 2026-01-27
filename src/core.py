@@ -74,6 +74,7 @@ except Exception as e:
 from .mcp_tools import register_all_tools
 from .mcp_resources import register_all_resources
 from .mcp_prompts import register_all_prompts
+from .mcp_tasks import register_all_tasks
 
 register_all_tools(mcp, resolve, logger)
 logger.info("All MCP tools registered successfully")
@@ -85,6 +86,10 @@ logger.info("All MCP resources registered successfully")
 # Register all MCP prompts
 register_all_prompts(mcp, resolve, logger)
 logger.info("All MCP prompts registered successfully")
+
+# Register all MCP tasks
+register_all_tasks(mcp, resolve, logger)
+logger.info("All MCP tasks registered successfully")
 
 
 # Note: This module should be imported, not run directly.

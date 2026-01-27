@@ -10,7 +10,6 @@ from src.utils.cloud_operations import (
     create_cloud_project,
     import_cloud_project,
     restore_cloud_project,
-    get_cloud_project_list,
     export_project_to_cloud,
     add_user_to_cloud_project,
     remove_user_from_cloud_project,
@@ -18,19 +17,7 @@ from src.utils.cloud_operations import (
 
 
 def register_cloud_tools(mcp, resolve, logger):
-    """Register cloud project MCP tools and resources."""
-
-    @mcp.resource("resolve://cloud/projects")
-    def get_cloud_projects() -> Dict[str, Any]:
-        """Get list of available cloud projects.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the list of cloud projects.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve", "success": False}
-
-        return get_cloud_project_list(resolve)
+    """Register cloud project MCP tools."""
 
     @mcp.tool()
     def create_cloud_project_tool(

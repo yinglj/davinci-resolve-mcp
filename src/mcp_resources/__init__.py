@@ -13,6 +13,10 @@ from .inspection import register_inspection_resources
 from .properties import register_property_resources
 from .layout import register_layout_resources
 from .presets import register_preset_resources
+from .cache import register_cache_resources
+from .timeline_items import register_timeline_item_resources
+from .cloud import register_cloud_resources
+from .keyframes import register_keyframe_resources
 
 
 def register_all_resources(mcp, resolve, logger):
@@ -27,6 +31,10 @@ def register_all_resources(mcp, resolve, logger):
     register_property_resources(mcp, resolve, logger)
     register_layout_resources(mcp, resolve, logger)
     register_preset_resources(mcp, resolve, logger)
+    register_cache_resources(mcp, resolve, logger)
+    register_timeline_item_resources(mcp, resolve, logger)
+    register_cloud_resources(mcp, resolve, logger)
+    register_keyframe_resources(mcp, resolve, logger)
 
 
 __all__ = ["register_all_resources"]

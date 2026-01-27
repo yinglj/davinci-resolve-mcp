@@ -16,30 +16,7 @@ from src.utils.app_control import (
 
 
 def register_app_tools(mcp, resolve, logger):
-    """Register app control MCP tools and resources."""
-
-    @mcp.resource("resolve://app/state")
-    def get_app_state_endpoint() -> Dict[str, Any]:
-        """Get DaVinci Resolve application state information via API inspection.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing connection status, product name, and version.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve", "connected": False}
-
-        return get_app_state(resolve)
-
-    @mcp.resource("resolve://app/screenshot")
-    def get_app_screenshot() -> str:
-        """Capture a screenshot of the DaVinci Resolve window (macOS only).
-
-        Returns:
-            str: Path to the saved screenshot file, or an error message.
-        """
-        from src.utils.screenshot import capture_resolve_window_mac
-
-        return capture_resolve_window_mac()
+    """Register app control MCP tools."""
 
     @mcp.tool()
     def quit_app(force: bool = False, save_project: bool = True) -> str:
