@@ -24,45 +24,6 @@ def get_platform():
     return system
 
 
-def is_wsl() -> bool:
-    """Check if running in Windows Subsystem for Linux (WSL)."""
-    try:
-        return sys.platform == "linux" and "microsoft" in os.uname().release.lower()
-    except:
-        return False
-
-
-def is_windows() -> bool:
-    """Check if running natively on Windows."""
-    return sys.platform == "win32"
-
-
-def convert_path(path: str, to_windows: bool = True) -> str:
-    """Convert paths between WSL/POSIX and Windows formats.
-
-    Args:
-        path: The path to convert
-        to_windows: If True, convert to Windows format. If False, convert to WSL format.
-    """
-    if not is_wsl():
-        return path
-
-    if to_windows:
-        # Check for /mnt/c/... or similar
-        if path.startswith("/mnt/"):
-            drive = path[5]
-            rest = path[7:].replace("/", "\\")
-            return f"{drive.upper()}:\\{rest}"
-        return path
-    else:
-        # Check for C:\... or similar
-        if len(path) > 2 and path[1] == ":" and path[2] == "\\":
-            drive = path[0].lower()
-            rest = path[3:].replace("\\", "/")
-            return f"/mnt/{drive}/{rest}"
-        return path
-
-
 def get_resolve_paths():
     """Get platform-specific paths for DaVinci Resolve scripting API.
 

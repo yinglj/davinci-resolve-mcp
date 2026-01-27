@@ -2,7 +2,7 @@
 
 # MCP Protocol SDK with CLI support
 mcp[cli]
-fastmcp>=2.14.0
+fastmcp>=3.0.0b1
 
 # Dependencies for testing and automation scripts
 requests>=2.28.0
