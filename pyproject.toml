@@ -40,4 +40,5 @@ dependencies = [
     "fastmcp >= 3.0.0b1",
     "sqlalchemy>=2.0.43",
     "pytest>=9.0.2",
+    "pytest-asyncio>=0.23.0",
 ]
