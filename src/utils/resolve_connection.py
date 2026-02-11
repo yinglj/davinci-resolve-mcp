@@ -13,14 +13,33 @@ logger = logging.getLogger("davinci-resolve-mcp.connection")
 def initialize_resolve():
     """Initialize connection to DaVinci Resolve application."""
     try:
+        # Check environment variables
+        env_status = check_environment_variables()
+        if not env_status["all_set"]:
+            logger.warning(
+                f"Missing environment variables: {env_status['missing']}. Attempting to set defaults..."
+            )
+            set_default_environment_variables()
+
         # Import the DaVinci Resolve scripting module
-        import DaVinciResolveScript as dvr_script
+        try:
+            import DaVinciResolveScript as dvr_script
+        except ImportError:
+            logger.error("Failed to import DaVinciResolveScript.")
+            paths = get_resolve_paths()
+            logger.error(f"Please ensure PYTHONPATH includes: {paths['modules_path']}")
+            return None
 
         # Get the resolve object
         resolve = dvr_script.scriptapp("Resolve")
 
         if resolve is None:
-            logger.error("Failed to get Resolve object. Is DaVinci Resolve running?")
+            logger.error("Failed to get Resolve object. Possible reasons:")
+            logger.error("1. DaVinci Resolve is not running.")
+            logger.error("2. External Scripting is disabled in Resolve Preferences.")
+            logger.error(
+                "   (System -> Control Panels -> External Control -> Scripting -> set to 'Local' or 'Network')"
+            )
             return None
 
         logger.info(
@@ -28,37 +47,11 @@ def initialize_resolve():
         )
         return resolve
 
-    except ImportError:
-        platform_name = get_platform()
-        paths = get_resolve_paths()
-
-        logger.error(
-            "Failed to import DaVinciResolveScript. Check environment variables."
-        )
-        logger.error(
-            "RESOLVE_SCRIPT_API, RESOLVE_SCRIPT_LIB, and PYTHONPATH must be set correctly."
-        )
-
-        if platform_name == "darwin":
-            logger.error("On macOS, typically:")
-            logger.error(f'export RESOLVE_SCRIPT_API="{paths["api_path"]}"')
-            logger.error(f'export RESOLVE_SCRIPT_LIB="{paths["lib_path"]}"')
-            logger.error(f'export PYTHONPATH="$PYTHONPATH:{paths["modules_path"]}"')
-        elif platform_name == "windows":
-            logger.error("On Windows, typically:")
-            logger.error(f'set RESOLVE_SCRIPT_API={paths["api_path"]}')
-            logger.error(f'set RESOLVE_SCRIPT_LIB={paths["lib_path"]}')
-            logger.error(f'set PYTHONPATH=%PYTHONPATH%;{paths["modules_path"]}')
-        elif platform_name == "linux":
-            logger.error("On Linux, typically:")
-            logger.error(f'export RESOLVE_SCRIPT_API="{paths["api_path"]}"')
-            logger.error(f'export RESOLVE_SCRIPT_LIB="{paths["lib_path"]}"')
-            logger.error(f'export PYTHONPATH="$PYTHONPATH:{paths["modules_path"]}"')
-
-        return None
-
     except Exception as e:
         logger.error(f"Unexpected error initializing Resolve: {str(e)}")
+        import traceback
+
+        logger.debug(traceback.format_exc())
         return None
 
 
