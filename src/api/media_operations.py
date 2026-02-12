@@ -18,6 +18,8 @@ from src.api.media.pool import (
 from src.api.media.clips import (
     list_timeline_clips,
     add_clip_to_timeline,
+    append_to_timeline,
+    get_clip_metadata,
     delete_media,
     move_media_to_bin,
     create_sub_clip,
@@ -41,6 +43,8 @@ __all__ = [
     # Clip operations
     "list_timeline_clips",
     "add_clip_to_timeline",
+    "append_to_timeline",
+    "get_clip_metadata",
     "delete_media",
     "move_media_to_bin",
     "create_sub_clip",

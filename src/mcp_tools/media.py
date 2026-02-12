@@ -170,4 +170,56 @@ def register_media_tools(mcp, resolve, logger):
 
         return add_clip_func(resolve, clip_name, timeline_name)
 
+    @mcp.tool()
+    def append_to_timeline(
+        clip_name: str,
+        start_frame: int = None,
+        end_frame: int = None,
+        track_index: int = 1,
+        record_frame: int = None,
+        timeline_name: str = None,
+    ) -> str:
+        """Append a media pool clip (or a frame range of it) to the current timeline.
+
+        This is the recommended way to add clips to a timeline. It uses Resolve's
+        native AppendToTimeline API which supports startFrame/endFrame for
+        "virtual subclip" semantics — no need to create subclips first.
+
+        Args:
+            clip_name: Name of the clip in the media pool (e.g. "video.mp4").
+            start_frame: Optional start frame for subclip range. Omit for full clip.
+            end_frame: Optional end frame for subclip range. Omit for full clip.
+            track_index: Target video track index (default 1).
+            record_frame: Optional position on the timeline to place the clip.
+            timeline_name: Optional timeline name (uses current if not specified).
+
+        Returns:
+            str: A message indicating the success or failure of the operation.
+        """
+        from src.api.media_operations import append_to_timeline as append_func
+
+        return append_func(
+            resolve,
+            clip_name,
+            start_frame,
+            end_frame,
+            track_index,
+            record_frame,
+            timeline_name,
+        )
+
+    @mcp.tool()
+    def get_clip_metadata(clip_name: str) -> Dict[str, Any]:
+        """Get detailed metadata for a media pool clip (FPS, duration, resolution, etc.).
+
+        Args:
+            clip_name: Name of the clip to inspect.
+
+        Returns:
+            dict: Metadata properties or error message.
+        """
+        from src.api.media_operations import get_clip_metadata as get_meta_func
+
+        return get_meta_func(resolve, clip_name)
+
     logger.info("Registered media tools")

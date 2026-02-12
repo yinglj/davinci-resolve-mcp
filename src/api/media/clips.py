@@ -66,6 +66,142 @@ def list_timeline_clips(resolve) -> List[Dict[str, Any]]:
     )
 
 
+def append_to_timeline(
+    resolve,
+    clip_name: str,
+    start_frame: int = None,
+    end_frame: int = None,
+    track_index: int = 1,
+    record_frame: int = None,
+    timeline_name: str = None,
+) -> str:
+    """Append a media pool clip (or a frame range of it) to the timeline.
+
+    Uses Resolve's native AppendToTimeline API which supports startFrame/endFrame
+    for "virtual subclip" semantics — no need to create subclips first.
+
+    Args:
+        resolve: Resolve instance.
+        clip_name: Name of the clip in the media pool.
+        start_frame: Optional start frame for subclip range.
+        end_frame: Optional end frame for subclip range.
+        track_index: Target video track (default 1).
+        record_frame: Optional position on the timeline to place the clip.
+        timeline_name: Optional timeline name (uses current if not specified).
+
+    Returns:
+        str: Success or failure message.
+    """
+    if not resolve:
+        return "Error: Not connected to DaVinci Resolve"
+
+    # Get all clips from media pool (root + subfolders)
+    pool_result = get_all_media_pool_clips(resolve)
+    if isinstance(pool_result, dict) and "error" in pool_result:
+        return f"Error: {pool_result['error']}"
+
+    all_clips = pool_result["clips"]
+    media_pool = pool_result["media_pool"]
+
+    # Find target clip by name
+    target_clip = None
+    for clip in all_clips:
+        if clip and clip.GetName() == clip_name:
+            target_clip = clip
+            break
+
+    if not target_clip:
+        available = [c.GetName() for c in all_clips if c]
+        return f"Error: Clip '{clip_name}' not found in Media Pool. Available clips: {available}"
+
+    # Switch timeline if specified
+    if timeline_name:
+        project_manager = resolve.GetProjectManager()
+        current_project = project_manager.GetCurrentProject()
+        timeline_count = current_project.GetTimelineCount()
+        found = False
+        for i in range(1, timeline_count + 1):
+            t = current_project.GetTimelineByIndex(i)
+            if t and t.GetName() == timeline_name:
+                current_project.SetCurrentTimeline(t)
+                found = True
+                break
+        if not found:
+            return f"Error: Timeline '{timeline_name}' not found"
+
+    # Build AppendToTimeline clip info dict
+    clip_info = {"mediaPoolItem": target_clip}
+
+    if start_frame is not None:
+        clip_info["startFrame"] = int(start_frame)
+    if end_frame is not None:
+        clip_info["endFrame"] = int(end_frame)
+    if track_index is not None:
+        clip_info["trackIndex"] = int(track_index)
+    if record_frame is not None:
+        clip_info["recordFrame"] = int(record_frame)
+
+    result = media_pool.AppendToTimeline([clip_info])
+
+    if result and len(result) > 0:
+        frame_info = ""
+        if start_frame is not None and end_frame is not None:
+            frame_info = f" (frames {start_frame}-{end_frame})"
+        return f"Successfully appended clip '{clip_name}'{frame_info} to timeline"
+    else:
+        return f"Failed to append clip '{clip_name}' to timeline. Check if a timeline is active."
+
+
+def get_clip_metadata(resolve, clip_name: str) -> Dict[str, Any]:
+    """Get detailed metadata for a media pool clip by name.
+
+    Args:
+        resolve: Resolve instance.
+        clip_name: Name of the clip to look for.
+
+    Returns:
+        dict: metadata including duration, fps, resolution, etc.
+    """
+    if not resolve:
+        return {"error": "Not connected to DaVinci Resolve"}
+
+    pool_result = get_all_media_pool_clips(resolve)
+    if isinstance(pool_result, dict) and "error" in pool_result:
+        return pool_result
+
+    all_clips = pool_result["clips"]
+
+    target_clip = None
+    for clip in all_clips:
+        if clip and clip.GetName() == clip_name:
+            target_clip = clip
+            break
+
+    if not target_clip:
+        return {"error": f"Clip '{clip_name}' not found in Media Pool"}
+
+    props = target_clip.GetClipProperty()
+
+    # Convert numeric values where possible
+    metadata = {
+        "name": target_clip.GetName(),
+        "type": props.get("Type", "Unknown"),
+        "duration": props.get("Duration", "Unknown"),
+        "frames": props.get("Frames", "Unknown"),
+        "fps": props.get("FPS", "Unknown"),
+        "video_codec": props.get("Video Codec", "Unknown"),
+        "audio_codec": props.get("Audio Codec", "Unknown"),
+        "resolution": f"{props.get('Width', '?')}x{props.get('Height', '?')}",
+        "width": props.get("Width", "Unknown"),
+        "height": props.get("Height", "Unknown"),
+        "start_timecode": props.get("Start TC", "Unknown"),
+        "end_timecode": props.get("End TC", "Unknown"),
+        "file_path": props.get("File Path", "Unknown"),
+    }
+
+    return metadata
+
+
 def add_clip_to_timeline(resolve, clip_name: str, timeline_name: str = None) -> str:
     """Add a media pool clip to the timeline."""
     if not resolve:
