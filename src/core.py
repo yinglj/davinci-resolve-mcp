@@ -105,19 +105,63 @@ class ResolveConnection:
 class ProxyResolve:
     """A proxy that always points to the current active Resolve instance."""
 
-    def __getattr__(self, name):
+    @staticmethod
+    def _null_method(*_args, **_kwargs):
+        return None
+
+    def _get_live_instance(self):
         instance = resolve_manager.instance
-        if instance is None:
-            # Attempt one silent reconnect if being accessed
-            if resolve_manager.connect():
-                instance = resolve_manager.instance
+
+        if instance is None and resolve_manager.connect():
+            instance = resolve_manager.instance
 
         if instance is None:
-            raise RuntimeError(
-                "Not connected to DaVinci Resolve. Please ensure Resolve is running and call 'reconnect_resolve' tool."
-            )
+            return None
 
-        return getattr(instance, name)
+        project_manager_getter = getattr(instance, "GetProjectManager", None)
+        project_manager = (
+            project_manager_getter() if callable(project_manager_getter) else None
+        )
+        if project_manager is None and resolve_manager.connect():
+            instance = resolve_manager.instance
+
+        return instance
+
+    def __getattr__(self, name):
+        instance = self._get_live_instance()
+        if instance is None:
+            return self._null_method
+
+        attr = getattr(instance, name, None)
+
+        if callable(attr):
+
+            def guarded_call(*args, **kwargs):
+                live_instance = self._get_live_instance()
+                if live_instance is None:
+                    return None
+
+                live_attr = getattr(live_instance, name, None)
+                if not callable(live_attr):
+                    if resolve_manager.connect():
+                        live_instance = resolve_manager.instance
+                        live_attr = (
+                            getattr(live_instance, name, None)
+                            if live_instance is not None
+                            else None
+                        )
+
+                if not callable(live_attr):
+                    return None
+
+                return live_attr(*args, **kwargs)
+
+            return guarded_call
+
+        if attr is None and name and name[0].isupper():
+            return self._null_method
+
+        return attr
 
     def __bool__(self):
         return resolve_manager.is_connected()
