@@ -1,11 +1,11 @@
 {
   "summary": {
-    "total": 113,
-    "tested": 79,
-    "passed": 79,
+    "total": 102,
+    "tested": 69,
+    "passed": 69,
     "failed": 0,
     "errors": 0,
-    "skipped": 34
+    "skipped": 33
   },
   "pass": [
     {
@@ -46,15 +46,15 @@
     },
     {
       "name": "PM.CreateProject",
-      "value": "None"
+      "value": "Project (0x0x3108f24c0) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47d4-a"
     },
     {
       "name": "PM.LoadProject",
-      "value": "Project (0x0x32c2cec00) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44a8-9"
+      "value": "Project (0x0x3108f24c0) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47d4-a"
     },
     {
       "name": "PM.DeleteProject",
-      "value": "False"
+      "value": "True"
     },
     {
       "name": "PM.ExportProject",
@@ -78,7 +78,7 @@
     },
     {
       "name": "PM.LoadProject_reopen",
-      "value": "Project (0x0x32c2cf400) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44a8-9"
+      "value": "Project (0x0x3108f0b00) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47d4-a"
     },
     {
       "name": "Project.SaveAsNewRenderPreset",
@@ -90,7 +90,7 @@
     },
     {
       "name": "Project.GetRenderJobStatus",
-      "value": "{'JobStatus': 'Ready', 'CompletionPercentage': 0}"
+      "value": "{'JobStatus': '\u5c31\u7eea', 'CompletionPercentage': 0}"
     },
     {
       "name": "Project.DeleteRenderJob",
@@ -102,55 +102,39 @@
     },
     {
       "name": "Project.RenderWithQuickExport",
-      "value": "{'JobStatus': 'Render Failed'}"
+      "value": "{'JobStatus': 'Render Failed', 'Error': 'Invalid quick export preset name'}"
     },
     {
       "name": "MS.AddItemListToMediaPool",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104c82390>]"
+      "value": "None"
     },
     {
       "name": "MP.AddSubFolder",
-      "value": "True"
-    },
-    {
-      "name": "MP.DeleteFolders",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "MP.CreateEmptyTimeline",
-      "value": "True"
-    },
-    {
-      "name": "MP.DeleteTimelines",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "MP.CreateTimelineFromClips",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "MP.AppendToTimeline",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104c82330>]"
-    },
-    {
-      "name": "MP.MoveClips",
-      "value": "True"
-    },
-    {
-      "name": "MP.MoveFolders",
-      "value": "True"
+      "value": "None"
     },
     {
       "name": "MP.ImportMedia",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104c82350>]"
+      "value": "None"
     },
     {
       "name": "MP.UnlinkClips",
-      "value": "True"
+      "value": "None"
     },
     {
       "name": "MP.RelinkClips",
-      "value": "False"
+      "value": "None"
     },
     {
       "name": "MP.DeleteClips",
@@ -159,14 +143,6 @@
     {
       "name": "Folder.Export",
       "value": "True"
-    },
-    {
-      "name": "MPI.SetThirdPartyMetadata",
-      "value": "True"
-    },
-    {
-      "name": "MPI.SetClipProperty",
-      "value": "False"
     },
     {
       "name": "TL.AddTrack",
@@ -182,23 +158,23 @@
     },
     {
       "name": "TL.SetClipsLinked",
-      "value": "True"
+      "value": "None"
     },
     {
       "name": "TL.InsertGeneratorIntoTimeline",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TL.InsertTitleIntoTimeline",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TL.InsertFusionGeneratorIntoTimeline",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TL.InsertFusionCompositionIntoTimeline",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TL.InsertOFXGeneratorIntoTimeline",
@@ -206,19 +182,15 @@
     },
     {
       "name": "TL.InsertFusionTitleIntoTimeline",
-      "value": "True"
-    },
-    {
-      "name": "TL.DeleteClips",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TL.CreateCompoundClip",
-      "value": "Timeline item (0x0x32c2ce780) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-"
+      "value": "Timeline item (0x0x3108f14c0) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-"
     },
     {
       "name": "TL.GrabAllStills",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104c830d0>, <BlackmagicFusion.PyRe"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x130609b50>, <BlackmagicFusion.PyRe"
     },
     {
       "name": "TI.SetProperty",
@@ -230,11 +202,11 @@
     },
     {
       "name": "TI.GetFusionCompByName",
-      "value": "Composition (0x0x32c348100) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44"
+      "value": "Composition (0x0x31083eb00) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47"
     },
     {
       "name": "TI.GetFusionCompByIndex",
-      "value": "Composition (0x0x32c348100) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44"
+      "value": "Composition (0x0x31083eb00) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47"
     },
     {
       "name": "TI.ExportFusionComp",
@@ -242,7 +214,7 @@
     },
     {
       "name": "TI.LoadFusionCompByName",
-      "value": "Composition (0x0x32c348100) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44"
+      "value": "Composition (0x0x3a029eb00) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47"
     },
     {
       "name": "TI.RenameFusionCompByName",
@@ -254,7 +226,7 @@
     },
     {
       "name": "TI.ImportFusionComp",
-      "value": "Composition (0x0x39b5d2b00) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44"
+      "value": "Composition (0x0x3a029c100) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47"
     },
     {
       "name": "TI.AddVersion",
@@ -270,7 +242,7 @@
     },
     {
       "name": "TI.DeleteVersionByName",
-      "value": "False"
+      "value": "True"
     },
     {
       "name": "TI.SetCDL",
@@ -278,19 +250,7 @@
     },
     {
       "name": "TI.AddTake",
-      "value": "True"
-    },
-    {
-      "name": "TI.GetTakeByIndex",
-      "value": "{'mediaPoolItem': <BlackmagicFusion.PyRemoteObject object at 0x104c832d0>, 'star"
-    },
-    {
-      "name": "TI.SelectTakeByIndex",
-      "value": "True"
-    },
-    {
-      "name": "TI.DeleteTakeByIndex",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TI.CopyGrades",
@@ -302,7 +262,7 @@
     },
     {
       "name": "TI.ExportLUT",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "TI.SetColorOutputCache",
@@ -389,22 +349,6 @@
       "reason": "needs transcription first"
     },
     {
-      "name": "MPI.LinkProxyMedia",
-      "reason": "needs proxy media file"
-    },
-    {
-      "name": "MPI.ReplaceClip",
-      "reason": "irreversible - would replace clip"
-    },
-    {
-      "name": "MPI.TranscribeAudio",
-      "reason": "slow AI operation"
-    },
-    {
-      "name": "MPI.ClearTranscription",
-      "reason": "needs transcription first"
-    },
-    {
       "name": "TL.CreateFusionClip",
       "reason": "would merge items irreversibly"
     },
@@ -427,6 +371,18 @@
     {
       "name": "TL.ImportIntoTimeline",
       "reason": "needs AAF/EDL file"
+    },
+    {
+      "name": "TI.GetTakeByIndex",
+      "reason": "no takes created"
+    },
+    {
+      "name": "TI.SelectTakeByIndex",
+      "reason": "no takes created"
+    },
+    {
+      "name": "TI.DeleteTakeByIndex",
+      "reason": "no takes created"
     },
     {
       "name": "TI.CreateMagicMask",

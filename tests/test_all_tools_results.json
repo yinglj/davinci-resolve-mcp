@@ -1,11 +1,11 @@
 {
   "summary": {
-    "total_methods": 315,
-    "tested": 204,
-    "passed": 204,
+    "total_methods": 326,
+    "tested": 210,
+    "passed": 210,
     "failed": 0,
     "errors": 0,
-    "skipped": 111,
+    "skipped": 116,
     "pass_rate": "100.0%"
   },
   "pass": [
@@ -35,15 +35,15 @@
     },
     {
       "name": "Resolve.GetVersion",
-      "value": "[19, 1, 3, 7, '']"
+      "value": "[20, 3, 2, 9, '']"
     },
     {
       "name": "Resolve.GetVersionString",
-      "value": "19.1.3.7"
+      "value": "20.3.2.9"
     },
     {
       "name": "Resolve.SaveLayoutPreset",
-      "value": "False"
+      "value": "True"
     },
     {
       "name": "Resolve.LoadLayoutPreset",
@@ -79,7 +79,7 @@
     },
     {
       "name": "PM.GetProjectListInCurrentFolder",
-      "value": "['Sample', '2025-10-20_20-49-52', '240069_DCTV_Twin_SLG-C_20250106_v05', '240069"
+      "value": "['LiLy', 'Bear Grylls', 'BeatSync_FastMontage_20260306', 'Color manager', 'Dynam"
     },
     {
       "name": "PM.GetFolderListInCurrentFolder",
@@ -111,7 +111,7 @@
     },
     {
       "name": "Project.GetTimelineCount",
-      "value": "1"
+      "value": "2"
     },
     {
       "name": "Project.GetTimelineByIndex",
@@ -131,7 +131,7 @@
     },
     {
       "name": "Project.GetName",
-      "value": "Sample"
+      "value": "LiLy"
     },
     {
       "name": "Project.SetName",
@@ -139,7 +139,7 @@
     },
     {
       "name": "Project.GetPresetList",
-      "value": "[{'Name': 'Current Project', 'Width': 1920, 'Height': 1080}, {'Name': 'System Co"
+      "value": "[{'Name': 'Current Project', 'Width': 1080, 'Height': 1920}, {'Name': '\u7cfb\u7edf\u914d\u7f6e', 'W"
     },
     {
       "name": "Project.SetPreset",
@@ -147,7 +147,7 @@
     },
     {
       "name": "Project.AddRenderJob",
-      "value": ""
+      "value": "befcc01e-f187-4d3f-ae99-f017498599d0"
     },
     {
       "name": "Project.DeleteAllRenderJobs",
@@ -179,7 +179,7 @@
     },
     {
       "name": "Project.GetQuickExportRenderPresets",
-      "value": "['H.264', 'HyperDeck', 'H.265', 'ProRes', 'YouTube', 'Vimeo', 'TikTok', 'Present"
+      "value": "['H.264 Master', 'HyperDeck', 'H.265 Master', 'ProRes 422 HQ', 'YouTube', 'Vimeo"
     },
     {
       "name": "Project.GetSetting",
@@ -187,7 +187,7 @@
     },
     {
       "name": "Project.SetSetting",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "Project.GetRenderFormats",
@@ -195,7 +195,7 @@
     },
     {
       "name": "Project.GetRenderCodecs",
-      "value": "{'H.264': 'H264', 'H.265': 'H265'}"
+      "value": "{'H.264': 'H264', 'H.265': 'H265', 'YUV 422 10-bit': 'APVYUV422_10'}"
     },
     {
       "name": "Project.GetCurrentRenderFormatAndCodec",
@@ -223,7 +223,7 @@
     },
     {
       "name": "Project.GetUniqueId",
-      "value": "72381ad3-7787-4e63-bb43-132a5f066650"
+      "value": "1bff604a-d7e9-4743-841f-5dd35f1f5d21"
     },
     {
       "name": "Project.LoadBurnInPreset",
@@ -239,7 +239,7 @@
     },
     {
       "name": "Project.AddColorGroup",
-      "value": "Color Group (0x0x32c2cf000) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44"
+      "value": "Color Group (0x0x3108f2d40) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47"
     },
     {
       "name": "Project.DeleteColorGroup",
@@ -247,15 +247,15 @@
     },
     {
       "name": "MS.GetMountedVolumeList",
-      "value": "['/Users/samuelgursky/Movies', '/Volumes/IH_Runner_v02', '/Volumes/Macintosh HD'"
+      "value": "['/Users/Diameter/Movies', '/Volumes/Data', '/Volumes/Macintosh HD', '/Volumes/P"
     },
     {
       "name": "MS.GetSubFolderList",
-      "value": "['/Users/samuelgursky/Movies/Resolve Project Backups', '/Users/samuelgursky/Movi"
+      "value": "['/Users/Diameter/Movies/3\u670812\u65e5', '/Users/Diameter/Movies/Bear Grylls', '/Users/D"
     },
     {
       "name": "MS.GetFileList",
-      "value": "[]"
+      "value": "['/Users/Diameter/Movies/1534053848988954.mp4', '/Users/Diameter/Movies/15340538"
     },
     {
       "name": "MS.RevealInStorage",
@@ -291,7 +291,7 @@
     },
     {
       "name": "MP.GetUniqueId",
-      "value": "dde652a0-5930-4198-8896-c750e3b48962"
+      "value": "7eabb35b-8eff-45a7-908e-95437d7bd90c"
     },
     {
       "name": "MP.GetSelectedClips",
@@ -303,7 +303,7 @@
     },
     {
       "name": "Folder.GetClipList",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104d5f690>, <BlackmagicFusion.PyRe"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x130608a70>]"
     },
     {
       "name": "Folder.GetName",
@@ -311,7 +311,7 @@
     },
     {
       "name": "Folder.GetSubFolderList",
-      "value": "[]"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x130609110>, <BlackmagicFusion.PyRe"
     },
     {
       "name": "Folder.GetIsFolderStale",
@@ -319,15 +319,15 @@
     },
     {
       "name": "Folder.GetUniqueId",
-      "value": "6afc6551-6f6d-4847-a76a-ea0ada79436a"
+      "value": "9fd6d4df-00aa-45e1-b666-a987b7e2166e"
     },
     {
       "name": "MPI.GetName",
-      "value": "240023_JaneCentofante_SaffronRobe-Textless_SLG-F_20250307_V08-4096x1716-ProRes42"
+      "value": "Compound Clip 1"
     },
     {
       "name": "MPI.GetMetadata",
-      "value": "{'Comments': 'API test'}"
+      "value": "{}"
     },
     {
       "name": "MPI.SetMetadata",
@@ -339,7 +339,7 @@
     },
     {
       "name": "MPI.GetMediaId",
-      "value": "51395f41-bc3f-4084-a5bd-ec5b7411d9a4"
+      "value": "68a8172d-f043-41ed-9dbd-0b348776fd9b"
     },
     {
       "name": "MPI.AddMarker",
@@ -379,7 +379,7 @@
     },
     {
       "name": "MPI.GetFlagList",
-      "value": "['Green', 'Blue']"
+      "value": "['Blue']"
     },
     {
       "name": "MPI.ClearFlags",
@@ -399,7 +399,7 @@
     },
     {
       "name": "MPI.GetClipProperty",
-      "value": "{'Alpha mode': 'None', 'Angle': '', 'Audio Bit Depth': '24', 'Audio Ch': '2', 'A"
+      "value": "{'2nd Asst': '', '2nd Continuity': '', '2nd DIT': '', '2nd DOP': '', '2nd DOP Re"
     },
     {
       "name": "MPI.UnlinkProxyMedia",
@@ -407,7 +407,7 @@
     },
     {
       "name": "MPI.GetUniqueId",
-      "value": "38a66a67-0e99-4d06-b9b1-24be49d6bcfe"
+      "value": "ae249718-4014-4ef6-b878-5ce1a5ea3700"
     },
     {
       "name": "MPI.GetAudioMapping",
@@ -439,7 +439,7 @@
     },
     {
       "name": "TL.GetEndFrame",
-      "value": "210071"
+      "value": "87574"
     },
     {
       "name": "TL.SetStartTimecode",
@@ -451,15 +451,15 @@
     },
     {
       "name": "TL.GetTrackCount_video",
-      "value": "1"
+      "value": "2"
     },
     {
       "name": "TL.GetTrackCount_audio",
-      "value": "1"
+      "value": "6"
     },
     {
       "name": "TL.GetTrackCount_subtitle",
-      "value": "0"
+      "value": "1"
     },
     {
       "name": "TL.GetTrackSubType",
@@ -483,7 +483,7 @@
     },
     {
       "name": "TL.GetItemListInTrack",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104d5f6f0>, <BlackmagicFusion.PyRe"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x130609110>, <BlackmagicFusion.PyRe"
     },
     {
       "name": "TL.AddMarker",
@@ -555,11 +555,11 @@
     },
     {
       "name": "TL.GrabStill",
-      "value": "GalleryStill (0x0x32c2cedc0) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-4"
+      "value": "GalleryStill (0x0x3108f22c0) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-4"
     },
     {
       "name": "TL.GetUniqueId",
-      "value": "314524ab-705f-4527-9362-9cea0e60d6ac"
+      "value": "dfe46c59-83a6-4504-904d-0768a5dba4f9"
     },
     {
       "name": "TL.GetNodeGraph",
@@ -567,7 +567,7 @@
     },
     {
       "name": "TL.GetMediaPoolItem",
-      "value": "Media pool item (0x0x32c2cf480) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cd"
+      "value": "Media pool item (0x0x3108f2280) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b81"
     },
     {
       "name": "TL.GetMarkInOut",
@@ -583,39 +583,39 @@
     },
     {
       "name": "TI.GetName",
-      "value": "10 Step"
+      "value": "980d08da67e5bc8c0577366ce6c7e197.jpeg"
     },
     {
       "name": "TI.GetDuration",
-      "value": "120"
+      "value": "24"
     },
     {
       "name": "TI.GetEnd",
-      "value": "86520"
+      "value": "86424"
     },
     {
       "name": "TI.GetSourceEndFrame",
-      "value": "None"
+      "value": "197"
     },
     {
       "name": "TI.GetSourceEndTime",
-      "value": "None"
+      "value": "0.041666666666666664"
     },
     {
       "name": "TI.GetFusionCompCount",
-      "value": "0"
+      "value": "1"
     },
     {
       "name": "TI.GetFusionCompNameList",
-      "value": "{}"
+      "value": "['_renamed_comp']"
     },
     {
       "name": "TI.GetLeftOffset",
-      "value": "None"
+      "value": "86400"
     },
     {
       "name": "TI.GetRightOffset",
-      "value": "None"
+      "value": "1353577"
     },
     {
       "name": "TI.GetStart",
@@ -623,11 +623,11 @@
     },
     {
       "name": "TI.GetSourceStartFrame",
-      "value": "None"
+      "value": "197"
     },
     {
       "name": "TI.GetSourceStartTime",
-      "value": "None"
+      "value": "0.0"
     },
     {
       "name": "TI.GetProperty",
@@ -671,7 +671,7 @@
     },
     {
       "name": "TI.GetFlagList",
-      "value": "[]"
+      "value": "['Green']"
     },
     {
       "name": "TI.ClearFlags",
@@ -691,39 +691,39 @@
     },
     {
       "name": "TI.GetCurrentVersion",
-      "value": "{}"
+      "value": "{'versionName': '_renamed_v_p2', 'versionType': 0}"
     },
     {
       "name": "TI.GetVersionNameList",
-      "value": "None"
+      "value": "['\u8c03\u8272\u7248\u672c 1', '_renamed_v_p2']"
     },
     {
       "name": "TI.GetMediaPoolItem",
-      "value": "None"
+      "value": "Media pool item (0x0x3108f2000) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b81"
     },
     {
       "name": "TI.GetStereoConvergenceValues",
-      "value": "{}"
+      "value": "{86400: 0.0}"
     },
     {
       "name": "TI.GetStereoLeftFloatingWindowParams",
-      "value": "{}"
+      "value": "{86400: {'left': 0.0, 'right': 0.0, 'top': 0.0, 'bottom': 0.0}}"
     },
     {
       "name": "TI.GetStereoRightFloatingWindowParams",
-      "value": "{}"
+      "value": "{86400: {'left': 0.0, 'right': 0.0, 'top': 0.0, 'bottom': 0.0}}"
     },
     {
       "name": "TI.GetSelectedTakeIndex",
-      "value": "None"
+      "value": "0"
     },
     {
       "name": "TI.GetTakesCount",
-      "value": "None"
+      "value": "0"
     },
     {
       "name": "TI.FinalizeTake",
-      "value": "False"
+      "value": "True"
     },
     {
       "name": "TI.SetClipEnabled",
@@ -739,7 +739,7 @@
     },
     {
       "name": "TI.GetUniqueId",
-      "value": "c5cf3acf-29db-432c-8839-d23b350e486c"
+      "value": "826803aa-3eb0-453b-9383-de7b6ba75680"
     },
     {
       "name": "TI.LoadBurnInPreset",
@@ -747,7 +747,7 @@
     },
     {
       "name": "TI.GetNodeGraph",
-      "value": "None"
+      "value": "Graph (0x0x31055cb80) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47d4-aac"
     },
     {
       "name": "TI.GetColorGroup",
@@ -755,7 +755,7 @@
     },
     {
       "name": "TI.RemoveFromColorGroup",
-      "value": "False"
+      "value": "True"
     },
     {
       "name": "TI.GetLinkedItems",
@@ -767,23 +767,23 @@
     },
     {
       "name": "TI.GetSourceAudioChannelMapping",
-      "value": "None"
+      "value": "{\"embedded_audio_channels\":0,\"linked_audio\":{},\"track_mapping\":{}}"
     },
     {
       "name": "TI.GetIsColorOutputCacheEnabled",
-      "value": "None"
+      "value": "0"
     },
     {
       "name": "TI.GetIsFusionOutputCacheEnabled",
-      "value": "None"
+      "value": "-1"
     },
     {
       "name": "Gallery.GetAlbumName",
-      "value": "Stills 1"
+      "value": "\u9759\u5e27 1"
     },
     {
       "name": "Gallery.GetCurrentStillAlbum",
-      "value": "GalleryStillAlbum (0x0x32c2cecc0) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2"
+      "value": "GalleryStillAlbum (0x0x3108f1f80) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b"
     },
     {
       "name": "Gallery.SetCurrentStillAlbum",
@@ -791,19 +791,43 @@
     },
     {
       "name": "Gallery.GetGalleryStillAlbums",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104d5f170>, <BlackmagicFusion.PyRe"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x130609390>, <BlackmagicFusion.PyRe"
     },
     {
       "name": "Gallery.GetGalleryPowerGradeAlbums",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104d5f190>, <BlackmagicFusion.PyRe"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x1306093f0>, <BlackmagicFusion.PyRe"
     },
     {
       "name": "GSA.GetStills",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104d5f870>]"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x130609390>, <BlackmagicFusion.PyRe"
     },
     {
       "name": "GSA.GetLabel",
       "value": ""
+    },
+    {
+      "name": "Graph.GetNumNodes",
+      "value": "1"
+    },
+    {
+      "name": "Graph.GetLUT",
+      "value": ""
+    },
+    {
+      "name": "Graph.GetNodeCacheMode",
+      "value": "-1"
+    },
+    {
+      "name": "Graph.GetNodeLabel",
+      "value": ""
+    },
+    {
+      "name": "Graph.GetToolsInNode",
+      "value": "['\u9971\u548c\u5ea6\uff0c\u8272\u76f8\u4e0e\u4eae\u5ea6 \u6df7\u5408']"
+    },
+    {
+      "name": "Graph.ApplyArriCdlLut",
+      "value": "False"
     },
     {
       "name": "CG.GetName",
@@ -819,11 +843,11 @@
     },
     {
       "name": "CG.GetPreClipNodeGraph",
-      "value": "Graph (0x0x39b70bee0) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44a8-920"
+      "value": "Graph (0x0x3105407c0) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47d4-aac"
     },
     {
       "name": "CG.GetPostClipNodeGraph",
-      "value": "Graph (0x0x39b70bdc0) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44a8-920"
+      "value": "Graph (0x0x310541120) [App: 'Resolve' on 127.0.0.1, UUID: 88c40577-b813-47d4-aac"
     }
   ],
   "fail": [],
@@ -1272,6 +1296,26 @@
     {
       "name": "GSA.DeleteStills",
       "reason": "would delete stills"
+    },
+    {
+      "name": "Graph.SetLUT",
+      "reason": "would change LUT"
+    },
+    {
+      "name": "Graph.SetNodeCacheMode",
+      "reason": "would change cache"
+    },
+    {
+      "name": "Graph.SetNodeEnabled",
+      "reason": "would change node"
+    },
+    {
+      "name": "Graph.ApplyGradeFromDRX",
+      "reason": "needs DRX file"
+    },
+    {
+      "name": "Graph.ResetAllGrades",
+      "reason": "would reset grades"
     }
   ]
 }

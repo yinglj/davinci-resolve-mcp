@@ -1,88 +1,80 @@
 {
   "summary": {
-    "total": 30,
-    "tested": 20,
-    "passed": 20,
+    "total": 33,
+    "tested": 18,
+    "passed": 18,
     "failed": 0,
     "errors": 0,
-    "skipped": 10
+    "skipped": 15
   },
   "pass": [
     {
-      "name": "PM.SetCurrentDatabase",
-      "value": "True"
-    },
-    {
       "name": "Import_video",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "Import_video2",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "Import_audio",
-      "value": "True"
-    },
-    {
-      "name": "MP.AutoSyncAudio",
       "value": "False"
-    },
-    {
-      "name": "MS.AddClipMattesToMediaPool",
-      "value": "True"
-    },
-    {
-      "name": "MP.DeleteClipMattes",
-      "value": "True"
     },
     {
       "name": "MS.AddTimelineMattesToMediaPool",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104441730>]"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x13060a8d0>]"
     },
     {
-      "name": "MP.ImportTimelineFromFile",
-      "value": "Timeline (0x0x12f894840) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cda-44a8-"
+      "name": "GSA.SetLabel",
+      "value": "True"
     },
     {
-      "name": "TL.ImportIntoTimeline",
+      "name": "GSA.ExportStills",
       "value": "False"
     },
     {
-      "name": "MP.ImportFolderFromFile",
+      "name": "GSA.DeleteStills",
       "value": "True"
-    },
-    {
-      "name": "MPI.LinkProxyMedia",
-      "value": "True"
-    },
-    {
-      "name": "MPI.ReplaceClip",
-      "value": "True"
-    },
-    {
-      "name": "MP.CreateStereoClip",
-      "value": "Media pool item (0x0x12f894a40) [App: 'Resolve' on 127.0.0.1, UUID: d74d0664-2cd"
     },
     {
       "name": "Project.InsertAudioToCurrentTrackAtPlayhead",
       "value": "False"
     },
     {
-      "name": "MPI.TranscribeAudio",
-      "value": "None"
-    },
-    {
-      "name": "MPI.ClearTranscription",
-      "value": "None"
-    },
-    {
       "name": "Folder.TranscribeAudio",
-      "value": "True"
+      "value": "False"
     },
     {
       "name": "Folder.ClearTranscription",
       "value": "True"
+    },
+    {
+      "name": "TL.DetectSceneCuts",
+      "value": "True"
+    },
+    {
+      "name": "TL.CreateSubtitlesFromAudio",
+      "value": "True"
+    },
+    {
+      "name": "TI.Stabilize",
+      "value": "True"
+    },
+    {
+      "name": "TI.SmartReframe",
+      "value": "True"
+    },
+    {
+      "name": "TI.CreateMagicMask",
+      "value": "False"
+    },
+    {
+      "name": "TI.RegenerateMagicMask",
+      "value": "False"
+    },
+    {
+      "name": "TL.AnalyzeDolbyVision",
+      "value": "False"
     },
     {
       "name": "Resolve.Quit",
@@ -93,28 +85,48 @@
   "error": [],
   "skip": [
     {
+      "name": "PM.SetCurrentDatabase",
+      "reason": "only one database available"
+    },
+    {
+      "name": "MP.AutoSyncAudio",
+      "reason": "need both video and audio clips"
+    },
+    {
+      "name": "MP.ImportTimelineFromFile",
+      "reason": "no video clips imported"
+    },
+    {
+      "name": "TL.ImportIntoTimeline",
+      "reason": "no video clips"
+    },
+    {
+      "name": "MP.ImportFolderFromFile",
+      "reason": "no test folder"
+    },
+    {
+      "name": "MPI.LinkProxyMedia",
+      "reason": "need 2 video clips"
+    },
+    {
+      "name": "MPI.ReplaceClip",
+      "reason": "need 2 video clips"
+    },
+    {
+      "name": "MP.CreateStereoClip",
+      "reason": "need 2 video clips"
+    },
+    {
+      "name": "GSA.ImportStills",
+      "reason": "no exported stills found"
+    },
+    {
       "name": "TL.CreateFusionClip",
       "reason": "need 2 clips for throwaway timeline"
     },
     {
       "name": "TL.ConvertTimelineToStereo",
       "reason": "need 2 clips"
-    },
-    {
-      "name": "TI.Stabilize",
-      "reason": "no real timeline item available"
-    },
-    {
-      "name": "TI.SmartReframe",
-      "reason": "no real timeline item available"
-    },
-    {
-      "name": "TI.CreateMagicMask",
-      "reason": "no real timeline item available"
-    },
-    {
-      "name": "TI.RegenerateMagicMask",
-      "reason": "no real timeline item available"
     },
     {
       "name": "PM.CreateCloudProject",
