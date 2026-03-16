@@ -19,7 +19,11 @@ def register_core_tools(mcp, resolve, logger):
         # In this architecture, we might need a better way to share it,
         # but for now, we'll try to re-initialize via the core logic.
         try:
-            from src.core import resolve_manager
+            import importlib
+
+            resolve_manager = importlib.import_module(
+                "src.utils.resolve_manager"
+            ).resolve_manager
 
             if resolve_manager.connect():
                 return f"Successfully reconnected to DaVinci Resolve: {resolve_manager.instance.GetProductName()}"
@@ -44,7 +48,11 @@ def register_core_tools(mcp, resolve, logger):
         # Try to get fresh resolve instance
         current_resolve = resolve
         try:
-            from src.core import resolve_manager
+            import importlib
+
+            resolve_manager = importlib.import_module(
+                "src.utils.resolve_manager"
+            ).resolve_manager
 
             current_resolve = resolve_manager.instance
         except ImportError:

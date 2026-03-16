@@ -9,6 +9,7 @@ import sys
 import argparse
 import logging
 from pathlib import Path
+from typing import Literal, cast
 
 # Add the parent directory to sys.path to ensure imports work
 # This allows us to import src_1.4.0 components as a package
@@ -49,33 +50,21 @@ def check_setup():
     return True
 
 
-def run_server(debug=False, port=8020, mode="stdio"):
+def run_server(
+    debug: bool = False,
+    port: int = 8020,
+    mode: Literal["stdio", "sse", "streamable-http"] = "stdio",
+):
     """Run the MCP server."""
     try:
-        from src.core import mcp, resolve
+        from src.core import mcp
     except ImportError:
-        from .core import mcp, resolve
+        from .core import mcp
 
     # Set logging level based on debug flag
     if debug:
         logging.getLogger("davinci-resolve-mcp").setLevel(logging.DEBUG)
         logger.print("Debug mode enabled")
-
-    # Register new modular tools
-    try:
-        try:
-            from src.tools.register_tools import register_all_new_tools
-        except ImportError:
-            from .tools.register_tools import register_all_new_tools
-
-        register_all_new_tools(mcp, resolve)
-        logger.print(
-            "Registered new modular tools (database, media storage, gallery, timeline, markers, capture)"
-        )
-    except ImportError as e:
-        logger.warning(f"Could not load modular tools: {e}")
-    except Exception as e:
-        logger.warning(f"Error registering modular tools: {e}")
 
     # Run the server
     logger.print(f"Starting DaVinci Resolve MCP Server in {mode} mode...")
@@ -88,12 +77,6 @@ def run_server(debug=False, port=8020, mode="stdio"):
         else:
             for interface, ip in ip_list:
                 logger.print(f"http://{ip}:{port}/mcp")
-
-    # FastMCP run supports transport, host, and port
-    # Note: FastMCP transport types are "stdio", "sse", "http" (streamable-http)
-    # The user request asks for "streamable-http" mode, which maps to "http" in FastMCP
-    # but we should check what transport string FastMCP expects.
-    # In src/main.py it passed mode directly: mcp.run(transport=mode, host="0.0.0.0", port=port)
 
     mcp.run(transport=mode, host="0.0.0.0", port=port)
 
@@ -118,7 +101,8 @@ def main():
     args = parser.parse_args()
 
     if check_setup():
-        run_server(debug=args.debug, port=args.port, mode=args.mode)
+        mode = cast(Literal["stdio", "sse", "streamable-http"], args.mode)
+        run_server(debug=args.debug, port=args.port, mode=mode)
     else:
         logger.error(
             "Failed to set up the environment. Please check the configuration."

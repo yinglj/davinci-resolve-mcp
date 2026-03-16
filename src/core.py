@@ -8,6 +8,7 @@ Version: 1.4.0 - Modular Architecture
 
 import os
 import sys
+import importlib
 import logging
 
 # Add src directory to Python path
@@ -51,54 +52,10 @@ logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")
 logger.info(f"Using Resolve library path: {RESOLVE_LIB_PATH}")
 
 # Create MCP server instance
-mcp = FastMCP("DaVinciResolveMCP")
+mcp = FastMCP("DaVinciResolveMCP", on_duplicate="ignore")
 
 
-# Create Resolve connection manager
-class ResolveConnection:
-    def __init__(self):
-        self._resolve = None
-        self.logger = logger
-
-    def connect(self):
-        """Initialize or refresh the connection to DaVinci Resolve."""
-        try:
-            # Ensure environment variables are set
-            from .utils.resolve_connection import set_default_environment_variables
-
-            set_default_environment_variables()
-
-            import DaVinciResolveScript as dvr_script
-
-            self._resolve = dvr_script.scriptapp("Resolve")
-
-            if self._resolve:
-                self.logger.info(
-                    f"Successfully connected to DaVinci Resolve: {self._resolve.GetProductName()} {self._resolve.GetVersionString()}"
-                )
-                return True
-            else:
-                self.logger.warning(
-                    "DaVinci Resolve is not running or scripting is not enabled."
-                )
-                return False
-        except ImportError as e:
-            self.logger.error(
-                f"Failed to import DaVinciResolveScript (PYTHONPATH may be incorrect): {e}"
-            )
-            return False
-        except Exception as e:
-            self.logger.error(f"Error connecting to DaVinci Resolve: {e}")
-            return False
-
-    @property
-    def instance(self):
-        """Get the current Resolve instance."""
-        return self._resolve
-
-    def is_connected(self):
-        """Check if we are currently connected."""
-        return self._resolve is not None
+resolve_manager = importlib.import_module("src.utils.resolve_manager").resolve_manager
 
 
 # Proxy class to allow tools to use 'resolve' dynamically
@@ -171,10 +128,6 @@ class ProxyResolve:
         return f"<ProxyResolve: {status}>"
 
 
-# Initialize connection manager
-resolve_manager = ResolveConnection()
-resolve_manager.connect()
-
 # Export 'resolve' as a proxy so tools capture the proxy, not the instance
 resolve = ProxyResolve()
 
@@ -198,8 +151,57 @@ register_all_prompts(mcp, resolve, logger)
 logger.info("All MCP prompts registered successfully")
 
 # Register all MCP tasks
-register_all_tasks(mcp, resolve, logger)
-logger.info("All MCP tasks registered successfully")
+try:
+    register_all_tasks(mcp, resolve, logger)
+    logger.info("All MCP tasks registered successfully")
+except ImportError as e:
+    logger.warning(f"Could not load MCP tasks: {e}")
+except Exception as e:
+    logger.warning(f"Error registering MCP tasks: {e}")
+
+try:
+    from .tools.register_tools import register_all_new_tools
+
+    register_all_new_tools(mcp, resolve)
+    logger.info(
+        "Registered new modular tools (database, media storage, gallery, timeline, markers, capture)"
+    )
+except ImportError as e:
+    logger.warning(f"Could not load modular tools: {e}")
+except Exception as e:
+    logger.warning(f"Error registering modular tools: {e}")
+
+try:
+    from .tools.keyboard import register_keyboard_tools
+
+    register_keyboard_tools(mcp)
+    logger.info("Registered keyboard simulation tools")
+except ImportError as e:
+    logger.warning(f"Could not load keyboard tools: {e}")
+except Exception as e:
+    logger.warning(f"Error registering keyboard tools: {e}")
+
+try:
+    LegacyToolProvider = importlib.import_module(
+        "src.utils.legacy_tool_provider"
+    ).LegacyToolProvider
+    from . import resolve_mcp_server
+
+    mcp.add_provider(LegacyToolProvider(resolve_mcp_server.mcp))
+    logger.info("Mounted legacy resolve_mcp_server tools")
+except Exception as e:
+    logger.warning(f"Could not mount legacy resolve_mcp_server tools: {e}")
+
+try:
+    LegacyToolProvider = importlib.import_module(
+        "src.utils.legacy_tool_provider"
+    ).LegacyToolProvider
+    from . import server as compound_server
+
+    mcp.add_provider(LegacyToolProvider(compound_server.mcp))
+    logger.info("Mounted legacy compound server tools")
+except Exception as e:
+    logger.warning(f"Could not mount legacy compound server tools: {e}")
 
 
 # Note: This module should be imported, not run directly.
