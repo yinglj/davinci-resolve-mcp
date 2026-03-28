@@ -3,25 +3,30 @@
 DaVinci Resolve MCP Resources - Timeline related resources
 """
 
-from typing import List, Dict, Any
+from typing import Any, Optional
+
+from fastmcp.resources import ResourceContent, ResourceResult
 
 
 def register_timeline_resources(mcp, resolve, logger):
     """Register timeline-related resources."""
 
+    def to_resource_result(payload: Any) -> ResourceResult:
+        return ResourceResult([ResourceContent(payload)])
+
     @mcp.resource("resolve://timelines")
-    def list_timelines() -> List[str]:
+    def list_timelines() -> ResourceResult:
         """List all timelines in the current project."""
         if resolve is None:
-            return ["Error: Not connected to DaVinci Resolve"]
+            return to_resource_result("Error: Not connected to DaVinci Resolve")
 
         project_manager = resolve.GetProjectManager()
         if not project_manager:
-            return ["Error: Failed to get Project Manager"]
+            return to_resource_result("Error: Failed to get Project Manager")
 
         current_project = project_manager.GetCurrentProject()
         if not current_project:
-            return ["Error: No project currently open"]
+            return to_resource_result("Error: No project currently open")
 
         timeline_count = current_project.GetTimelineCount()
         timelines = []
@@ -32,27 +37,27 @@ def register_timeline_resources(mcp, resolve, logger):
                 timelines.append(timeline.GetName())
 
         if not timelines:
-            return ["No timelines found in the current project"]
+            return to_resource_result("No timelines found in the current project")
 
-        return timelines
+        return to_resource_result(timelines)
 
     @mcp.resource("resolve://current-timeline")
-    def get_current_timeline() -> Dict[str, Any]:
+    def get_current_timeline() -> ResourceResult:
         """Get detailed information about the currently active timeline."""
         if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
+            return to_resource_result({"error": "Not connected to DaVinci Resolve"})
 
         project_manager = resolve.GetProjectManager()
         if not project_manager:
-            return {"error": "Failed to get Project Manager"}
+            return to_resource_result({"error": "Failed to get Project Manager"})
 
         current_project = project_manager.GetCurrentProject()
         if not current_project:
-            return {"error": "No project currently open"}
+            return to_resource_result({"error": "No project currently open"})
 
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
-            return {"error": "No timeline currently active"}
+            return to_resource_result({"error": "No timeline currently active"})
 
         result = {
             "name": current_timeline.GetName(),
@@ -66,19 +71,23 @@ def register_timeline_resources(mcp, resolve, logger):
             + 1,
         }
 
-        return result
+        return to_resource_result(result)
 
     @mcp.resource("resolve://timeline-tracks/{timeline_name}")
-    def get_timeline_tracks(timeline_name: str = None) -> Dict[str, Any]:
+    def get_timeline_tracks(
+        timeline_name: Optional[str] = None,
+    ) -> ResourceResult:
         """Get the track structure of a timeline."""
         try:
-            from src.api.timeline_operations import (
+            from src.api.timeline import (
                 get_timeline_tracks as get_tracks_func,
             )
         except ImportError:
             # Fallback if needed
-            return {"error": "Could not import timeline operations"}
+            return to_resource_result({"error": "Could not import timeline operations"})
 
-        return get_tracks_func(resolve, timeline_name)
+        if timeline_name is None:
+            return to_resource_result(get_tracks_func(resolve))
+        return to_resource_result(get_tracks_func(resolve, timeline_name))
 
     logger.info("Timeline resources registered")

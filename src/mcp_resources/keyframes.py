@@ -3,7 +3,9 @@
 DaVinci Resolve MCP Resources - Keyframe related resources
 """
 
-from typing import Dict, Any
+from typing import Any
+
+from fastmcp.resources import ResourceContent, ResourceResult
 
 
 def find_timeline_item(timeline, timeline_item_id):
@@ -30,35 +32,38 @@ def find_timeline_item(timeline, timeline_item_id):
 def register_keyframe_resources(mcp, resolve, logger):
     """Register keyframe-related resources."""
 
+    def to_resource_result(payload: Any) -> ResourceResult:
+        return ResourceResult([ResourceContent(payload)])
+
     @mcp.resource(
         "resolve://timeline-item/{timeline_item_id}/keyframes/{property_name}"
     )
     def get_timeline_item_keyframes_endpoint(
         timeline_item_id: str, property_name: str
-    ) -> Dict[str, Any]:
+    ) -> ResourceResult:
         """Get keyframes for a specific timeline item by ID."""
         if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
+            return to_resource_result({"error": "Not connected to DaVinci Resolve"})
 
         project_manager = resolve.GetProjectManager()
         if not project_manager:
-            return {"error": "Failed to get Project Manager"}
+            return to_resource_result({"error": "Failed to get Project Manager"})
 
         current_project = project_manager.GetCurrentProject()
         if not current_project:
-            return {"error": "No project currently open"}
+            return to_resource_result({"error": "No project currently open"})
 
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
-            return {"error": "No timeline currently active"}
+            return to_resource_result({"error": "No timeline currently active"})
 
         try:
             timeline_item, _ = find_timeline_item(current_timeline, timeline_item_id)
 
             if not timeline_item:
-                return {
-                    "error": f"Timeline item with ID '{timeline_item_id}' not found"
-                }
+                return to_resource_result(
+                    {"error": (f"Timeline item with ID '{timeline_item_id}' not found")}
+                )
 
             video_properties = [
                 "Pan",
@@ -112,28 +117,36 @@ def register_keyframe_resources(mcp, resolve, logger):
 
             if property_name:
                 if property_name in keyframes:
-                    return {
-                        "item_id": timeline_item_id,
-                        "item_name": timeline_item.GetName(),
-                        "properties": [property_name],
-                        "keyframes": {property_name: keyframes[property_name]},
-                    }
+                    return to_resource_result(
+                        {
+                            "item_id": timeline_item_id,
+                            "item_name": timeline_item.GetName(),
+                            "properties": [property_name],
+                            "keyframes": {property_name: keyframes[property_name]},
+                        }
+                    )
                 else:
-                    return {
-                        "item_id": timeline_item_id,
-                        "item_name": timeline_item.GetName(),
-                        "properties": [],
-                        "keyframes": {},
-                    }
+                    return to_resource_result(
+                        {
+                            "item_id": timeline_item_id,
+                            "item_name": timeline_item.GetName(),
+                            "properties": [],
+                            "keyframes": {},
+                        }
+                    )
 
-            return {
-                "item_id": timeline_item_id,
-                "item_name": timeline_item.GetName(),
-                "properties": keyframeable_properties,
-                "keyframes": keyframes,
-            }
+            return to_resource_result(
+                {
+                    "item_id": timeline_item_id,
+                    "item_name": timeline_item.GetName(),
+                    "properties": keyframeable_properties,
+                    "keyframes": keyframes,
+                }
+            )
 
         except Exception as e:
-            return {"error": f"Error getting timeline item keyframes: {str(e)}"}
+            return to_resource_result(
+                {"error": f"Error getting timeline item keyframes: {str(e)}"}
+            )
 
     logger.info("Keyframe resources registered")

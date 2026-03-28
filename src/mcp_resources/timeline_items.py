@@ -5,6 +5,8 @@ DaVinci Resolve MCP Resources - Timeline item related resources
 
 from typing import List, Dict, Any
 
+from fastmcp.resources import ResourceContent, ResourceResult
+
 
 def find_timeline_item(
     timeline, timeline_item_id, search_video=True, search_audio=True
@@ -34,23 +36,30 @@ def find_timeline_item(
 def register_timeline_item_resources(mcp, resolve, logger):
     """Register timeline item-related resources."""
 
+    def to_resource_result(payload: Any) -> ResourceResult:
+        if isinstance(payload, list):
+            return ResourceResult([ResourceContent(item) for item in payload])
+        return ResourceResult([ResourceContent(payload)])
+
     @mcp.resource("resolve://timeline-item/{timeline_item_id}")
-    def get_timeline_item_properties_endpoint(timeline_item_id: str) -> Dict[str, Any]:
+    def get_timeline_item_properties_endpoint(
+        timeline_item_id: str,
+    ) -> ResourceResult:
         """Get properties of a specific timeline item by ID."""
         if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve"}
+            return to_resource_result({"error": "Not connected to DaVinci Resolve"})
 
         project_manager = resolve.GetProjectManager()
         if not project_manager:
-            return {"error": "Failed to get Project Manager"}
+            return to_resource_result({"error": "Failed to get Project Manager"})
 
         current_project = project_manager.GetCurrentProject()
         if not current_project:
-            return {"error": "No project currently open"}
+            return to_resource_result({"error": "No project currently open"})
 
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
-            return {"error": "No timeline currently active"}
+            return to_resource_result({"error": "No timeline currently active"})
 
         try:
             timeline_item, item_type = find_timeline_item(
@@ -58,9 +67,9 @@ def register_timeline_item_resources(mcp, resolve, logger):
             )
 
             if not timeline_item:
-                return {
-                    "error": f"Timeline item with ID '{timeline_item_id}' not found"
-                }
+                return to_resource_result(
+                    {"error": f"Timeline item with ID '{timeline_item_id}' not found"}
+                )
 
             properties = {
                 "id": timeline_item_id,
@@ -124,28 +133,30 @@ def register_timeline_item_resources(mcp, resolve, logger):
                     "normalize_level": timeline_item.GetProperty("NormalizeLevel"),
                 }
 
-            return properties
+            return to_resource_result(properties)
 
         except Exception as e:
-            return {"error": f"Error getting timeline item properties: {str(e)}"}
+            return to_resource_result(
+                {"error": f"Error getting timeline item properties: {str(e)}"}
+            )
 
     @mcp.resource("resolve://timeline-items")
-    def get_timeline_items() -> List[Dict[str, Any]]:
+    def get_timeline_items() -> ResourceResult:
         """Get all items in the current timeline with their IDs and basic properties."""
         if resolve is None:
-            return [{"error": "Not connected to DaVinci Resolve"}]
+            return to_resource_result({"error": "Not connected to DaVinci Resolve"})
 
         project_manager = resolve.GetProjectManager()
         if not project_manager:
-            return [{"error": "Failed to get Project Manager"}]
+            return to_resource_result({"error": "Failed to get Project Manager"})
 
         current_project = project_manager.GetCurrentProject()
         if not current_project:
-            return [{"error": "No project currently open"}]
+            return to_resource_result({"error": "No project currently open"})
 
         current_timeline = current_project.GetCurrentTimeline()
         if not current_timeline:
-            return [{"error": "No timeline currently active"}]
+            return to_resource_result({"error": "No timeline currently active"})
 
         try:
             video_track_count = current_timeline.GetTrackCount("video")
@@ -186,10 +197,14 @@ def register_timeline_item_resources(mcp, resolve, logger):
                         )
 
             if not items:
-                return [{"info": "No items found in the current timeline"}]
+                return to_resource_result(
+                    {"info": "No items found in the current timeline"}
+                )
 
-            return items
+            return to_resource_result(items)
         except Exception as e:
-            return [{"error": f"Error listing timeline items: {str(e)}"}]
+            return to_resource_result(
+                {"error": f"Error listing timeline items: {str(e)}"}
+            )
 
     logger.info("Timeline item resources registered")

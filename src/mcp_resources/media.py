@@ -9,6 +9,26 @@ from typing import List, Dict, Any
 def register_media_resources(mcp, resolve, logger):
     """Register media-related resources."""
 
+    def safe_invoke(obj: Any, method_name: str, *args: Any) -> Any:
+        method = getattr(obj, method_name, None)
+        if not callable(method):
+            return None
+        try:
+            return method(*args)
+        except Exception:
+            return None
+
+    def safe_clip_duration(clip: Any) -> Any:
+        # Resolve Python bridge may expose GetDuration as None/non-callable on some clips.
+        duration = safe_invoke(clip, "GetDuration")
+        if duration is not None:
+            return duration
+
+        clip_prop = safe_invoke(clip, "GetClipProperty", "Duration")
+        if clip_prop in (None, ""):
+            clip_prop = safe_invoke(clip, "GetClipProperty", "Frames")
+        return clip_prop if clip_prop not in (None, "") else 0
+
     @mcp.resource("resolve://media-pool-clips")
     def list_media_pool_clips() -> List[Dict[str, Any]]:
         """List all clips in the root folder of the media pool."""
@@ -37,11 +57,12 @@ def register_media_resources(mcp, resolve, logger):
 
         result = []
         for clip in clips:
+            name = safe_invoke(clip, "GetName") or "Unknown Clip"
             result.append(
                 {
-                    "name": clip.GetName(),
-                    "duration": clip.GetDuration(),
-                    "fps": clip.GetClipProperty("FPS"),
+                    "name": name,
+                    "duration": safe_clip_duration(clip),
+                    "fps": safe_invoke(clip, "GetClipProperty", "FPS"),
                 }
             )
 

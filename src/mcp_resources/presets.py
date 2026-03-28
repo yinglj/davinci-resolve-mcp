@@ -3,58 +3,65 @@
 DaVinci Resolve MCP Resources - Preset related resources
 """
 
-from typing import List, Dict, Any
+from typing import Any
+
+from fastmcp.resources import ResourceContent, ResourceResult
 
 
 def register_preset_resources(mcp, resolve, logger):
     """Register preset-related (LUTs, Color Presets) resources."""
 
+    def to_resource_result(payload: Any) -> ResourceResult:
+        return ResourceResult([ResourceContent(payload)])
+
     @mcp.resource("resolve://color/lut-formats")
-    def get_lut_formats() -> Dict[str, Any]:
+    def get_lut_formats() -> ResourceResult:
         """Get available LUT export formats and sizes."""
-        return {
-            "formats": [
-                {
-                    "name": "Cube",
-                    "extension": ".cube",
-                    "description": "Industry standard LUT format",
-                },
-                {
-                    "name": "Davinci",
-                    "extension": ".ilut",
-                    "description": "DaVinci Resolve native format",
-                },
-                {
-                    "name": "3dl",
-                    "extension": ".3dl",
-                    "description": "ASSIMILATE SCRATCH format",
-                },
-                {
-                    "name": "Panasonic",
-                    "extension": ".vlut",
-                    "description": "Panasonic VariCam format",
-                },
-            ],
-            "sizes": [
-                {"name": "17Point", "description": "Smaller file size (17x17x17)"},
-                {"name": "33Point", "description": "Standard size (33x33x33)"},
-                {"name": "65Point", "description": "Highest precision (65x65x65)"},
-            ],
-        }
+        return to_resource_result(
+            {
+                "formats": [
+                    {
+                        "name": "Cube",
+                        "extension": ".cube",
+                        "description": "Industry standard LUT format",
+                    },
+                    {
+                        "name": "Davinci",
+                        "extension": ".ilut",
+                        "description": "DaVinci Resolve native format",
+                    },
+                    {
+                        "name": "3dl",
+                        "extension": ".3dl",
+                        "description": "ASSIMILATE SCRATCH format",
+                    },
+                    {
+                        "name": "Panasonic",
+                        "extension": ".vlut",
+                        "description": "Panasonic VariCam format",
+                    },
+                ],
+                "sizes": [
+                    {"name": "17Point", "description": "Smaller file size (17x17x17)"},
+                    {"name": "33Point", "description": "Standard size (33x33x33)"},
+                    {"name": "65Point", "description": "Highest precision (65x65x65)"},
+                ],
+            }
+        )
 
     @mcp.resource("resolve://color/presets")
-    def get_color_presets() -> List[Dict[str, Any]]:
+    def get_color_presets() -> ResourceResult:
         """Get all available color presets in the current project."""
         if resolve is None:
-            return [{"error": "Not connected to DaVinci Resolve"}]
+            return to_resource_result([{"error": "Not connected to DaVinci Resolve"}])
 
         project_manager = resolve.GetProjectManager()
         if not project_manager:
-            return [{"error": "Failed to get Project Manager"}]
+            return to_resource_result([{"error": "Failed to get Project Manager"}])
 
         current_project = project_manager.GetCurrentProject()
         if not current_project:
-            return [{"error": "No project currently open"}]
+            return to_resource_result([{"error": "No project currently open"}])
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
@@ -63,11 +70,11 @@ def register_preset_resources(mcp, resolve, logger):
         try:
             gallery = current_project.GetGallery()
             if not gallery:
-                return [{"error": "Failed to get gallery"}]
+                return to_resource_result([{"error": "Failed to get gallery"}])
 
             albums = gallery.GetAlbums()
             if not albums:
-                return [{"info": "No albums found in gallery"}]
+                return to_resource_result([{"info": "No albums found in gallery"}])
 
             result = []
             for album in albums:
@@ -89,10 +96,12 @@ def register_preset_resources(mcp, resolve, logger):
             if current_page != "color":
                 resolve.OpenPage(current_page)
 
-            return result
+            return to_resource_result(result)
         except Exception as e:
             if current_page != "color":
                 resolve.OpenPage(current_page)
-            return [{"error": f"Error retrieving color presets: {str(e)}"}]
+            return to_resource_result(
+                [{"error": f"Error retrieving color presets: {str(e)}"}]
+            )
 
     logger.info("Preset resources registered")
