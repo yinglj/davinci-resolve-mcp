@@ -56,7 +56,10 @@ def find_powershell() -> Optional[str]:
     return None
 
 
-def _run_powershell(script: str, timeout: int = 10) -> tuple:
+def _run_powershell(
+    script: str,
+    timeout: int = 10,
+) -> tuple[bool, Optional[str], Optional[str]]:
     """Run PowerShell script and return (success, output, error)."""
     ps_exe = find_powershell()
     if not ps_exe:
@@ -99,7 +102,7 @@ def _save_image(png_data: bytes, output_path: str, quality: int) -> str:
 
 
 def capture_screenshot(
-    output_path: str = None,
+    output_path: Optional[str] = None,
     quality: int = 85,
     monitor_id: int = 0,
     capture_all: bool = False,
@@ -163,6 +166,8 @@ def capture_screenshot(
     success, output, error = _run_powershell(ps_script)
     if not success:
         return {"success": False, "error": error}
+    if output is None:
+        return {"success": False, "error": "No screenshot data returned"}
 
     if return_base64:
         return {"success": True, "base64": output, "format": "png"}
@@ -211,6 +216,8 @@ def list_windows() -> Dict[str, Any]:
     success, output, error = _run_powershell(ps_script)
     if not success:
         return {"success": False, "error": error}
+    if output is None:
+        return {"success": False, "error": "No window data returned"}
 
     import json
 
@@ -222,7 +229,7 @@ def list_windows() -> Dict[str, Any]:
 
 def capture_window(
     window_handle: int,
-    output_path: str = None,
+    output_path: Optional[str] = None,
     quality: int = 85,
     return_base64: bool = False,
 ) -> Dict[str, Any]:
@@ -251,6 +258,8 @@ def capture_window(
     success, output, error = _run_powershell(ps_script)
     if not success:
         return {"success": False, "error": error or "Window capture failed"}
+    if output is None:
+        return {"success": False, "error": "No window capture data returned"}
 
     if return_base64:
         return {"success": True, "base64": output, "format": "png"}
@@ -280,7 +289,11 @@ def find_resolve_window() -> Optional[Dict[str, Any]]:
     return None
 
 
-def capture_resolve_window(output_path: str = None, quality: int = 85, return_base64: bool = False) -> Dict[str, Any]:
+def capture_resolve_window(
+    output_path: Optional[str] = None,
+    quality: int = 85,
+    return_base64: bool = False,
+) -> Dict[str, Any]:
     """Capture the DaVinci Resolve window."""
     window = find_resolve_window()
     if not window:
@@ -308,6 +321,8 @@ def get_monitor_info() -> Dict[str, Any]:
     success, output, error = _run_powershell(ps_script)
     if not success:
         return {"success": False, "error": error}
+    if output is None:
+        return {"success": False, "error": "No monitor data returned"}
 
     import json
 
