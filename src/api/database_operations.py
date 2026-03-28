@@ -4,7 +4,7 @@ Database and Folder Navigation Operations for DaVinci Resolve MCP Server.
 Implements ProjectManager folder navigation and database management APIs.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
 def get_current_database(resolve) -> Dict[str, Any]:
@@ -221,7 +221,11 @@ def delete_folder(resolve, folder_name: str) -> str:
         return f"Error: {str(e)}"
 
 
-def import_project(resolve, file_path: str, project_name: str = None) -> str:
+def import_project(
+    resolve,
+    file_path: str,
+    project_name: Optional[str] = None,
+) -> str:
     """Import a project from file.
 
     Args:
@@ -327,7 +331,11 @@ def archive_project(
         return f"Error: {str(e)}"
 
 
-def restore_project(resolve, file_path: str, project_name: str = None) -> str:
+def restore_project(
+    resolve,
+    file_path: str,
+    project_name: Optional[str] = None,
+) -> str:
     """Restore a project from archive.
 
     Args:
