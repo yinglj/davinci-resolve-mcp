@@ -4,7 +4,7 @@ DaVinci Resolve MCP Timeline Tools
 Timeline operations and marker management
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 
 def register_timeline_tools(mcp, resolve, logger):
@@ -47,12 +47,12 @@ def register_timeline_tools(mcp, resolve, logger):
     @mcp.tool()
     def create_empty_timeline(
         name: str,
-        frame_rate: str = None,
-        resolution_width: int = None,
-        resolution_height: int = None,
-        start_timecode: str = None,
-        video_tracks: int = None,
-        audio_tracks: int = None,
+        frame_rate: Optional[str] = None,
+        resolution_width: Optional[int] = None,
+        resolution_height: Optional[int] = None,
+        start_timecode: Optional[str] = None,
+        video_tracks: Optional[int] = None,
+        audio_tracks: Optional[int] = None,
     ) -> str:
         """Create a new timeline with custom settings.
 
@@ -68,7 +68,7 @@ def register_timeline_tools(mcp, resolve, logger):
         Returns:
             str: Success or failure message.
         """
-        from src.api.timeline_operations import (
+        from src.api.timeline import (
             create_empty_timeline as create_empty_timeline_func,
         )
 
@@ -93,7 +93,7 @@ def register_timeline_tools(mcp, resolve, logger):
         Returns:
             str: Success or failure message.
         """
-        from src.api.timeline_operations import delete_timeline as delete_timeline_func
+        from src.api.timeline import delete_timeline as delete_timeline_func
 
         return delete_timeline_func(resolve, name)
 
@@ -134,7 +134,9 @@ def register_timeline_tools(mcp, resolve, logger):
         return f"Error: Timeline '{name}' not found"
 
     @mcp.tool()
-    def add_marker(frame: int = None, color: str = "Blue", note: str = "") -> str:
+    def add_marker(
+        frame: Optional[int] = None, color: str = "Blue", note: str = ""
+    ) -> str:
         """Add a marker at the specified frame in the current timeline.
 
         Args:
@@ -145,7 +147,7 @@ def register_timeline_tools(mcp, resolve, logger):
         Returns:
             str: Success or failure message.
         """
-        from src.api.timeline_operations import add_marker as add_marker_func
+        from src.api.timeline import add_marker as add_marker_func
 
         return add_marker_func(resolve, frame, color, note)
 

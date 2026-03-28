@@ -4,7 +4,13 @@ Tool Registration for DaVinci Resolve MCP Server.
 This module registers all new tools with the MCP server.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+
+from fastmcp.resources import ResourceContent, ResourceResult
+
+
+def to_resource_result(payload: Any) -> ResourceResult:
+    return ResourceResult([ResourceContent(payload)])
 
 
 def register_database_tools(mcp, resolve):
@@ -28,14 +34,14 @@ def register_database_tools(mcp, resolve):
     )
 
     @mcp.resource("resolve://database/current")
-    def get_current_database_resource() -> Dict[str, Any]:
+    def get_current_database_resource() -> ResourceResult:
         """Get information about the current database connection."""
-        return db_get_current(resolve)
+        return to_resource_result(db_get_current(resolve))
 
     @mcp.resource("resolve://database/list")
-    def get_database_list_resource() -> List[Dict[str, Any]]:
+    def get_database_list_resource() -> ResourceResult:
         """Get list of all databases added to Resolve."""
-        return db_get_list(resolve)
+        return to_resource_result(db_get_list(resolve))
 
     @mcp.tool()
     def switch_database(db_type: str, db_name: str, ip_address: str = "127.0.0.1"):
@@ -43,14 +49,14 @@ def register_database_tools(mcp, resolve):
         return db_set_current(resolve, db_type, db_name, ip_address)
 
     @mcp.resource("resolve://folder/current")
-    def get_current_folder_resource() -> str:
+    def get_current_folder_resource() -> ResourceResult:
         """Get the current folder name in the project manager."""
-        return db_get_folder(resolve)
+        return to_resource_result(db_get_folder(resolve))
 
     @mcp.resource("resolve://folder/list")
-    def get_folder_list_resource() -> List[str]:
+    def get_folder_list_resource() -> ResourceResult:
         """Get list of folder names in the current folder."""
-        return db_get_folder_list(resolve)
+        return to_resource_result(db_get_folder_list(resolve))
 
     @mcp.tool()
     def navigate_to_root_folder() -> str:
@@ -78,8 +84,13 @@ def register_database_tools(mcp, resolve):
         return db_delete_folder(resolve, folder_name)
 
     @mcp.tool()
-    def import_project_file(file_path: str, project_name: str = None) -> str:
+    def import_project_file(
+        file_path: str,
+        project_name: Optional[str] = None,
+    ) -> str:
         """Import a project from file (.drp)."""
+        if project_name is None:
+            return db_import_project(resolve, file_path)
         return db_import_project(resolve, file_path, project_name)
 
     @mcp.tool()
@@ -108,8 +119,13 @@ def register_database_tools(mcp, resolve):
         )
 
     @mcp.tool()
-    def restore_project_from_archive(file_path: str, project_name: str = None) -> str:
+    def restore_project_from_archive(
+        file_path: str,
+        project_name: Optional[str] = None,
+    ) -> str:
         """Restore a project from archive."""
+        if project_name is None:
+            return db_restore_project(resolve, file_path)
         return db_restore_project(resolve, file_path, project_name)
 
     @mcp.tool()
@@ -129,9 +145,9 @@ def register_media_storage_tools(mcp, resolve):
     )
 
     @mcp.resource("resolve://media-storage/volumes")
-    def get_media_storage_volumes() -> List[str]:
+    def get_media_storage_volumes() -> ResourceResult:
         """Get list of mounted volumes in Media Storage."""
-        return ms_get_volumes(resolve)
+        return to_resource_result(ms_get_volumes(resolve))
 
     @mcp.tool()
     def get_media_storage_subfolders(folder_path: str) -> List[str]:
@@ -171,19 +187,19 @@ def register_gallery_tools(mcp, resolve):
     )
 
     @mcp.resource("resolve://gallery/still-albums")
-    def get_still_albums() -> List[Dict[str, str]]:
+    def get_still_albums() -> ResourceResult:
         """Get list of gallery still albums."""
-        return gal_get_albums(resolve)
+        return to_resource_result(gal_get_albums(resolve))
 
     @mcp.resource("resolve://gallery/powergrade-albums")
-    def get_powergrade_albums() -> List[Dict[str, str]]:
+    def get_powergrade_albums() -> ResourceResult:
         """Get list of gallery PowerGrade albums."""
-        return gal_get_pg_albums(resolve)
+        return to_resource_result(gal_get_pg_albums(resolve))
 
     @mcp.resource("resolve://gallery/current-album")
-    def get_current_album() -> Dict[str, Any]:
+    def get_current_album() -> ResourceResult:
         """Get the current still album."""
-        return gal_get_current(resolve)
+        return to_resource_result(gal_get_current(resolve))
 
     @mcp.tool()
     def create_gallery_still_album() -> str:
@@ -246,7 +262,8 @@ def register_timeline_advanced_tools(mcp, resolve):
 
     @mcp.tool()
     def duplicate_current_timeline(
-        timeline_name: str = None, new_name: str = None
+        timeline_name: Optional[str] = None,
+        new_name: Optional[str] = None,
     ) -> str:
         """Duplicate a timeline."""
         return tl_duplicate(resolve, timeline_name, new_name)
@@ -254,8 +271,8 @@ def register_timeline_advanced_tools(mcp, resolve):
     @mcp.tool()
     def create_compound_clip_from_items(
         clip_names: List[str],
-        compound_name: str = None,
-        start_timecode: str = None,
+        compound_name: Optional[str] = None,
+        start_timecode: Optional[str] = None,
     ) -> str:
         """Create a compound clip from timeline items."""
         return tl_compound(resolve, clip_names, compound_name, start_timecode)
@@ -306,9 +323,9 @@ def register_timeline_export_tools(mcp, resolve):
     @mcp.tool()
     def import_timeline(
         file_path: str,
-        timeline_name: str = None,
+        timeline_name: Optional[str] = None,
         import_source_clips: bool = True,
-        source_clips_path: str = None,
+        source_clips_path: Optional[str] = None,
     ) -> str:
         """Import timeline from file (AAF/EDL/XML/FCPXML/DRT/ADL/OTIO)."""
         return tl_import(
@@ -323,9 +340,9 @@ def register_timeline_export_tools(mcp, resolve):
         return tl_export(resolve, file_path, export_type, export_subtype)
 
     @mcp.resource("resolve://timeline/timecode")
-    def get_playhead_timecode() -> str:
+    def get_playhead_timecode() -> ResourceResult:
         """Get the current playhead timecode."""
-        return tl_get_tc(resolve)
+        return to_resource_result(tl_get_tc(resolve))
 
     @mcp.tool()
     def set_playhead_timecode(timecode: str) -> str:
@@ -366,9 +383,9 @@ def register_marker_tools(mcp, resolve):
     )
 
     @mcp.resource("resolve://timeline/markers")
-    def get_all_timeline_markers() -> Dict[str, Any]:
+    def get_all_timeline_markers() -> ResourceResult:
         """Get all markers from the current timeline."""
-        return mk_get_timeline(resolve)
+        return to_resource_result(mk_get_timeline(resolve))
 
     @mcp.tool()
     def add_marker_to_timeline(
@@ -413,9 +430,9 @@ def register_marker_tools(mcp, resolve):
         return mk_del_by_data(resolve, custom_data)
 
     @mcp.resource("resolve://clip/{clip_name}/markers")
-    def get_media_pool_clip_markers(clip_name: str) -> Dict[str, Any]:
+    def get_media_pool_clip_markers(clip_name: str) -> ResourceResult:
         """Get all markers from a media pool clip."""
-        return mk_get_clip(resolve, clip_name)
+        return to_resource_result(mk_get_clip(resolve, clip_name))
 
     @mcp.tool()
     def add_marker_to_clip(

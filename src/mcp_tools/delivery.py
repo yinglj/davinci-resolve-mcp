@@ -5,7 +5,31 @@ Rendering and delivery operations
 """
 
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, Optional, Protocol, TypedDict, cast
+
+
+class _MediaPoolItem(Protocol):
+    def GetName(self) -> str:  # noqa: N802
+        ...
+
+    def LinkProxyMedia(self, proxy_media_file_path: str) -> bool:  # noqa: N802
+        ...
+
+    def UnlinkProxyMedia(self) -> bool:  # noqa: N802
+        ...
+
+    def ReplaceClip(self, replacement_path: str) -> bool:  # noqa: N802
+        ...
+
+    def TranscribeAudio(self, language: Optional[str] = None) -> bool:  # noqa: N802
+        ...
+
+    def ClearTranscription(self) -> bool:  # noqa: N802
+        ...
+
+
+class _MediaPoolClipsResult(TypedDict):
+    clips: list[_MediaPoolItem]
 
 
 def register_delivery_tools(mcp, resolve, logger):
@@ -14,10 +38,10 @@ def register_delivery_tools(mcp, resolve, logger):
     @mcp.tool()
     def add_to_render_queue(
         preset_name: str,
-        timeline_name: str = None,
+        timeline_name: Optional[str] = None,
         use_in_out_range: bool = False,
-        target_dir: str = None,
-        custom_name: str = None,
+        target_dir: Optional[str] = None,
+        custom_name: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Add a timeline to the render queue with the specified preset.
 
@@ -31,7 +55,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             Dict[str, Any]: A dictionary containing the result of the operation.
         """
-        from src.api.delivery_operations import add_to_render_queue as add_queue_func
+        from src.api.delivery import add_to_render_queue as add_queue_func
 
         # Build render_settings dict if custom options provided
         render_settings = {}
@@ -55,7 +79,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             Dict[str, Any]: A dictionary containing the result of the operation.
         """
-        from src.api.delivery_operations import start_render as start_render_func
+        from src.api.delivery import start_render as start_render_func
 
         return start_render_func(resolve)
 
@@ -66,7 +90,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             Dict[str, Any]: A dictionary containing the result of the operation.
         """
-        from src.api.delivery_operations import clear_render_queue as clear_queue_func
+        from src.api.delivery import clear_render_queue as clear_queue_func
 
         return clear_queue_func(resolve)
 
@@ -81,7 +105,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        if resolve is None:
+        if not resolve:
             return "Error: Not connected to DaVinci Resolve"
 
         project_manager = resolve.GetProjectManager()
@@ -96,10 +120,20 @@ def register_delivery_tools(mcp, resolve, logger):
         if not media_pool:
             return "Error: Failed to get Media Pool"
 
-        clips = get_all_media_pool_clips(media_pool)
+        from src.api.media import get_all_media_pool_clips
+
+        pool_result = get_all_media_pool_clips(resolve)
+        if isinstance(pool_result, dict) and "error" in pool_result:
+            return f"Error: {pool_result['error']}"
+        if not isinstance(pool_result, dict) or "clips" not in pool_result:
+            return "Error: Failed to fetch media pool clips"
+
+        clips = cast(_MediaPoolClipsResult, cast(object, pool_result))["clips"]
         target_clip = None
 
         for clip in clips:
+            if not clip:
+                continue
             if clip.GetName() == clip_name:
                 target_clip = clip
                 break
@@ -129,7 +163,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        if resolve is None:
+        if not resolve:
             return "Error: Not connected to DaVinci Resolve"
 
         project_manager = resolve.GetProjectManager()
@@ -144,10 +178,20 @@ def register_delivery_tools(mcp, resolve, logger):
         if not media_pool:
             return "Error: Failed to get Media Pool"
 
-        clips = get_all_media_pool_clips(media_pool)
+        from src.api.media import get_all_media_pool_clips
+
+        pool_result = get_all_media_pool_clips(resolve)
+        if isinstance(pool_result, dict) and "error" in pool_result:
+            return f"Error: {pool_result['error']}"
+        if not isinstance(pool_result, dict) or "clips" not in pool_result:
+            return "Error: Failed to fetch media pool clips"
+
+        clips = cast(_MediaPoolClipsResult, cast(object, pool_result))["clips"]
         target_clip = None
 
         for clip in clips:
+            if not clip:
+                continue
             if clip.GetName() == clip_name:
                 target_clip = clip
                 break
@@ -175,7 +219,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        if resolve is None:
+        if not resolve:
             return "Error: Not connected to DaVinci Resolve"
 
         project_manager = resolve.GetProjectManager()
@@ -190,10 +234,20 @@ def register_delivery_tools(mcp, resolve, logger):
         if not media_pool:
             return "Error: Failed to get Media Pool"
 
-        clips = get_all_media_pool_clips(media_pool)
+        from src.api.media import get_all_media_pool_clips
+
+        pool_result = get_all_media_pool_clips(resolve)
+        if isinstance(pool_result, dict) and "error" in pool_result:
+            return f"Error: {pool_result['error']}"
+        if not isinstance(pool_result, dict) or "clips" not in pool_result:
+            return "Error: Failed to fetch media pool clips"
+
+        clips = cast(_MediaPoolClipsResult, cast(object, pool_result))["clips"]
         target_clip = None
 
         for clip in clips:
+            if not clip:
+                continue
             if clip.GetName() == clip_name:
                 target_clip = clip
                 break
@@ -224,7 +278,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        if resolve is None:
+        if not resolve:
             return "Error: Not connected to DaVinci Resolve"
 
         project_manager = resolve.GetProjectManager()
@@ -239,10 +293,20 @@ def register_delivery_tools(mcp, resolve, logger):
         if not media_pool:
             return "Error: Failed to get Media Pool"
 
-        clips = get_all_media_pool_clips(media_pool)
+        from src.api.media import get_all_media_pool_clips
+
+        pool_result = get_all_media_pool_clips(resolve)
+        if isinstance(pool_result, dict) and "error" in pool_result:
+            return f"Error: {pool_result['error']}"
+        if not isinstance(pool_result, dict) or "clips" not in pool_result:
+            return "Error: Failed to fetch media pool clips"
+
+        clips = cast(_MediaPoolClipsResult, cast(object, pool_result))["clips"]
         target_clip = None
 
         for clip in clips:
+            if not clip:
+                continue
             if clip.GetName() == clip_name:
                 target_clip = clip
                 break
@@ -251,7 +315,10 @@ def register_delivery_tools(mcp, resolve, logger):
             return f"Error: Clip '{clip_name}' not found in Media Pool"
 
         try:
-            result = target_clip.TranscribeAudio(language)
+            try:
+                result = target_clip.TranscribeAudio(language)
+            except TypeError:
+                result = target_clip.TranscribeAudio()
             if result:
                 return f"Successfully started audio transcription for clip '{clip_name}' in language '{language}'"
             else:
@@ -269,7 +336,7 @@ def register_delivery_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        if resolve is None:
+        if not resolve:
             return "Error: Not connected to DaVinci Resolve"
 
         project_manager = resolve.GetProjectManager()
@@ -284,10 +351,20 @@ def register_delivery_tools(mcp, resolve, logger):
         if not media_pool:
             return "Error: Failed to get Media Pool"
 
-        clips = get_all_media_pool_clips(media_pool)
+        from src.api.media import get_all_media_pool_clips
+
+        pool_result = get_all_media_pool_clips(resolve)
+        if isinstance(pool_result, dict) and "error" in pool_result:
+            return f"Error: {pool_result['error']}"
+        if not isinstance(pool_result, dict) or "clips" not in pool_result:
+            return "Error: Failed to fetch media pool clips"
+
+        clips = cast(_MediaPoolClipsResult, cast(object, pool_result))["clips"]
         target_clip = None
 
         for clip in clips:
+            if not clip:
+                continue
             if clip.GetName() == clip_name:
                 target_clip = clip
                 break

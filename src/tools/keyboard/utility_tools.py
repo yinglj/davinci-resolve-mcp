@@ -1,11 +1,16 @@
 """Utility tools for DaVinci Resolve MCP Server."""
 
-from typing import Dict, Any
+from typing import Any, Dict
+
+from fastmcp.resources import ResourceContent, ResourceResult
 
 
 def register_utility_tools(mcp):
     """Register utility tools with the MCP server."""
     from src.utils.keyboard import send_custom_key, get_keyboard_shortcuts
+
+    def to_resource_result(payload: Any) -> ResourceResult:
+        return ResourceResult([ResourceContent(payload)])
 
     @mcp.tool()
     def send_keyboard_shortcut(key: str, description: str = "") -> Dict[str, Any]:
@@ -28,6 +33,6 @@ def register_utility_tools(mcp):
         return send_custom_key(key, description)
 
     @mcp.resource("resolve://keyboard/shortcuts")
-    def list_keyboard_shortcuts() -> Dict[str, str]:
+    def list_keyboard_shortcuts() -> ResourceResult:
         """Get a comprehensive list of DaVinci Resolve keyboard shortcuts."""
-        return get_keyboard_shortcuts()
+        return to_resource_result(get_keyboard_shortcuts())

@@ -4,7 +4,9 @@ Capture Tool Registration for DaVinci Resolve MCP Server.
 Registers screenshot capture tools for AI agents to "see" DaVinci Resolve.
 """
 
-from typing import Dict, Any
+from typing import Any, Dict, Optional
+
+from fastmcp.resources import ResourceContent, ResourceResult
 
 
 def register_capture_tools(mcp):
@@ -24,9 +26,12 @@ def register_capture_tools(mcp):
         get_monitoring_status,
     )
 
+    def to_resource_result(payload: Any) -> ResourceResult:
+        return ResourceResult([ResourceContent(payload)])
+
     @mcp.tool()
     def take_screenshot(
-        output_path: str = None,
+        output_path: Optional[str] = None,
         quality: int = 85,
         monitor_id: int = 0,
         capture_all: bool = False,
@@ -45,17 +50,21 @@ def register_capture_tools(mcp):
         Returns:
             Dict with success status and path or base64 data
         """
-        return capture_screenshot(
-            output_path=output_path,
-            quality=quality,
-            monitor_id=monitor_id,
-            capture_all=capture_all,
-            return_base64=return_base64,
-        )
+        kwargs: Dict[str, Any] = {
+            "quality": quality,
+            "monitor_id": monitor_id,
+            "capture_all": capture_all,
+            "return_base64": return_base64,
+        }
+        if output_path is not None:
+            kwargs["output_path"] = output_path
+        return capture_screenshot(**kwargs)
 
     @mcp.tool()
     def capture_resolve_ui(
-        output_path: str = None, quality: int = 85, return_base64: bool = False
+        output_path: Optional[str] = None,
+        quality: int = 85,
+        return_base64: bool = False,
     ) -> Dict[str, Any]:
         """
         Capture screenshot of the DaVinci Resolve window.
@@ -68,16 +77,18 @@ def register_capture_tools(mcp):
         Returns:
             Dict with success status and path or base64 data
         """
-        return capture_resolve_window(
-            output_path=output_path,
-            quality=quality,
-            return_base64=return_base64,
-        )
+        kwargs: Dict[str, Any] = {
+            "quality": quality,
+            "return_base64": return_base64,
+        }
+        if output_path is not None:
+            kwargs["output_path"] = output_path
+        return capture_resolve_window(**kwargs)
 
     @mcp.tool()
     def capture_window_by_handle(
         window_handle: int,
-        output_path: str = None,
+        output_path: Optional[str] = None,
         quality: int = 85,
         return_base64: bool = False,
     ) -> Dict[str, Any]:
@@ -93,47 +104,53 @@ def register_capture_tools(mcp):
         Returns:
             Dict with success status and path or base64 data
         """
-        return capture_window(
-            window_handle=window_handle,
-            output_path=output_path,
-            quality=quality,
-            return_base64=return_base64,
-        )
+        kwargs: Dict[str, Any] = {
+            "window_handle": window_handle,
+            "quality": quality,
+            "return_base64": return_base64,
+        }
+        if output_path is not None:
+            kwargs["output_path"] = output_path
+        return capture_window(**kwargs)
 
     @mcp.resource("resolve://system/windows")
-    def list_all_windows() -> Dict[str, Any]:
+    def list_all_windows() -> ResourceResult:
         """List all visible windows with their handles."""
-        return list_windows()
+        return to_resource_result(list_windows())
 
     @mcp.resource("resolve://system/monitors")
-    def get_all_monitors() -> Dict[str, Any]:
+    def get_all_monitors() -> ResourceResult:
         """Get information about all monitors."""
-        return get_monitor_info()
+        return to_resource_result(get_monitor_info())
 
     @mcp.resource("resolve://system/resolve-window")
-    def get_resolve_window_info() -> Dict[str, Any]:
+    def get_resolve_window_info() -> ResourceResult:
         """Find DaVinci Resolve window information."""
         window = find_resolve_window()
         if window:
-            return {"success": True, "window": window}
-        return {"success": False, "error": "DaVinci Resolve window not found"}
+            return to_resource_result({"success": True, "window": window})
+        return to_resource_result(
+            {"success": False, "error": "DaVinci Resolve window not found"}
+        )
 
     @mcp.resource("resolve://system/environment")
-    def get_environment_info() -> Dict[str, Any]:
+    def get_environment_info() -> ResourceResult:
         """Get system environment information."""
         import sys
         import os
 
-        return {
-            "is_wsl": is_wsl(),
-            "platform": sys.platform,
-            "python_version": sys.version,
-            "cwd": os.getcwd(),
-        }
+        return to_resource_result(
+            {
+                "is_wsl": is_wsl(),
+                "platform": sys.platform,
+                "python_version": sys.version,
+                "cwd": os.getcwd(),
+            }
+        )
 
     @mcp.tool()
     def start_screenshot_monitoring(
-        output_dir: str = None,
+        output_dir: Optional[str] = None,
         interval_sec: float = 1.0,
         quality: int = 60,
         monitor_id: int = 0,
@@ -152,7 +169,7 @@ def register_capture_tools(mcp):
         Returns:
             Dict with success status and session info
         """
-        kwargs = {
+        kwargs: Dict[str, Any] = {
             "interval_sec": interval_sec,
             "quality": quality,
             "monitor_id": monitor_id,
@@ -168,6 +185,6 @@ def register_capture_tools(mcp):
         return stop_monitoring()
 
     @mcp.resource("resolve://system/monitoring-status")
-    def get_screenshot_monitoring_status() -> Dict[str, Any]:
+    def get_screenshot_monitoring_status() -> ResourceResult:
         """Get current screenshot monitoring status."""
-        return get_monitoring_status()
+        return to_resource_result(get_monitoring_status())

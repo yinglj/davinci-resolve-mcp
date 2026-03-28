@@ -27,7 +27,7 @@ def register_workflow_tasks(mcp, resolve, logger):
         Returns:
             str: A message indicating the status of the task.
         """
-        if resolve is None:
+        if not resolve:
             return "Error: Not connected to DaVinci Resolve"
 
         logger.info(
@@ -38,7 +38,7 @@ def register_workflow_tasks(mcp, resolve, logger):
             # 1. Add to render queue
             # (In a real implementation, we would call the actual tool logic here)
             # For this example, we'll simulate the workflow steps
-            from src.api.delivery_operations import add_to_render_queue, start_render
+            from src.api.delivery import add_to_render_queue, start_render
 
             render_settings = {"TargetDir": target_dir}
             add_result = add_to_render_queue(
