@@ -28,6 +28,11 @@ def mcp_instance():
     return mcp
 
 
+@pytest.fixture(scope="session")
+def anyio_backend():
+    return "asyncio"
+
+
 def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line(
@@ -47,3 +52,25 @@ def pytest_collection_modifyitems(config, items):
         for item in items:
             if "real_resolve" in item.keywords:
                 item.add_marker(skip_resolve)
+
+    project_root = Path(__file__).resolve().parent.parent
+    agent_root = project_root / "src" / "agent"
+    if not agent_root.exists():
+        skip_agent = pytest.mark.skip(reason="Optional agent modules are not available")
+        skip_paths = (
+            str(project_root / "tests" / "api" / "color"),
+            str(
+                project_root
+                / "tests"
+                / "api"
+                / "delivery"
+                / "test_render_preset_runner.py"
+            ),
+            str(project_root / "tests" / "api" / "timeline"),
+            str(project_root / "tests" / "helpers"),
+            str(project_root / "tests" / "integration"),
+        )
+        for item in items:
+            item_path = str(item.fspath)
+            if item_path.startswith(skip_paths):
+                item.add_marker(skip_agent)

@@ -13,14 +13,29 @@ import os
 import json
 import traceback
 import tempfile
+import importlib
+from typing import Any, cast
 
-sys.path.insert(0, '/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules')
-import DaVinciResolveScript as dvr
 
-resolve = dvr.scriptapp('Resolve')
+if __name__ != "__main__":
+    import pytest
+
+    pytest.skip(
+        "Resolve integration script; run directly, not under pytest.",
+        allow_module_level=True,
+    )
+
+sys.path.insert(
+    0,
+    "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules",
+)
+dvr = importlib.import_module("DaVinciResolveScript")
+
+resolve = dvr.scriptapp("Resolve")
 if not resolve:
     print("FATAL: Cannot connect to DaVinci Resolve")
     sys.exit(1)
+resolve = cast(Any, resolve)
 
 print(f"Connected to {resolve.GetProductName()} {resolve.GetVersionString()}")
 
@@ -42,6 +57,7 @@ print("=" * 70)
 
 results = {"pass": [], "fail": [], "skip": [], "error": []}
 
+
 def test(name, fn=None, skip_reason=None):
     """Run a test and record result."""
     if skip_reason or fn is None:
@@ -55,6 +71,7 @@ def test(name, fn=None, skip_reason=None):
     except Exception as e:
         results["error"].append((name, f"{type(e).__name__}: {str(e)[:100]}"))
         return None
+
 
 # ===========================
 # RESOLVE OBJECT (21 methods)
@@ -71,7 +88,12 @@ test("Resolve.GetVersionString", lambda: resolve.GetVersionString())
 test("Resolve.SaveLayoutPreset", lambda: resolve.SaveLayoutPreset("_test_api"))
 test("Resolve.LoadLayoutPreset", lambda: resolve.LoadLayoutPreset("_test_api"))
 test("Resolve.UpdateLayoutPreset", lambda: resolve.UpdateLayoutPreset("_test_api"))
-test("Resolve.ExportLayoutPreset", lambda: resolve.ExportLayoutPreset("_test_api", os.path.join(tempfile.mkdtemp(), "test.preset")))
+test(
+    "Resolve.ExportLayoutPreset",
+    lambda: resolve.ExportLayoutPreset(
+        "_test_api", os.path.join(tempfile.mkdtemp(), "test.preset")
+    ),
+)
 test("Resolve.ImportLayoutPreset", skip_reason="no preset file to import")
 test("Resolve.DeleteLayoutPreset", lambda: resolve.DeleteLayoutPreset("_test_api"))
 test("Resolve.ImportRenderPreset", skip_reason="no preset file")
@@ -118,14 +140,24 @@ test("PM.RestoreCloudProject", skip_reason="needs cloud setup")
 print("\n--- Project (42 methods) ---")
 test("Project.GetMediaPool", lambda: project.GetMediaPool() is not None)
 test("Project.GetTimelineCount", lambda: project.GetTimelineCount())
-test("Project.GetTimelineByIndex", lambda: project.GetTimelineByIndex(1) is not None if project.GetTimelineCount() > 0 else "no timelines")
+test(
+    "Project.GetTimelineByIndex",
+    lambda: project.GetTimelineByIndex(1) is not None
+    if project.GetTimelineCount() > 0
+    else "no timelines",
+)
 test("Project.GetCurrentTimeline", lambda: project.GetCurrentTimeline() is not None)
-test("Project.SetCurrentTimeline", lambda: project.SetCurrentTimeline(tl) if tl else "no timeline")
+test(
+    "Project.SetCurrentTimeline",
+    lambda: project.SetCurrentTimeline(tl) if tl else "no timeline",
+)
 test("Project.GetGallery", lambda: project.GetGallery() is not None)
 test("Project.GetName", lambda: project.GetName())
 test("Project.SetName", lambda: project.SetName(project.GetName()))
 test("Project.GetPresetList", lambda: project.GetPresetList())
-test("Project.SetPreset", lambda: project.SetPreset("nonexistent"))  # Will return False but tests API
+test(
+    "Project.SetPreset", lambda: project.SetPreset("nonexistent")
+)  # Will return False but tests API
 test("Project.AddRenderJob", lambda: project.AddRenderJob())
 test("Project.DeleteRenderJob", skip_reason="needs valid job ID")
 test("Project.DeleteAllRenderJobs", lambda: project.DeleteAllRenderJobs())
@@ -137,28 +169,49 @@ test("Project.IsRenderingInProgress", lambda: project.IsRenderingInProgress())
 test("Project.LoadRenderPreset", lambda: project.LoadRenderPreset("H.264 Master"))
 test("Project.SaveAsNewRenderPreset", skip_reason="would create preset")
 test("Project.DeleteRenderPreset", skip_reason="would delete preset")
-test("Project.SetRenderSettings", lambda: project.SetRenderSettings({"TargetDir": "/tmp"}))
+test(
+    "Project.SetRenderSettings",
+    lambda: project.SetRenderSettings({"TargetDir": "/tmp"}),
+)
 test("Project.GetRenderJobStatus", skip_reason="needs valid job ID")
-test("Project.GetQuickExportRenderPresets", lambda: project.GetQuickExportRenderPresets())
+test(
+    "Project.GetQuickExportRenderPresets", lambda: project.GetQuickExportRenderPresets()
+)
 test("Project.RenderWithQuickExport", skip_reason="would start render")
 test("Project.GetSetting", lambda: project.GetSetting(""))
 test("Project.SetSetting", lambda: project.SetSetting("timelineFrameRate", "23.976"))
 test("Project.GetRenderFormats", lambda: project.GetRenderFormats())
 test("Project.GetRenderCodecs", lambda: project.GetRenderCodecs("mp4"))
-test("Project.GetCurrentRenderFormatAndCodec", lambda: project.GetCurrentRenderFormatAndCodec())
-test("Project.SetCurrentRenderFormatAndCodec", lambda: project.SetCurrentRenderFormatAndCodec("mov", "H264"))
+test(
+    "Project.GetCurrentRenderFormatAndCodec",
+    lambda: project.GetCurrentRenderFormatAndCodec(),
+)
+test(
+    "Project.SetCurrentRenderFormatAndCodec",
+    lambda: project.SetCurrentRenderFormatAndCodec("mov", "H264"),
+)
 test("Project.GetCurrentRenderMode", lambda: project.GetCurrentRenderMode())
 test("Project.SetCurrentRenderMode", lambda: project.SetCurrentRenderMode(1))
-test("Project.GetRenderResolutions", lambda: project.GetRenderResolutions("mp4", "H.264"))
+test(
+    "Project.GetRenderResolutions", lambda: project.GetRenderResolutions("mp4", "H.264")
+)
 test("Project.RefreshLUTList", lambda: project.RefreshLUTList())
 test("Project.GetUniqueId", lambda: project.GetUniqueId())
-test("Project.InsertAudioToCurrentTrackAtPlayhead", skip_reason="needs audio file on Fairlight page")
+test(
+    "Project.InsertAudioToCurrentTrackAtPlayhead",
+    skip_reason="needs audio file on Fairlight page",
+)
 test("Project.LoadBurnInPreset", lambda: project.LoadBurnInPreset("nonexistent"))
-test("Project.ExportCurrentFrameAsStill", lambda: project.ExportCurrentFrameAsStill(os.path.join(tempfile.mkdtemp(), "still.png")))
+test(
+    "Project.ExportCurrentFrameAsStill",
+    lambda: project.ExportCurrentFrameAsStill(
+        os.path.join(tempfile.mkdtemp(), "still.png")
+    ),
+)
 test("Project.GetColorGroupsList", lambda: project.GetColorGroupsList())
 test("Project.AddColorGroup", lambda: project.AddColorGroup("_test_cg"))
 # Clean up
-for g in (project.GetColorGroupsList() or []):
+for g in project.GetColorGroupsList() or []:
     try:
         if g.GetName() == "_test_cg":
             test("Project.DeleteColorGroup", lambda: project.DeleteColorGroup(g))
@@ -172,9 +225,15 @@ for g in (project.GetColorGroupsList() or []):
 print("\n--- MediaStorage (7 methods) ---")
 volumes = ms.GetMountedVolumeList() or []
 test("MS.GetMountedVolumeList", lambda: ms.GetMountedVolumeList())
-test("MS.GetSubFolderList", lambda: ms.GetSubFolderList(volumes[0]) if volumes else "no volumes")
+test(
+    "MS.GetSubFolderList",
+    lambda: ms.GetSubFolderList(volumes[0]) if volumes else "no volumes",
+)
 test("MS.GetFileList", lambda: ms.GetFileList(volumes[0]) if volumes else "no volumes")
-test("MS.RevealInStorage", lambda: ms.RevealInStorage(volumes[0]) if volumes else "no volumes")
+test(
+    "MS.RevealInStorage",
+    lambda: ms.RevealInStorage(volumes[0]) if volumes else "no volumes",
+)
 test("MS.AddItemListToMediaPool", skip_reason="would import media")
 test("MS.AddClipMattesToMediaPool", skip_reason="needs matte files")
 test("MS.AddTimelineMattesToMediaPool", skip_reason="needs matte files")
@@ -198,18 +257,26 @@ test("MP.ImportFolderFromFile", skip_reason="needs DRB file")
 test("MP.DeleteFolders", skip_reason="would delete folders")
 test("MP.MoveClips", skip_reason="would move clips")
 test("MP.MoveFolders", skip_reason="would move folders")
-test("MP.GetClipMatteList", lambda: mp.GetClipMatteList(clips[0]) if clips else "no clips")
+test(
+    "MP.GetClipMatteList",
+    lambda: mp.GetClipMatteList(clips[0]) if clips else "no clips",
+)
 test("MP.GetTimelineMatteList", lambda: mp.GetTimelineMatteList(root))
 test("MP.DeleteClipMattes", skip_reason="would delete mattes")
 test("MP.RelinkClips", skip_reason="would relink clips")
 test("MP.UnlinkClips", skip_reason="would unlink clips")
 test("MP.ImportMedia", skip_reason="would import media")
-test("MP.ExportMetadata", lambda: mp.ExportMetadata(os.path.join(tempfile.mkdtemp(), "meta.csv")))
+test(
+    "MP.ExportMetadata",
+    lambda: mp.ExportMetadata(os.path.join(tempfile.mkdtemp(), "meta.csv")),
+)
 test("MP.GetUniqueId", lambda: mp.GetUniqueId())
 test("MP.CreateStereoClip", skip_reason="needs stereo clips")
 test("MP.AutoSyncAudio", skip_reason="needs matching clips")
 test("MP.GetSelectedClips", lambda: mp.GetSelectedClips())
-test("MP.SetSelectedClip", lambda: mp.SetSelectedClip(clips[0]) if clips else "no clips")
+test(
+    "MP.SetSelectedClip", lambda: mp.SetSelectedClip(clips[0]) if clips else "no clips"
+)
 
 # ===========================
 # FOLDER (8 methods)
@@ -239,11 +306,17 @@ if clips:
     test("MPI.AddMarker", lambda: clip.AddMarker(0, "Green", "TestMarker", "test", 1))
     test("MPI.GetMarkers", lambda: clip.GetMarkers())
     test("MPI.GetMarkerByCustomData", lambda: clip.GetMarkerByCustomData("nonexistent"))
-    test("MPI.UpdateMarkerCustomData", lambda: clip.UpdateMarkerCustomData(0, "test_data"))
+    test(
+        "MPI.UpdateMarkerCustomData",
+        lambda: clip.UpdateMarkerCustomData(0, "test_data"),
+    )
     test("MPI.GetMarkerCustomData", lambda: clip.GetMarkerCustomData(0))
     test("MPI.DeleteMarkersByColor", lambda: clip.DeleteMarkersByColor("Green"))
     test("MPI.DeleteMarkerAtFrame", lambda: clip.DeleteMarkerAtFrame(0))
-    test("MPI.DeleteMarkerByCustomData", lambda: clip.DeleteMarkerByCustomData("test_data"))
+    test(
+        "MPI.DeleteMarkerByCustomData",
+        lambda: clip.DeleteMarkerByCustomData("test_data"),
+    )
     test("MPI.AddFlag", lambda: clip.AddFlag("Blue"))
     test("MPI.GetFlagList", lambda: clip.GetFlagList())
     test("MPI.ClearFlags", lambda: clip.ClearFlags("All"))
@@ -263,13 +336,40 @@ if clips:
     test("MPI.SetMarkInOut", lambda: clip.SetMarkInOut(0, 100))
     test("MPI.ClearMarkInOut", lambda: clip.ClearMarkInOut())
 else:
-    for m in ["GetName","GetMetadata","SetMetadata","GetThirdPartyMetadata","SetThirdPartyMetadata",
-              "GetMediaId","AddMarker","GetMarkers","GetMarkerByCustomData","UpdateMarkerCustomData",
-              "GetMarkerCustomData","DeleteMarkersByColor","DeleteMarkerAtFrame","DeleteMarkerByCustomData",
-              "AddFlag","GetFlagList","ClearFlags","GetClipColor","SetClipColor","ClearClipColor",
-              "GetClipProperty","SetClipProperty","LinkProxyMedia","UnlinkProxyMedia","ReplaceClip",
-              "GetUniqueId","TranscribeAudio","ClearTranscription","GetAudioMapping",
-              "GetMarkInOut","SetMarkInOut","ClearMarkInOut"]:
+    for m in [
+        "GetName",
+        "GetMetadata",
+        "SetMetadata",
+        "GetThirdPartyMetadata",
+        "SetThirdPartyMetadata",
+        "GetMediaId",
+        "AddMarker",
+        "GetMarkers",
+        "GetMarkerByCustomData",
+        "UpdateMarkerCustomData",
+        "GetMarkerCustomData",
+        "DeleteMarkersByColor",
+        "DeleteMarkerAtFrame",
+        "DeleteMarkerByCustomData",
+        "AddFlag",
+        "GetFlagList",
+        "ClearFlags",
+        "GetClipColor",
+        "SetClipColor",
+        "ClearClipColor",
+        "GetClipProperty",
+        "SetClipProperty",
+        "LinkProxyMedia",
+        "UnlinkProxyMedia",
+        "ReplaceClip",
+        "GetUniqueId",
+        "TranscribeAudio",
+        "ClearTranscription",
+        "GetAudioMapping",
+        "GetMarkInOut",
+        "SetMarkInOut",
+        "ClearMarkInOut",
+    ]:
         results["skip"].append((f"MPI.{m}", "no clips in project"))
 
 # ===========================
@@ -305,7 +405,9 @@ if tl:
     test("TL.DeleteMarkerAtFrame", lambda: tl.DeleteMarkerAtFrame(86400))
     test("TL.DeleteMarkerByCustomData", lambda: tl.DeleteMarkerByCustomData("test"))
     test("TL.GetCurrentTimecode", lambda: tl.GetCurrentTimecode())
-    test("TL.SetCurrentTimecode", lambda: tl.SetCurrentTimecode(tl.GetCurrentTimecode()))
+    test(
+        "TL.SetCurrentTimecode", lambda: tl.SetCurrentTimecode(tl.GetCurrentTimecode())
+    )
     test("TL.GetCurrentVideoItem", lambda: tl.GetCurrentVideoItem())
     test("TL.GetCurrentClipThumbnailImage", lambda: tl.GetCurrentClipThumbnailImage())
     test("TL.GetTrackName", lambda: tl.GetTrackName("video", 1))
@@ -314,7 +416,14 @@ if tl:
     test("TL.CreateCompoundClip", skip_reason="would create compound")
     test("TL.CreateFusionClip", skip_reason="would create fusion clip")
     test("TL.ImportIntoTimeline", skip_reason="needs AAF/EDL file")
-    test("TL.Export", lambda: tl.Export(os.path.join(tempfile.mkdtemp(), "test.fcpxml"), resolve.EXPORT_FCPXML_1_10, resolve.EXPORT_NONE))
+    test(
+        "TL.Export",
+        lambda: tl.Export(
+            os.path.join(tempfile.mkdtemp(), "test.fcpxml"),
+            resolve.EXPORT_FCPXML_1_10,
+            resolve.EXPORT_NONE,
+        ),
+    )
     test("TL.GetSetting", lambda: tl.GetSetting(""))
     test("TL.SetSetting", lambda: tl.SetSetting("timelineFrameRate", "23.976"))
     test("TL.InsertGeneratorIntoTimeline", skip_reason="would modify timeline")
@@ -389,8 +498,14 @@ if tl_items:
     test("TI.GetVersionNameList", lambda: item.GetVersionNameList(0))
     test("TI.GetMediaPoolItem", lambda: item.GetMediaPoolItem())
     test("TI.GetStereoConvergenceValues", lambda: item.GetStereoConvergenceValues())
-    test("TI.GetStereoLeftFloatingWindowParams", lambda: item.GetStereoLeftFloatingWindowParams())
-    test("TI.GetStereoRightFloatingWindowParams", lambda: item.GetStereoRightFloatingWindowParams())
+    test(
+        "TI.GetStereoLeftFloatingWindowParams",
+        lambda: item.GetStereoLeftFloatingWindowParams(),
+    )
+    test(
+        "TI.GetStereoRightFloatingWindowParams",
+        lambda: item.GetStereoRightFloatingWindowParams(),
+    )
     test("TI.SetCDL", skip_reason="would change color")
     test("TI.AddTake", skip_reason="needs media pool item")
     test("TI.GetSelectedTakeIndex", lambda: item.GetSelectedTakeIndex())
@@ -418,7 +533,9 @@ if tl_items:
     test("TI.GetTrackTypeAndIndex", lambda: item.GetTrackTypeAndIndex())
     test("TI.GetSourceAudioChannelMapping", lambda: item.GetSourceAudioChannelMapping())
     test("TI.GetIsColorOutputCacheEnabled", lambda: item.GetIsColorOutputCacheEnabled())
-    test("TI.GetIsFusionOutputCacheEnabled", lambda: item.GetIsFusionOutputCacheEnabled())
+    test(
+        "TI.GetIsFusionOutputCacheEnabled", lambda: item.GetIsFusionOutputCacheEnabled()
+    )
     test("TI.SetColorOutputCache", skip_reason="would change cache")
     test("TI.SetFusionOutputCache", skip_reason="would change cache")
 else:
@@ -431,12 +548,21 @@ else:
 print("\n--- Gallery (8 methods) ---")
 if gallery:
     albums = gallery.GetGalleryStillAlbums() or []
-    test("Gallery.GetAlbumName", lambda: gallery.GetAlbumName(albums[0]) if albums else "no albums")
+    test(
+        "Gallery.GetAlbumName",
+        lambda: gallery.GetAlbumName(albums[0]) if albums else "no albums",
+    )
     test("Gallery.SetAlbumName", skip_reason="would rename album")
     test("Gallery.GetCurrentStillAlbum", lambda: gallery.GetCurrentStillAlbum())
-    test("Gallery.SetCurrentStillAlbum", lambda: gallery.SetCurrentStillAlbum(albums[0]) if albums else "no albums")
+    test(
+        "Gallery.SetCurrentStillAlbum",
+        lambda: gallery.SetCurrentStillAlbum(albums[0]) if albums else "no albums",
+    )
     test("Gallery.GetGalleryStillAlbums", lambda: gallery.GetGalleryStillAlbums())
-    test("Gallery.GetGalleryPowerGradeAlbums", lambda: gallery.GetGalleryPowerGradeAlbums())
+    test(
+        "Gallery.GetGalleryPowerGradeAlbums",
+        lambda: gallery.GetGalleryPowerGradeAlbums(),
+    )
     test("Gallery.CreateGalleryStillAlbum", skip_reason="would create album")
     test("Gallery.CreateGalleryPowerGradeAlbum", skip_reason="would create album")
 
@@ -449,7 +575,9 @@ if gallery:
     if album:
         test("GSA.GetStills", lambda: album.GetStills())
         stills = album.GetStills() or []
-        test("GSA.GetLabel", lambda: album.GetLabel(stills[0]) if stills else "no stills")
+        test(
+            "GSA.GetLabel", lambda: album.GetLabel(stills[0]) if stills else "no stills"
+        )
         test("GSA.SetLabel", skip_reason="would change label")
         test("GSA.ImportStills", skip_reason="needs still files")
         test("GSA.ExportStills", skip_reason="needs stills")
@@ -490,7 +618,13 @@ if cg:
     cg.SetName("_test_cg_api_renamed")
     project.DeleteColorGroup(cg)
 else:
-    for m in ["GetName", "SetName", "GetClipsInTimeline", "GetPreClipNodeGraph", "GetPostClipNodeGraph"]:
+    for m in [
+        "GetName",
+        "SetName",
+        "GetClipsInTimeline",
+        "GetPreClipNodeGraph",
+        "GetPostClipNodeGraph",
+    ]:
         results["skip"].append((f"CG.{m}", "could not create color group"))
 
 # ===========================
@@ -504,10 +638,12 @@ total_skip = len(results["skip"])
 total = total_pass + total_fail + total_error + total_skip
 tested = total_pass + total_fail + total_error
 
-print(f"RESULTS: {total_pass} passed, {total_fail} failed, {total_error} errors, {total_skip} skipped")
+print(
+    f"RESULTS: {total_pass} passed, {total_fail} failed, {total_error} errors, {total_skip} skipped"
+)
 print(f"Total API methods accounted for: {total}")
 print(f"Actually tested: {tested}")
-print(f"Pass rate (of tested): {total_pass/max(tested,1)*100:.1f}%")
+print(f"Pass rate (of tested): {total_pass / max(tested, 1) * 100:.1f}%")
 
 if results["fail"]:
     print(f"\n--- FAILURES ({len(results['fail'])}) ---")
@@ -536,7 +672,7 @@ output = {
         "failed": total_fail,
         "errors": total_error,
         "skipped": total_skip,
-        "pass_rate": f"{total_pass/max(tested,1)*100:.1f}%"
+        "pass_rate": f"{total_pass / max(tested, 1) * 100:.1f}%",
     },
     "pass": [{"name": n, "value": v} for n, v in results["pass"]],
     "fail": [{"name": n, "detail": d} for n, d in results["fail"]],
@@ -544,6 +680,6 @@ output = {
     "skip": [{"name": n, "reason": r} for n, r in results["skip"]],
 }
 
-with open('tests/test_all_tools_results.json', 'w') as f:
+with open("tests/test_all_tools_results.json", "w") as f:
     json.dump(output, f, indent=2)
 print(f"\nResults saved to tests/test_all_tools_results.json")

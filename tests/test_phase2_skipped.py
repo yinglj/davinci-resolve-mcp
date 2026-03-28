@@ -12,24 +12,47 @@ import os
 import json
 import tempfile
 import time
+import importlib
+from typing import Any, cast
 
-sys.path.insert(0, '/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules')
-import DaVinciResolveScript as dvr
 
-resolve = dvr.scriptapp('Resolve')
+if __name__ != "__main__":
+    import pytest
+
+    pytest.skip(
+        "Resolve integration script; run directly, not under pytest.",
+        allow_module_level=True,
+    )
+
+sys.path.insert(
+    0,
+    "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules",
+)
+dvr = importlib.import_module("DaVinciResolveScript")
+
+resolve = dvr.scriptapp("Resolve")
 if not resolve:
     print("FATAL: Cannot connect to DaVinci Resolve")
     sys.exit(1)
+resolve = cast(Any, resolve)
 
 print(f"Connected to {resolve.GetProductName()} {resolve.GetVersionString()}")
 resolve.OpenPage("edit")
 
-pm = resolve.GetProjectManager()
-project = pm.GetCurrentProject()
-mp = project.GetMediaPool()
-root = mp.GetRootFolder()
-gallery = project.GetGallery()
-tl = project.GetCurrentTimeline()
+
+def require_any(value, message):
+    if not value:
+        print(message)
+        sys.exit(1)
+    return cast(Any, value)
+
+
+pm = require_any(resolve.GetProjectManager(), "FATAL: Failed to get Project Manager")
+project = require_any(pm.GetCurrentProject(), "FATAL: No project open")
+mp = require_any(project.GetMediaPool(), "FATAL: Failed to get Media Pool")
+root = require_any(mp.GetRootFolder(), "FATAL: Failed to get Root Folder")
+gallery = require_any(project.GetGallery(), "FATAL: Failed to get Gallery")
+tl = require_any(project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline")
 clips = root.GetClipList() or []
 tl_items = tl.GetItemListInTrack("video", 1) if tl else []
 
@@ -40,6 +63,7 @@ print(f"Clips: {len(clips)}, TL Items: {len(tl_items or [])}")
 print("=" * 70)
 
 results = {"pass": [], "fail": [], "skip": [], "error": []}
+
 
 def test(name, fn=None, skip_reason=None):
     if skip_reason or fn is None:
@@ -56,6 +80,7 @@ def test(name, fn=None, skip_reason=None):
         print(f"  ERROR: {name}: {type(e).__name__}: {str(e)[:80]}")
         return None
 
+
 # ======================================================
 # SECTION 1: Resolve - Import/Export presets
 # ======================================================
@@ -66,24 +91,39 @@ resolve.SaveLayoutPreset("_phase2_test")
 tmpdir = tempfile.mkdtemp()
 
 # ExportRenderPreset - first load one to ensure it exists
-test("Resolve.ExportRenderPreset", lambda: resolve.ExportRenderPreset("H.264 Master", os.path.join(tmpdir, "render.preset")))
+test(
+    "Resolve.ExportRenderPreset",
+    lambda: resolve.ExportRenderPreset(
+        "H.264 Master", os.path.join(tmpdir, "render.preset")
+    ),
+)
 
 # ImportRenderPreset
 rp_path = os.path.join(tmpdir, "render.preset")
 if os.path.exists(rp_path):
     test("Resolve.ImportRenderPreset", lambda: resolve.ImportRenderPreset(rp_path))
 else:
-    test("Resolve.ImportRenderPreset", lambda: resolve.ImportRenderPreset(rp_path))  # will return False but tests API
+    test(
+        "Resolve.ImportRenderPreset", lambda: resolve.ImportRenderPreset(rp_path)
+    )  # will return False but tests API
 
 # ExportBurnInPreset / ImportBurnInPreset
-test("Resolve.ExportBurnInPreset", lambda: resolve.ExportBurnInPreset("Default", os.path.join(tmpdir, "burnin.preset")))
+test(
+    "Resolve.ExportBurnInPreset",
+    lambda: resolve.ExportBurnInPreset(
+        "Default", os.path.join(tmpdir, "burnin.preset")
+    ),
+)
 bi_path = os.path.join(tmpdir, "burnin.preset")
 test("Resolve.ImportBurnInPreset", lambda: resolve.ImportBurnInPreset(bi_path))
 
 # ImportLayoutPreset - export then import
 lp_path = os.path.join(tmpdir, "layout.preset")
 resolve.ExportLayoutPreset("_phase2_test", lp_path)
-test("Resolve.ImportLayoutPreset", lambda: resolve.ImportLayoutPreset(lp_path, "_phase2_imported"))
+test(
+    "Resolve.ImportLayoutPreset",
+    lambda: resolve.ImportLayoutPreset(lp_path, "_phase2_imported"),
+)
 resolve.DeleteLayoutPreset("_phase2_test")
 resolve.DeleteLayoutPreset("_phase2_imported")
 
@@ -107,12 +147,12 @@ test("PM.LoadProject", lambda: pm.LoadProject(orig_project_name))
 test("PM.DeleteProject", lambda: pm.DeleteProject("_test_proj_phase2"))
 
 # Re-acquire references after project switch
-project = pm.GetCurrentProject()
-mp = project.GetMediaPool()
-root = mp.GetRootFolder()
-tl = project.GetCurrentTimeline()
+project = require_any(pm.GetCurrentProject(), "FATAL: No project open")
+mp = require_any(project.GetMediaPool(), "FATAL: Failed to get Media Pool")
+root = require_any(mp.GetRootFolder(), "FATAL: Failed to get Root Folder")
+tl = require_any(project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline")
 clips = root.GetClipList() or []
-gallery = project.GetGallery()
+gallery = require_any(project.GetGallery(), "FATAL: Failed to get Gallery")
 
 # ExportProject / ImportProject
 exp_path = os.path.join(tmpdir, "test_export.drp")
@@ -128,29 +168,32 @@ pm.LoadProject(orig_project_name)
 pm.DeleteProject("_test_restore_phase2")
 
 # Re-acquire after all the project switching
-project = pm.GetCurrentProject()
-mp = project.GetMediaPool()
-root = mp.GetRootFolder()
-tl = project.GetCurrentTimeline()
+project = require_any(pm.GetCurrentProject(), "FATAL: No project open")
+mp = require_any(project.GetMediaPool(), "FATAL: Failed to get Media Pool")
+root = require_any(mp.GetRootFolder(), "FATAL: Failed to get Root Folder")
+tl = require_any(project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline")
 clips = root.GetClipList() or []
-gallery = project.GetGallery()
+gallery = require_any(project.GetGallery(), "FATAL: Failed to get Gallery")
 tl_items = tl.GetItemListInTrack("video", 1) if tl else []
 
 # ArchiveProject
 archive_path = os.path.join(tmpdir, "test_archive.dra")
-test("PM.ArchiveProject", lambda: pm.ArchiveProject(orig_project_name, archive_path, False, False, False))
+test(
+    "PM.ArchiveProject",
+    lambda: pm.ArchiveProject(orig_project_name, archive_path, False, False, False),
+)
 
 # CloseProject - test but immediately re-open
 test("PM.CloseProject", lambda: pm.CloseProject(project))
 test("PM.LoadProject_reopen", lambda: pm.LoadProject(orig_project_name))
 
 # Re-acquire references
-project = pm.GetCurrentProject()
-mp = project.GetMediaPool()
-root = mp.GetRootFolder()
-tl = project.GetCurrentTimeline()
+project = require_any(pm.GetCurrentProject(), "FATAL: No project open")
+mp = require_any(project.GetMediaPool(), "FATAL: Failed to get Media Pool")
+root = require_any(mp.GetRootFolder(), "FATAL: Failed to get Root Folder")
+tl = require_any(project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline")
 clips = root.GetClipList() or []
-gallery = project.GetGallery()
+gallery = require_any(project.GetGallery(), "FATAL: Failed to get Gallery")
 tl_items = tl.GetItemListInTrack("video", 1) if tl else []
 
 # Cloud methods - skip (need cloud infrastructure)
@@ -166,8 +209,14 @@ test("PM.SetCurrentDatabase", skip_reason="only one database available")
 print("\n--- Project: Render job lifecycle ---")
 
 # SaveAsNewRenderPreset / DeleteRenderPreset
-test("Project.SaveAsNewRenderPreset", lambda: project.SaveAsNewRenderPreset("_test_preset_phase2"))
-test("Project.DeleteRenderPreset", lambda: project.DeleteRenderPreset("_test_preset_phase2"))
+test(
+    "Project.SaveAsNewRenderPreset",
+    lambda: project.SaveAsNewRenderPreset("_test_preset_phase2"),
+)
+test(
+    "Project.DeleteRenderPreset",
+    lambda: project.DeleteRenderPreset("_test_preset_phase2"),
+)
 
 # AddRenderJob / GetRenderJobStatus / DeleteRenderJob / StartRendering
 project.SetRenderSettings({"TargetDir": tmpdir})
@@ -190,10 +239,18 @@ else:
     test("Project.StartRendering", skip_reason="no job to render")
 
 # RenderWithQuickExport - will fail without valid setup but tests API
-test("Project.RenderWithQuickExport", lambda: project.RenderWithQuickExport("H.264", {"TargetDir": tmpdir, "CustomName": "_phase2_test"}))
+test(
+    "Project.RenderWithQuickExport",
+    lambda: project.RenderWithQuickExport(
+        "H.264", {"TargetDir": tmpdir, "CustomName": "_phase2_test"}
+    ),
+)
 
 # InsertAudioToCurrentTrackAtPlayhead
-test("Project.InsertAudioToCurrentTrackAtPlayhead", skip_reason="needs Fairlight page + audio file")
+test(
+    "Project.InsertAudioToCurrentTrackAtPlayhead",
+    skip_reason="needs Fairlight page + audio file",
+)
 
 # ======================================================
 # SECTION 4: MediaStorage - Add items
@@ -206,38 +263,351 @@ volumes = ms.GetMountedVolumeList() or []
 # Create a test image file to import
 test_img = os.path.join(tmpdir, "test_media.jpg")
 # Create a minimal JPEG file (smallest valid JPEG)
-with open(test_img, 'wb') as f:
-    f.write(bytes([
-        0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
-        0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0xDB, 0x00, 0x43,
-        0x00, 0x08, 0x06, 0x06, 0x07, 0x06, 0x05, 0x08, 0x07, 0x07, 0x07, 0x09,
-        0x09, 0x08, 0x0A, 0x0C, 0x14, 0x0D, 0x0C, 0x0B, 0x0B, 0x0C, 0x19, 0x12,
-        0x13, 0x0F, 0x14, 0x1D, 0x1A, 0x1F, 0x1E, 0x1D, 0x1A, 0x1C, 0x1C, 0x20,
-        0x24, 0x2E, 0x27, 0x20, 0x22, 0x2C, 0x23, 0x1C, 0x1C, 0x28, 0x37, 0x29,
-        0x2C, 0x30, 0x31, 0x34, 0x34, 0x34, 0x1F, 0x27, 0x39, 0x3D, 0x38, 0x32,
-        0x3C, 0x2E, 0x33, 0x34, 0x32, 0xFF, 0xC0, 0x00, 0x0B, 0x08, 0x00, 0x01,
-        0x00, 0x01, 0x01, 0x01, 0x11, 0x00, 0xFF, 0xC4, 0x00, 0x1F, 0x00, 0x00,
-        0x01, 0x05, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0A, 0x0B, 0xFF, 0xC4, 0x00, 0xB5, 0x10, 0x00, 0x02, 0x01, 0x03,
-        0x03, 0x02, 0x04, 0x03, 0x05, 0x05, 0x04, 0x04, 0x00, 0x00, 0x01, 0x7D,
-        0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12, 0x21, 0x31, 0x41, 0x06,
-        0x13, 0x51, 0x61, 0x07, 0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xA1, 0x08,
-        0x23, 0x42, 0xB1, 0xC1, 0x15, 0x52, 0xD1, 0xF0, 0x24, 0x33, 0x62, 0x72,
-        0x82, 0x09, 0x0A, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x25, 0x26, 0x27, 0x28,
-        0x29, 0x2A, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x43, 0x44, 0x45,
-        0x46, 0x47, 0x48, 0x49, 0x4A, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59,
-        0x5A, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x73, 0x74, 0x75,
-        0x76, 0x77, 0x78, 0x79, 0x7A, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89,
-        0x8A, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0xA2, 0xA3,
-        0xA4, 0xA5, 0xA6, 0xA7, 0xA8, 0xA9, 0xAA, 0xB2, 0xB3, 0xB4, 0xB5, 0xB6,
-        0xB7, 0xB8, 0xB9, 0xBA, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9,
-        0xCA, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9, 0xDA, 0xE1, 0xE2,
-        0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8, 0xE9, 0xEA, 0xF1, 0xF2, 0xF3, 0xF4,
-        0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01,
-        0x00, 0x00, 0x3F, 0x00, 0x7B, 0x94, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0xFF, 0xD9
-    ]))
+with open(test_img, "wb") as f:
+    f.write(
+        bytes(
+            [
+                0xFF,
+                0xD8,
+                0xFF,
+                0xE0,
+                0x00,
+                0x10,
+                0x4A,
+                0x46,
+                0x49,
+                0x46,
+                0x00,
+                0x01,
+                0x01,
+                0x00,
+                0x00,
+                0x01,
+                0x00,
+                0x01,
+                0x00,
+                0x00,
+                0xFF,
+                0xDB,
+                0x00,
+                0x43,
+                0x00,
+                0x08,
+                0x06,
+                0x06,
+                0x07,
+                0x06,
+                0x05,
+                0x08,
+                0x07,
+                0x07,
+                0x07,
+                0x09,
+                0x09,
+                0x08,
+                0x0A,
+                0x0C,
+                0x14,
+                0x0D,
+                0x0C,
+                0x0B,
+                0x0B,
+                0x0C,
+                0x19,
+                0x12,
+                0x13,
+                0x0F,
+                0x14,
+                0x1D,
+                0x1A,
+                0x1F,
+                0x1E,
+                0x1D,
+                0x1A,
+                0x1C,
+                0x1C,
+                0x20,
+                0x24,
+                0x2E,
+                0x27,
+                0x20,
+                0x22,
+                0x2C,
+                0x23,
+                0x1C,
+                0x1C,
+                0x28,
+                0x37,
+                0x29,
+                0x2C,
+                0x30,
+                0x31,
+                0x34,
+                0x34,
+                0x34,
+                0x1F,
+                0x27,
+                0x39,
+                0x3D,
+                0x38,
+                0x32,
+                0x3C,
+                0x2E,
+                0x33,
+                0x34,
+                0x32,
+                0xFF,
+                0xC0,
+                0x00,
+                0x0B,
+                0x08,
+                0x00,
+                0x01,
+                0x00,
+                0x01,
+                0x01,
+                0x01,
+                0x11,
+                0x00,
+                0xFF,
+                0xC4,
+                0x00,
+                0x1F,
+                0x00,
+                0x00,
+                0x01,
+                0x05,
+                0x01,
+                0x01,
+                0x01,
+                0x01,
+                0x01,
+                0x01,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x01,
+                0x02,
+                0x03,
+                0x04,
+                0x05,
+                0x06,
+                0x07,
+                0x08,
+                0x09,
+                0x0A,
+                0x0B,
+                0xFF,
+                0xC4,
+                0x00,
+                0xB5,
+                0x10,
+                0x00,
+                0x02,
+                0x01,
+                0x03,
+                0x03,
+                0x02,
+                0x04,
+                0x03,
+                0x05,
+                0x05,
+                0x04,
+                0x04,
+                0x00,
+                0x00,
+                0x01,
+                0x7D,
+                0x01,
+                0x02,
+                0x03,
+                0x00,
+                0x04,
+                0x11,
+                0x05,
+                0x12,
+                0x21,
+                0x31,
+                0x41,
+                0x06,
+                0x13,
+                0x51,
+                0x61,
+                0x07,
+                0x22,
+                0x71,
+                0x14,
+                0x32,
+                0x81,
+                0x91,
+                0xA1,
+                0x08,
+                0x23,
+                0x42,
+                0xB1,
+                0xC1,
+                0x15,
+                0x52,
+                0xD1,
+                0xF0,
+                0x24,
+                0x33,
+                0x62,
+                0x72,
+                0x82,
+                0x09,
+                0x0A,
+                0x16,
+                0x17,
+                0x18,
+                0x19,
+                0x1A,
+                0x25,
+                0x26,
+                0x27,
+                0x28,
+                0x29,
+                0x2A,
+                0x34,
+                0x35,
+                0x36,
+                0x37,
+                0x38,
+                0x39,
+                0x3A,
+                0x43,
+                0x44,
+                0x45,
+                0x46,
+                0x47,
+                0x48,
+                0x49,
+                0x4A,
+                0x53,
+                0x54,
+                0x55,
+                0x56,
+                0x57,
+                0x58,
+                0x59,
+                0x5A,
+                0x63,
+                0x64,
+                0x65,
+                0x66,
+                0x67,
+                0x68,
+                0x69,
+                0x6A,
+                0x73,
+                0x74,
+                0x75,
+                0x76,
+                0x77,
+                0x78,
+                0x79,
+                0x7A,
+                0x83,
+                0x84,
+                0x85,
+                0x86,
+                0x87,
+                0x88,
+                0x89,
+                0x8A,
+                0x92,
+                0x93,
+                0x94,
+                0x95,
+                0x96,
+                0x97,
+                0x98,
+                0x99,
+                0x9A,
+                0xA2,
+                0xA3,
+                0xA4,
+                0xA5,
+                0xA6,
+                0xA7,
+                0xA8,
+                0xA9,
+                0xAA,
+                0xB2,
+                0xB3,
+                0xB4,
+                0xB5,
+                0xB6,
+                0xB7,
+                0xB8,
+                0xB9,
+                0xBA,
+                0xC2,
+                0xC3,
+                0xC4,
+                0xC5,
+                0xC6,
+                0xC7,
+                0xC8,
+                0xC9,
+                0xCA,
+                0xD2,
+                0xD3,
+                0xD4,
+                0xD5,
+                0xD6,
+                0xD7,
+                0xD8,
+                0xD9,
+                0xDA,
+                0xE1,
+                0xE2,
+                0xE3,
+                0xE4,
+                0xE5,
+                0xE6,
+                0xE7,
+                0xE8,
+                0xE9,
+                0xEA,
+                0xF1,
+                0xF2,
+                0xF3,
+                0xF4,
+                0xF5,
+                0xF6,
+                0xF7,
+                0xF8,
+                0xF9,
+                0xFA,
+                0xFF,
+                0xDA,
+                0x00,
+                0x08,
+                0x01,
+                0x01,
+                0x00,
+                0x00,
+                0x3F,
+                0x00,
+                0x7B,
+                0x94,
+                0x11,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+                0xFF,
+                0xD9,
+            ]
+        )
+    )
 
 test("MS.AddItemListToMediaPool", lambda: ms.AddItemListToMediaPool([test_img]))
 test("MS.AddClipMattesToMediaPool", skip_reason="needs proper matte media files")
@@ -304,7 +674,12 @@ test("MP.ImportMedia", lambda: mp.ImportMedia([test_img]))
 clips = root.GetClipList() or []
 if len(clips) >= 1:
     test("MP.UnlinkClips", lambda: mp.UnlinkClips([clips[0]]))
-    test("MP.RelinkClips", lambda: mp.RelinkClips([clips[0]], os.path.dirname(clips[0].GetClipProperty("File Path") or "/tmp")))
+    test(
+        "MP.RelinkClips",
+        lambda: mp.RelinkClips(
+            [clips[0]], os.path.dirname(clips[0].GetClipProperty("File Path") or "/tmp")
+        ),
+    )
 
 # DeleteClips - delete the test media we imported
 clips = root.GetClipList() or []
@@ -343,8 +718,13 @@ print("\n--- MediaPoolItem: Set/Property operations ---")
 clips = root.GetClipList() or []
 if clips:
     clip = clips[0]
-    test("MPI.SetThirdPartyMetadata", lambda: clip.SetThirdPartyMetadata("TestKey", "TestValue"))
-    test("MPI.SetClipProperty", lambda: clip.SetClipProperty("Clip Name", clip.GetName()))
+    test(
+        "MPI.SetThirdPartyMetadata",
+        lambda: clip.SetThirdPartyMetadata("TestKey", "TestValue"),
+    )
+    test(
+        "MPI.SetClipProperty", lambda: clip.SetClipProperty("Clip Name", clip.GetName())
+    )
 
     test("MPI.LinkProxyMedia", skip_reason="needs proxy media file")
     test("MPI.ReplaceClip", skip_reason="irreversible - would replace clip")
@@ -380,7 +760,10 @@ if tl:
 
     # SetClipsLinked
     if len(tl_items) >= 2:
-        test("TL.SetClipsLinked", lambda: tl.SetClipsLinked([tl_items[0], tl_items[1]], True))
+        test(
+            "TL.SetClipsLinked",
+            lambda: tl.SetClipsLinked([tl_items[0], tl_items[1]], True),
+        )
     else:
         test("TL.SetClipsLinked", skip_reason="need 2+ items")
 
@@ -411,14 +794,17 @@ if tl:
     # DeleteClips - clean up inserted items
     new_items = tl.GetItemListInTrack("video", 1) or []
     # Delete items that were newly added (more than original count)
-    items_to_delete = new_items[len(tl_items):]
+    items_to_delete = new_items[len(tl_items) :]
     if items_to_delete:
         test("TL.DeleteClips", lambda: tl.DeleteClips(items_to_delete, False))
 
     # CreateCompoundClip / CreateFusionClip
     tl_items = tl.GetItemListInTrack("video", 1) or []
     if len(tl_items) >= 2:
-        test("TL.CreateCompoundClip", lambda: tl.CreateCompoundClip([tl_items[-2], tl_items[-1]]))
+        test(
+            "TL.CreateCompoundClip",
+            lambda: tl.CreateCompoundClip([tl_items[-2], tl_items[-1]]),
+        )
         test("TL.CreateFusionClip", skip_reason="would merge items irreversibly")
     else:
         test("TL.CreateCompoundClip", skip_reason="need 2+ items")
@@ -454,23 +840,41 @@ if item:
 
     comp_names = item.GetFusionCompNameList()
     if comp_names:
-        first_comp_name = list(comp_names.values())[0] if isinstance(comp_names, dict) else comp_names[0]
-        test("TI.GetFusionCompByName", lambda: item.GetFusionCompByName(first_comp_name))
+        first_comp_name = (
+            list(comp_names.values())[0]
+            if isinstance(comp_names, dict)
+            else comp_names[0]
+        )
+        test(
+            "TI.GetFusionCompByName", lambda: item.GetFusionCompByName(first_comp_name)
+        )
         test("TI.GetFusionCompByIndex", lambda: item.GetFusionCompByIndex(1))
 
         # Export comp
         comp_path = os.path.join(tmpdir, "test_comp.comp")
         test("TI.ExportFusionComp", lambda: item.ExportFusionComp(comp_path, 1))
-        test("TI.LoadFusionCompByName", lambda: item.LoadFusionCompByName(first_comp_name))
-        test("TI.RenameFusionCompByName", lambda: item.RenameFusionCompByName(first_comp_name, "_renamed_comp"))
+        test(
+            "TI.LoadFusionCompByName",
+            lambda: item.LoadFusionCompByName(first_comp_name),
+        )
+        test(
+            "TI.RenameFusionCompByName",
+            lambda: item.RenameFusionCompByName(first_comp_name, "_renamed_comp"),
+        )
 
         # Get updated name after rename
         comp_names2 = item.GetFusionCompNameList()
         renamed = "_renamed_comp"
         test("TI.DeleteFusionCompByName", lambda: item.DeleteFusionCompByName(renamed))
     else:
-        for m in ["GetFusionCompByName", "GetFusionCompByIndex", "ExportFusionComp",
-                   "LoadFusionCompByName", "RenameFusionCompByName", "DeleteFusionCompByName"]:
+        for m in [
+            "GetFusionCompByName",
+            "GetFusionCompByIndex",
+            "ExportFusionComp",
+            "LoadFusionCompByName",
+            "RenameFusionCompByName",
+            "DeleteFusionCompByName",
+        ]:
             test(f"TI.{m}", skip_reason="AddFusionComp returned no comp names")
 
     # ImportFusionComp
@@ -480,7 +884,11 @@ if item:
         # Clean up imported comp
         comp_names3 = item.GetFusionCompNameList()
         if comp_names3:
-            last_name = list(comp_names3.values())[-1] if isinstance(comp_names3, dict) else comp_names3[-1]
+            last_name = (
+                list(comp_names3.values())[-1]
+                if isinstance(comp_names3, dict)
+                else comp_names3[-1]
+            )
             item.DeleteFusionCompByName(last_name)
     else:
         test("TI.ImportFusionComp", skip_reason="no exported comp file available")
@@ -489,11 +897,24 @@ if item:
     test("TI.AddVersion", lambda: item.AddVersion("_test_version_p2", 0))
     versions = item.GetVersionNameList(0)
     if versions:
-        v_list = list(versions.values()) if isinstance(versions, dict) else list(versions)
+        v_list = (
+            list(versions.values()) if isinstance(versions, dict) else list(versions)
+        )
         if "_test_version_p2" in v_list:
-            test("TI.LoadVersionByName", lambda: item.LoadVersionByName("_test_version_p2", 0))
-            test("TI.RenameVersionByName", lambda: item.RenameVersionByName("_test_version_p2", "_renamed_v_p2", 0))
-            test("TI.DeleteVersionByName", lambda: item.DeleteVersionByName("_renamed_v_p2", 0))
+            test(
+                "TI.LoadVersionByName",
+                lambda: item.LoadVersionByName("_test_version_p2", 0),
+            )
+            test(
+                "TI.RenameVersionByName",
+                lambda: item.RenameVersionByName(
+                    "_test_version_p2", "_renamed_v_p2", 0
+                ),
+            )
+            test(
+                "TI.DeleteVersionByName",
+                lambda: item.DeleteVersionByName("_renamed_v_p2", 0),
+            )
         else:
             test("TI.LoadVersionByName", skip_reason="version not found in list")
             test("TI.RenameVersionByName", skip_reason="version not found")
@@ -504,7 +925,18 @@ if item:
         test("TI.DeleteVersionByName", skip_reason="no versions available")
 
     # SetCDL
-    test("TI.SetCDL", lambda: item.SetCDL({"NodeIndex": "1", "Slope": "1 1 1", "Offset": "0 0 0", "Power": "1 1 1", "Saturation": "1"}))
+    test(
+        "TI.SetCDL",
+        lambda: item.SetCDL(
+            {
+                "NodeIndex": "1",
+                "Slope": "1 1 1",
+                "Offset": "0 0 0",
+                "Power": "1 1 1",
+                "Saturation": "1",
+            }
+        ),
+    )
 
     # Take lifecycle
     clips = root.GetClipList() or []
@@ -520,7 +952,12 @@ if item:
             test("TI.SelectTakeByIndex", skip_reason="no takes created")
             test("TI.DeleteTakeByIndex", skip_reason="no takes created")
     else:
-        for m in ["AddTake", "GetTakeByIndex", "SelectTakeByIndex", "DeleteTakeByIndex"]:
+        for m in [
+            "AddTake",
+            "GetTakeByIndex",
+            "SelectTakeByIndex",
+            "DeleteTakeByIndex",
+        ]:
             test(f"TI.{m}", skip_reason="no clips for take")
 
     # CopyGrades
@@ -555,13 +992,35 @@ if item:
     test("TI.Stabilize", skip_reason="slow operation")
     test("TI.SmartReframe", skip_reason="slow operation")
 else:
-    for m in ["SetProperty", "AddFusionComp", "GetFusionCompByName", "GetFusionCompByIndex",
-              "ExportFusionComp", "LoadFusionCompByName", "RenameFusionCompByName",
-              "DeleteFusionCompByName", "ImportFusionComp", "AddVersion", "LoadVersionByName",
-              "RenameVersionByName", "DeleteVersionByName", "SetCDL", "AddTake",
-              "GetTakeByIndex", "SelectTakeByIndex", "DeleteTakeByIndex", "CopyGrades",
-              "AssignToColorGroup", "ExportLUT", "SetColorOutputCache", "SetFusionOutputCache",
-              "CreateMagicMask", "RegenerateMagicMask", "Stabilize", "SmartReframe"]:
+    for m in [
+        "SetProperty",
+        "AddFusionComp",
+        "GetFusionCompByName",
+        "GetFusionCompByIndex",
+        "ExportFusionComp",
+        "LoadFusionCompByName",
+        "RenameFusionCompByName",
+        "DeleteFusionCompByName",
+        "ImportFusionComp",
+        "AddVersion",
+        "LoadVersionByName",
+        "RenameVersionByName",
+        "DeleteVersionByName",
+        "SetCDL",
+        "AddTake",
+        "GetTakeByIndex",
+        "SelectTakeByIndex",
+        "DeleteTakeByIndex",
+        "CopyGrades",
+        "AssignToColorGroup",
+        "ExportLUT",
+        "SetColorOutputCache",
+        "SetFusionOutputCache",
+        "CreateMagicMask",
+        "RegenerateMagicMask",
+        "Stabilize",
+        "SmartReframe",
+    ]:
         results["skip"].append((f"TI.{m}", "no timeline items"))
 
 # ======================================================
@@ -576,7 +1035,10 @@ if gallery:
 
     # SetAlbumName
     if new_album:
-        test("Gallery.SetAlbumName", lambda: gallery.SetAlbumName(new_album, "_test_album_p2"))
+        test(
+            "Gallery.SetAlbumName",
+            lambda: gallery.SetAlbumName(new_album, "_test_album_p2"),
+        )
 
     # CreateGalleryPowerGradeAlbum
     pg_album = gallery.CreateGalleryPowerGradeAlbum()
@@ -592,10 +1054,19 @@ if gallery:
             # ExportStills
             still_export_dir = os.path.join(tmpdir, "stills")
             os.makedirs(still_export_dir, exist_ok=True)
-            test("GSA.ExportStills", lambda: cur_album.ExportStills(stills, still_export_dir, "test_still", "jpg"))
+            test(
+                "GSA.ExportStills",
+                lambda: cur_album.ExportStills(
+                    stills, still_export_dir, "test_still", "jpg"
+                ),
+            )
 
             # ImportStills
-            exported = [os.path.join(still_export_dir, f) for f in os.listdir(still_export_dir) if f.endswith(('.jpg','.dpx','.drx'))]
+            exported = [
+                os.path.join(still_export_dir, f)
+                for f in os.listdir(still_export_dir)
+                if f.endswith((".jpg", ".dpx", ".drx"))
+            ]
             if exported:
                 test("GSA.ImportStills", lambda: cur_album.ImportStills(exported))
             else:
@@ -630,11 +1101,13 @@ total_skip = len(results["skip"])
 total = total_pass + total_fail + total_error + total_skip
 tested = total_pass + total_fail + total_error
 
-print(f"\nPHASE 2 RESULTS: {total_pass} passed, {total_fail} failed, {total_error} errors, {total_skip} skipped")
+print(
+    f"\nPHASE 2 RESULTS: {total_pass} passed, {total_fail} failed, {total_error} errors, {total_skip} skipped"
+)
 print(f"Total methods in Phase 2: {total}")
 print(f"Actually tested: {tested}")
 if tested > 0:
-    print(f"Pass rate: {total_pass/tested*100:.1f}%")
+    print(f"Pass rate: {total_pass / tested * 100:.1f}%")
 
 if results["fail"]:
     print(f"\n--- FAILURES ({len(results['fail'])}) ---")
@@ -667,6 +1140,6 @@ output = {
     "skip": [{"name": n, "reason": r} for n, r in results["skip"]],
 }
 
-with open('tests/test_phase2_results.json', 'w') as f:
+with open("tests/test_phase2_results.json", "w") as f:
     json.dump(output, f, indent=2)
 print(f"\nResults saved to tests/test_phase2_results.json")

@@ -9,32 +9,55 @@ Tests:
   - Graph.GetToolsInNode
   - Graph.SetNodeEnabled
 """
-import sys, os, json, time
 
-sys.path.append("/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules")
-import DaVinciResolveScript as dvr
+import sys, os, json, time
+import importlib
+from typing import Any, cast
+
+
+if __name__ != "__main__":
+    import pytest
+
+    pytest.skip(
+        "Resolve integration script; run directly, not under pytest.",
+        allow_module_level=True,
+    )
+
+sys.path.append(
+    "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules"
+)
+dvr = importlib.import_module("DaVinciResolveScript")
 
 resolve = dvr.scriptapp("Resolve")
 if not resolve:
     print("ERROR: Cannot connect to Resolve")
     sys.exit(1)
+resolve = cast(Any, resolve)
 
 pm = resolve.GetProjectManager()
+if not pm:
+    print("ERROR: Failed to get Project Manager")
+    sys.exit(1)
+pm = cast(Any, pm)
 proj = pm.GetCurrentProject()
 if not proj:
     print("ERROR: No project open")
     sys.exit(1)
+pm = cast(Any, pm)
+proj = cast(Any, proj)
 
 tl = proj.GetCurrentTimeline()
 if not tl:
     print("ERROR: No current timeline")
     sys.exit(1)
+tl = cast(Any, tl)
 
 print(f"Project: {proj.GetName()}")
 print(f"Timeline: {tl.GetName()}")
 print(f"Track count (video): {tl.GetTrackCount('video')}")
 
 results = {"pass": [], "fail": [], "skip": []}
+
 
 def test(name, fn, skip_reason=None):
     if skip_reason:
@@ -49,15 +72,20 @@ def test(name, fn, skip_reason=None):
         print(f"  FAIL  {name}: {e}")
         results["fail"].append(name)
 
+
 # ─── Timeline AI Methods ─────────────────────────────────────
 
 print("\n=== Timeline AI Methods ===")
+
 
 # DetectSceneCuts - just call it, returns Bool
 def test_detect_scene_cuts():
     r = tl.DetectSceneCuts()
     return r
+
+
 test("TL.DetectSceneCuts", test_detect_scene_cuts)
+
 
 # CreateSubtitlesFromAudio - use resolve constants
 def test_create_subtitles():
@@ -67,6 +95,8 @@ def test_create_subtitles():
     }
     r = tl.CreateSubtitlesFromAudio(settings)
     return r
+
+
 test("TL.CreateSubtitlesFromAudio", test_create_subtitles)
 
 # ─── Graph Node Methods ──────────────────────────────────────
@@ -86,32 +116,51 @@ if items and len(items) > 0:
             # GetNodeCacheMode
             def test_get_cache():
                 return graph.GetNodeCacheMode(1)
+
             test("Graph.GetNodeCacheMode", test_get_cache)
 
             # SetNodeCacheMode (set to current value to be non-destructive)
             def test_set_cache():
                 current = graph.GetNodeCacheMode(1)
                 return graph.SetNodeCacheMode(1, current)
+
             test("Graph.SetNodeCacheMode", test_set_cache)
 
             # GetToolsInNode
             def test_get_tools():
                 return graph.GetToolsInNode(1)
+
             test("Graph.GetToolsInNode", test_get_tools)
 
             # SetNodeEnabled (read current state, set to same value)
             def test_set_enabled():
                 # Enable node 1 (should already be enabled)
                 return graph.SetNodeEnabled(1, True)
+
             test("Graph.SetNodeEnabled", test_set_enabled)
         else:
-            for name in ["Graph.GetNodeCacheMode", "Graph.SetNodeCacheMode", "Graph.GetToolsInNode", "Graph.SetNodeEnabled"]:
+            for name in [
+                "Graph.GetNodeCacheMode",
+                "Graph.SetNodeCacheMode",
+                "Graph.GetToolsInNode",
+                "Graph.SetNodeEnabled",
+            ]:
                 test(name, None, skip_reason="No nodes in graph")
     else:
-        for name in ["Graph.GetNodeCacheMode", "Graph.SetNodeCacheMode", "Graph.GetToolsInNode", "Graph.SetNodeEnabled"]:
+        for name in [
+            "Graph.GetNodeCacheMode",
+            "Graph.SetNodeCacheMode",
+            "Graph.GetToolsInNode",
+            "Graph.SetNodeEnabled",
+        ]:
             test(name, None, skip_reason="Could not get node graph")
 else:
-    for name in ["Graph.GetNodeCacheMode", "Graph.SetNodeCacheMode", "Graph.GetToolsInNode", "Graph.SetNodeEnabled"]:
+    for name in [
+        "Graph.GetNodeCacheMode",
+        "Graph.SetNodeCacheMode",
+        "Graph.GetToolsInNode",
+        "Graph.SetNodeEnabled",
+    ]:
         test(name, None, skip_reason="No items on video track 1")
 
 # ─── Summary ─────────────────────────────────────────────────

@@ -5,11 +5,11 @@
   },
   "Resolve.GetVersion": {
     "status": "OK",
-    "value": "[19, 1, 3, 7, '']"
+    "value": "[20, 3, 2, 9, '']"
   },
   "Resolve.GetVersionString": {
     "status": "OK",
-    "value": "19.1.3.7"
+    "value": "20.3.2.9"
   },
   "Resolve.GetCurrentPage": {
     "status": "OK",
@@ -29,7 +29,7 @@
   },
   "Resolve.Fusion": {
     "status": "OK",
-    "value": "FusionUI (0x0x155b37040) [App: 'Resolve' on 127.0.0.1, UUID: c80f160d-86ff-480b-b5e3-211d4739d4e6]"
+    "value": "FusionUI (0x0x149f3b040) [App: 'Resolve' on 127.0.0.1, UUID: 7f6933a9-7abb-452a-afea-780b9bb43ece]"
   },
   "PM.GetCurrentProject": {
     "status": "OK",
@@ -37,7 +37,7 @@
   },
   "PM.GetProjectListInCurrentFolder": {
     "status": "OK",
-    "value": "['Sample', '2025-10-20_20-49-52', '240069_DCTV_Twin_SLG-C_20250106_v05', '240069_DCTV_Twin_SLG-C_202"
+    "value": "['Bear Grylls', 'Color manager', 'FastPaced_BeatSync_Repair', 'LiLy', 'Multicamera', 'project', 'Qui"
   },
   "PM.GetFolderListInCurrentFolder": {
     "status": "OK",
@@ -57,7 +57,7 @@
   },
   "Project.GetName": {
     "status": "OK",
-    "value": "Sample"
+    "value": "Untitled Project 2026-03-17_132500"
   },
   "Project.GetMediaPool": {
     "status": "OK",
@@ -77,7 +77,7 @@
   },
   "Project.GetRenderCodecs": {
     "status": "OK",
-    "value": "{'H.264': 'H264', 'H.265': 'H265'}"
+    "value": "{'H.264': 'H264', 'H.265': 'H265', 'YUV 422 10-bit': 'APVYUV422_10'}"
   },
   "Project.GetCurrentRenderFormatAndCodec": {
     "status": "OK",
@@ -105,11 +105,11 @@
   },
   "Project.GetUniqueId": {
     "status": "OK",
-    "value": "72381ad3-7787-4e63-bb43-132a5f066650"
+    "value": "6ede7218-dcba-4d15-897d-f8e698ed0157"
   },
   "Project.GetPresetList": {
     "status": "OK",
-    "value": "[{'Name': 'Current Project', 'Width': 1920, 'Height': 1080}, {'Name': 'System Config', 'Width': 1920"
+    "value": "[{'Name': 'Current Project', 'Width': 1920, 'Height': 1080}, {'Name': '\u7cfb\u7edf\u914d\u7f6e', 'Width': 1920, 'Height"
   },
   "Project.GetColorGroupsList": {
     "status": "OK",
@@ -121,7 +121,7 @@
   },
   "Project.GetQuickExportRenderPresets": {
     "status": "OK",
-    "value": "['H.264', 'HyperDeck', 'H.265', 'ProRes', 'YouTube', 'Vimeo', 'TikTok', 'Presentations', 'Dropbox', "
+    "value": "['H.264 Master', 'HyperDeck', 'H.265 Master', 'ProRes 422 HQ', 'YouTube', 'Vimeo', 'TikTok', 'Presen"
   },
   "Project.GetRenderResolutions": {
     "status": "OK",
@@ -129,15 +129,15 @@
   },
   "MS.GetMountedVolumeList": {
     "status": "OK",
-    "value": "['/Users/samuelgursky/Movies', '/Volumes/IH_Runner_v02', '/Volumes/Macintosh HD', '/Volumes/Sam Joyb"
+    "value": "['/Users/Diameter/Movies', '/Volumes/Data', '/Volumes/Macintosh HD', '/Volumes/Parallels Desktop 26'"
   },
   "MS.GetSubFolderList": {
     "status": "OK",
-    "value": "['/Users/samuelgursky/Movies/Resolve Project Backups', '/Users/samuelgursky/Movies/TV']"
+    "value": "['/Users/Diameter/Movies/3\u670812\u65e5', '/Users/Diameter/Movies/Bear Grylls', '/Users/Diameter/Movies/CapCu"
   },
   "MS.GetFileList": {
     "status": "OK",
-    "value": "[]"
+    "value": "['/Users/Diameter/Movies/1534053848988954.mp4', '/Users/Diameter/Movies/1534053849002678.mp4', '/Use"
   },
   "MP.GetRootFolder": {
     "status": "OK",
@@ -149,11 +149,11 @@
   },
   "MP.GetUniqueId": {
     "status": "OK",
-    "value": "dde652a0-5930-4198-8896-c750e3b48962"
+    "value": "63ba19a5-7dc4-41e1-bfd8-ea086f30c486"
   },
   "MP.GetSelectedClips": {
     "status": "OK",
-    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104ef3490>]"
+    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x121c3bad0>]"
   },
   "Folder.GetName": {
     "status": "OK",
@@ -161,7 +161,7 @@
   },
   "Folder.GetClipList": {
     "status": "OK",
-    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104ef3450>, <BlackmagicFusion.PyRemoteObject object at"
+    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x121c3b970>]"
   },
   "Folder.GetSubFolderList": {
     "status": "OK",
@@ -173,7 +173,7 @@
   },
   "Folder.GetUniqueId": {
     "status": "OK",
-    "value": "6afc6551-6f6d-4847-a76a-ea0ada79436a"
+    "value": "2222662a-2912-489b-8d11-8232a42bbb99"
   },
   "Gallery.GetAlbumName": {
     "status": "OK",
@@ -185,11 +185,11 @@
   },
   "Gallery.GetGalleryStillAlbums": {
     "status": "OK",
-    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104ef3450>]"
+    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x121c3b970>]"
   },
   "Gallery.GetGalleryPowerGradeAlbums": {
     "status": "OK",
-    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x104ef2c50>]"
+    "value": "[<BlackmagicFusion.PyRemoteObject object at 0x121c3b850>, <BlackmagicFusion.PyRemoteObject object at"
   },
   "GSA.GetStills": {
     "status": "OK",
@@ -201,7 +201,7 @@
   },
   "TL.GetName": {
     "status": "OK",
-    "value": "Timeline 1"
+    "value": "API_Test_Timeline"
   },
   "TL.GetStartFrame": {
     "status": "OK",
@@ -209,7 +209,7 @@
   },
   "TL.GetEndFrame": {
     "status": "OK",
-    "value": "208991"
+    "value": "86400"
   },
   "TL.GetTrackCount('video')": {
     "status": "OK",
@@ -225,7 +225,7 @@
   },
   "TL.GetCurrentTimecode": {
     "status": "OK",
-    "value": "01:00:00:00"
+    "value": "00:59:59:23"
   },
   "TL.GetMarkers": {
     "status": "OK",
@@ -237,10 +237,10 @@
   },
   "TL.GetUniqueId": {
     "status": "OK",
-    "value": "314524ab-705f-4527-9362-9cea0e60d6ac"
+    "value": "b1a5232c-ced2-405a-aa19-6bdcbb7b9ba7"
   },
   "TL.GetCurrentVideoItem": {
     "status": "OK",
-    "value": "Timeline item (0x0x31fd5b080) [App: 'Resolve' on 127.0.0.1, UUID: c80f160d-86ff-480b-b5e3-211d4739d4"
+    "value": "None"
   }
 }

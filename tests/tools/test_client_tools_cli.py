@@ -1,11 +1,14 @@
 import json
 import pytest
+
+pytest.importorskip("aiohttp")
+
 from davinci_resolve_agent.client_simulator import ClientSimulator
 
 
 @pytest.mark.asyncio
 async def test_send_tool_request_monkeypatch(monkeypatch):
-    client = ClientSimulator(api_key=None)
+    client = ClientSimulator(api_key="test")
 
     async def fake_send_rpc_request(method, params):
         assert method == "execute_tool"
@@ -21,6 +24,7 @@ async def test_send_tool_request_monkeypatch(monkeypatch):
 def test_tools_help_prints():
     # Basic string parsing check for 'tools' help message
     from davinci_resolve_agent.client_simulator import ClientSimulator
+
     client = ClientSimulator()
     # just ensure the method exists
     assert hasattr(client, "send_tool_request")

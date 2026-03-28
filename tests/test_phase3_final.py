@@ -13,24 +13,47 @@ import os
 import json
 import tempfile
 import time
+import importlib
+from typing import Any, cast
 
-sys.path.insert(0, '/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules')
-import DaVinciResolveScript as dvr
 
-resolve = dvr.scriptapp('Resolve')
+if __name__ != "__main__":
+    import pytest
+
+    pytest.skip(
+        "Resolve integration script; run directly, not under pytest.",
+        allow_module_level=True,
+    )
+
+sys.path.insert(
+    0,
+    "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules",
+)
+dvr = importlib.import_module("DaVinciResolveScript")
+
+resolve = dvr.scriptapp("Resolve")
 if not resolve:
     print("FATAL: Cannot connect to DaVinci Resolve")
     sys.exit(1)
+resolve = cast(Any, resolve)
 
 print(f"Connected to {resolve.GetProductName()} {resolve.GetVersionString()}")
 resolve.OpenPage("edit")
 
-pm = resolve.GetProjectManager()
-project = pm.GetCurrentProject()
-mp = project.GetMediaPool()
-root = mp.GetRootFolder()
-gallery = project.GetGallery()
-tl = project.GetCurrentTimeline()
+
+def require_any(value, message):
+    if not value:
+        print(message)
+        sys.exit(1)
+    return cast(Any, value)
+
+
+pm = require_any(resolve.GetProjectManager(), "FATAL: Failed to get Project Manager")
+project = require_any(pm.GetCurrentProject(), "FATAL: No project open")
+mp = require_any(project.GetMediaPool(), "FATAL: Failed to get Media Pool")
+root = require_any(mp.GetRootFolder(), "FATAL: Failed to get Root Folder")
+gallery = require_any(project.GetGallery(), "FATAL: Failed to get Gallery")
+tl = require_any(project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline")
 
 orig_project_name = project.GetName()
 orig_db = pm.GetCurrentDatabase()
@@ -51,6 +74,7 @@ print("=" * 70)
 
 results = {"pass": [], "fail": [], "skip": [], "error": []}
 
+
 def test(name, fn=None, skip_reason=None):
     if skip_reason or fn is None:
         results["skip"].append((name, skip_reason or "no function"))
@@ -67,6 +91,7 @@ def test(name, fn=None, skip_reason=None):
         print(f"  ERROR: {name}: {type(e).__name__}: {str(e)[:80]}")
         return None
 
+
 # ======================================================
 # SECTION 1: SetCurrentDatabase
 # ======================================================
@@ -74,7 +99,7 @@ print("\n--- SetCurrentDatabase ---")
 dbs = pm.GetDatabaseList()
 other_db = None
 for db in dbs:
-    if db['DbName'] != orig_db['DbName']:
+    if db["DbName"] != orig_db["DbName"]:
         other_db = db
         break
 
@@ -91,10 +116,13 @@ if other_db:
         projects = pm.GetProjectListInCurrentFolder()
         if orig_project_name in projects:
             project = pm.LoadProject(orig_project_name)
-    mp = project.GetMediaPool() if project else None
-    root = mp.GetRootFolder() if mp else None
-    tl = project.GetCurrentTimeline() if project else None
-    gallery = project.GetGallery() if project else None
+    project = require_any(project, "FATAL: Failed to reload project")
+    mp = require_any(project.GetMediaPool(), "FATAL: Failed to get Media Pool")
+    root = require_any(mp.GetRootFolder(), "FATAL: Failed to get Root Folder")
+    tl = require_any(
+        project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline"
+    )
+    gallery = require_any(project.GetGallery(), "FATAL: Failed to get Gallery")
 else:
     test("PM.SetCurrentDatabase", skip_reason="only one database available")
 
@@ -138,7 +166,10 @@ print(f"  Video clips: {len(video_clips)}, Audio clips: {len(audio_clips)}")
 print("\n--- AutoSyncAudio ---")
 if video_clips and audio_clips:
     sync_clips = [video_clips[0], audio_clips[0]]
-    test("MP.AutoSyncAudio", lambda: mp.AutoSyncAudio(sync_clips, {"isSourceTimecodeSync": True}))
+    test(
+        "MP.AutoSyncAudio",
+        lambda: mp.AutoSyncAudio(sync_clips, {"isSourceTimecodeSync": True}),
+    )
 else:
     test("MP.AutoSyncAudio", skip_reason="need both video and audio clips")
 
@@ -151,29 +182,45 @@ print("\n--- Matte operations ---")
 matte_path = os.path.join(tmpdir, "test_matte.png")
 # Minimal valid PNG (1x1 white pixel)
 import struct, zlib
+
+
 def create_png(path, width=64, height=64):
     def chunk(chunk_type, data):
         c = chunk_type + data
-        return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
-    header = b'\x89PNG\r\n\x1a\n'
-    ihdr = chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0))
-    raw = b''
+        return (
+            struct.pack(">I", len(data))
+            + c
+            + struct.pack(">I", zlib.crc32(c) & 0xFFFFFFFF)
+        )
+
+    header = b"\x89PNG\r\n\x1a\n"
+    ihdr = chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+    raw = b""
     for y in range(height):
-        raw += b'\x00' + b'\xff\xff\xff' * width
-    idat = chunk(b'IDAT', zlib.compress(raw))
-    iend = chunk(b'IEND', b'')
-    with open(path, 'wb') as f:
+        raw += b"\x00" + b"\xff\xff\xff" * width
+    idat = chunk(b"IDAT", zlib.compress(raw))
+    iend = chunk(b"IEND", b"")
+    with open(path, "wb") as f:
         f.write(header + ihdr + idat + iend)
+
 
 create_png(matte_path)
 print(f"  Created test matte: {matte_path}")
 
 ms = resolve.GetMediaStorage()
 if video_clips:
-    test("MS.AddClipMattesToMediaPool", lambda: ms.AddClipMattesToMediaPool(video_clips[0], [matte_path]))
-    test("MP.DeleteClipMattes", lambda: mp.DeleteClipMattes(video_clips[0], [matte_path]))
+    test(
+        "MS.AddClipMattesToMediaPool",
+        lambda: ms.AddClipMattesToMediaPool(video_clips[0], [matte_path]),
+    )
+    test(
+        "MP.DeleteClipMattes", lambda: mp.DeleteClipMattes(video_clips[0], [matte_path])
+    )
 
-test("MS.AddTimelineMattesToMediaPool", lambda: ms.AddTimelineMattesToMediaPool([matte_path]))
+test(
+    "MS.AddTimelineMattesToMediaPool",
+    lambda: ms.AddTimelineMattesToMediaPool([matte_path]),
+)
 
 # ======================================================
 # SECTION 5: Timeline import/export files
@@ -198,13 +245,21 @@ if video_clips:
 
         # ImportTimelineFromFile
         if os.path.exists(edl_path):
-            test("MP.ImportTimelineFromFile", lambda: mp.ImportTimelineFromFile(edl_path, {"timelineName": "_phase3_imported_tl"}))
+            test(
+                "MP.ImportTimelineFromFile",
+                lambda: mp.ImportTimelineFromFile(
+                    edl_path, {"timelineName": "_phase3_imported_tl"}
+                ),
+            )
         else:
             test("MP.ImportTimelineFromFile", skip_reason="EDL export failed")
 
         # ImportIntoTimeline (AAF import into existing timeline)
         if os.path.exists(fcpxml_path):
-            test("TL.ImportIntoTimeline", lambda: test_tl.ImportIntoTimeline(fcpxml_path, {}))
+            test(
+                "TL.ImportIntoTimeline",
+                lambda: test_tl.ImportIntoTimeline(fcpxml_path, {}),
+            )
         else:
             test("TL.ImportIntoTimeline", skip_reason="FCPXML export failed")
 
@@ -213,7 +268,9 @@ if video_clips:
         if test_folder:
             test_folder.Export(drb_path)
             if os.path.exists(drb_path):
-                test("MP.ImportFolderFromFile", lambda: mp.ImportFolderFromFile(drb_path))
+                test(
+                    "MP.ImportFolderFromFile", lambda: mp.ImportFolderFromFile(drb_path)
+                )
             else:
                 test("MP.ImportFolderFromFile", skip_reason="DRB export failed")
         else:
@@ -264,7 +321,10 @@ else:
 # ======================================================
 print("\n--- CreateStereoClip ---")
 if len(video_clips) >= 2:
-    test("MP.CreateStereoClip", lambda: mp.CreateStereoClip(video_clips[0], video_clips[1]))
+    test(
+        "MP.CreateStereoClip",
+        lambda: mp.CreateStereoClip(video_clips[0], video_clips[1]),
+    )
 else:
     test("MP.CreateStereoClip", skip_reason="need 2 video clips")
 
@@ -283,15 +343,27 @@ if gallery and tl:
     if cur_album:
         stills = cur_album.GetStills() or []
         if stills:
-            test("GSA.SetLabel", lambda: cur_album.SetLabel(stills[-1], "phase3_test_label"))
+            test(
+                "GSA.SetLabel",
+                lambda: cur_album.SetLabel(stills[-1], "phase3_test_label"),
+            )
 
             still_export_dir = os.path.join(tmpdir, "stills_export")
             os.makedirs(still_export_dir, exist_ok=True)
-            test("GSA.ExportStills", lambda: cur_album.ExportStills([stills[-1]], still_export_dir, "phase3_still", "jpg"))
+            test(
+                "GSA.ExportStills",
+                lambda: cur_album.ExportStills(
+                    [stills[-1]], still_export_dir, "phase3_still", "jpg"
+                ),
+            )
 
             # Find exported files
             time.sleep(1)
-            exported = [os.path.join(still_export_dir, f) for f in os.listdir(still_export_dir) if not f.startswith('.')]
+            exported = [
+                os.path.join(still_export_dir, f)
+                for f in os.listdir(still_export_dir)
+                if not f.startswith(".")
+            ]
             if exported:
                 test("GSA.ImportStills", lambda: cur_album.ImportStills(exported))
             else:
@@ -317,7 +389,10 @@ print("\n--- InsertAudioToCurrentTrackAtPlayhead ---")
 
 resolve.OpenPage("fairlight")
 time.sleep(2)
-test("Project.InsertAudioToCurrentTrackAtPlayhead", lambda: project.InsertAudioToCurrentTrackAtPlayhead(AUDIO_FILE, 0, 48000))
+test(
+    "Project.InsertAudioToCurrentTrackAtPlayhead",
+    lambda: project.InsertAudioToCurrentTrackAtPlayhead(AUDIO_FILE, 0, 48000),
+)
 resolve.OpenPage("edit")
 time.sleep(1)
 
@@ -329,8 +404,12 @@ print("\n--- Irreversible operations (throwaway timeline) ---")
 # Create a throwaway timeline for irreversible ops
 if test_folder:
     mp.SetCurrentFolder(test_folder)
-test_clips_now = (test_folder.GetClipList() if test_folder else root.GetClipList()) or []
-video_clips_now = [c for c in test_clips_now if "MOV" in (c.GetClipProperty("File Path") or "").upper()]
+test_clips_now = (
+    test_folder.GetClipList() if test_folder else root.GetClipList()
+) or []
+video_clips_now = [
+    c for c in test_clips_now if "MOV" in (c.GetClipProperty("File Path") or "").upper()
+]
 if not video_clips_now:
     video_clips_now = test_clips_now[:2]
 
@@ -341,9 +420,14 @@ if len(video_clips_now) >= 2:
         items = throwaway.GetItemListInTrack("video", 1) or []
 
         if len(items) >= 2:
-            test("TL.CreateFusionClip", lambda: throwaway.CreateFusionClip([items[0], items[1]]))
+            test(
+                "TL.CreateFusionClip",
+                lambda: throwaway.CreateFusionClip([items[0], items[1]]),
+            )
         else:
-            test("TL.CreateFusionClip", skip_reason="need 2+ items on throwaway timeline")
+            test(
+                "TL.CreateFusionClip", skip_reason="need 2+ items on throwaway timeline"
+            )
 
         # ConvertTimelineToStereo
         test("TL.ConvertTimelineToStereo", lambda: throwaway.ConvertTimelineToStereo())
@@ -354,7 +438,10 @@ if len(video_clips_now) >= 2:
         mp.DeleteTimelines([throwaway])
     else:
         test("TL.CreateFusionClip", skip_reason="could not create throwaway timeline")
-        test("TL.ConvertTimelineToStereo", skip_reason="could not create throwaway timeline")
+        test(
+            "TL.ConvertTimelineToStereo",
+            skip_reason="could not create throwaway timeline",
+        )
 else:
     test("TL.CreateFusionClip", skip_reason="need 2 clips for throwaway timeline")
     test("TL.ConvertTimelineToStereo", skip_reason="need 2 clips")
@@ -365,7 +452,7 @@ else:
 print("\n--- Slow AI operations (this will take a few minutes) ---")
 
 # Use our imported video clips for AI ops
-tl = project.GetCurrentTimeline()
+tl = require_any(project.GetCurrentTimeline(), "FATAL: Failed to get Current Timeline")
 tl_items = tl.GetItemListInTrack("video", 1) if tl else []
 real_items = [i for i in (tl_items or []) if i.GetMediaPoolItem() is not None]
 item = real_items[0] if real_items else None
@@ -462,11 +549,13 @@ total_skip = len(results["skip"])
 total = total_pass + total_fail + total_error + total_skip
 tested = total_pass + total_fail + total_error
 
-print(f"\nPHASE 3 RESULTS: {total_pass} passed, {total_fail} failed, {total_error} errors, {total_skip} skipped")
+print(
+    f"\nPHASE 3 RESULTS: {total_pass} passed, {total_fail} failed, {total_error} errors, {total_skip} skipped"
+)
 print(f"Total methods in Phase 3: {total}")
 print(f"Actually tested: {tested}")
 if tested > 0:
-    print(f"Pass rate: {total_pass/tested*100:.1f}%")
+    print(f"Pass rate: {total_pass / tested * 100:.1f}%")
 
 if results["fail"]:
     print(f"\n--- FAILURES ---")
@@ -489,13 +578,17 @@ print(f"Phase 1: 204 passed")
 print(f"Phase 2: 79 passed")
 print(f"Phase 3: {total_pass} passed")
 combined = 204 + 79 + total_pass
-print(f"TOTAL: {combined}/324 methods tested ({combined/324*100:.1f}%)")
+print(f"TOTAL: {combined}/324 methods tested ({combined / 324 * 100:.1f}%)")
 print(f"Final skip count: {total_skip} (cloud methods only: 4)")
 
 output = {
     "summary": {
-        "total": total, "tested": tested, "passed": total_pass,
-        "failed": total_fail, "errors": total_error, "skipped": total_skip,
+        "total": total,
+        "tested": tested,
+        "passed": total_pass,
+        "failed": total_fail,
+        "errors": total_error,
+        "skipped": total_skip,
     },
     "pass": [{"name": n, "value": v} for n, v in results["pass"]],
     "fail": [{"name": n, "detail": d} for n, d in results["fail"]],
@@ -503,6 +596,6 @@ output = {
     "skip": [{"name": n, "reason": r} for n, r in results["skip"]],
 }
 
-with open('tests/test_phase3_results.json', 'w') as f:
+with open("tests/test_phase3_results.json", "w") as f:
     json.dump(output, f, indent=2)
 print(f"\nResults saved to tests/test_phase3_results.json")

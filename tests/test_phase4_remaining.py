@@ -9,13 +9,30 @@ Tests:
   - TL.ConvertTimelineToStereo
   - Gallery still operations (GSA.SetLabel, ExportStills, ImportStills, DeleteStills)
 """
-import sys, os, json, time, tempfile
 
-sys.path.insert(0, "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules")
-import DaVinciResolveScript as dvr
+import sys, os, json, time, tempfile
+import importlib
+import pytest
+
+sys.path.insert(
+    0,
+    "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting/Modules",
+)
+try:
+    dvr = importlib.import_module("DaVinciResolveScript")
+except ModuleNotFoundError:
+    if __name__ != "__main__":
+        pytest.skip(
+            "DaVinci Resolve scripting module not available.",
+            allow_module_level=True,
+        )
+    raise
 
 resolve = dvr.scriptapp("Resolve")
-assert resolve, "Cannot connect to DaVinci Resolve"
+if not resolve:
+    if __name__ != "__main__":
+        pytest.skip("Cannot connect to DaVinci Resolve.", allow_module_level=True)
+    raise SystemExit("Cannot connect to DaVinci Resolve")
 
 pm = resolve.GetProjectManager()
 proj = pm.GetCurrentProject()
@@ -23,10 +40,15 @@ print(f"Project: {proj.GetName()}")
 
 results = {"pass": [], "fail": [], "skip": []}
 
+
 def test(name, fn=None, skip_reason=None):
     if skip_reason:
         results["skip"].append((name, skip_reason))
         print(f"  SKIP  {name} — {skip_reason}")
+        return
+    if fn is None:
+        results["skip"].append((name, "no function"))
+        print(f"  SKIP  {name} — no function")
         return
     try:
         r = fn()
@@ -36,13 +58,20 @@ def test(name, fn=None, skip_reason=None):
         results["fail"].append((name, str(e)))
         print(f"  FAIL  {name} — {e}")
 
+
 # Get the main timeline and a real item
 tl = proj.GetTimelineByIndex(1)
-assert tl, "No timeline found"
+if not tl:
+    if __name__ != "__main__":
+        pytest.skip("No timeline found", allow_module_level=True)
+    raise SystemExit("No timeline found")
 proj.SetCurrentTimeline(tl)
 
 items = tl.GetItemListInTrack("video", 1)
-assert items and len(items) > 0, "No video items on track 1"
+if not items:
+    if __name__ != "__main__":
+        pytest.skip("No video items on track 1", allow_module_level=True)
+    raise SystemExit("No video items on track 1")
 item = items[0]
 print(f"Using timeline: {tl.GetName()}, item: {item.GetName()}")
 
@@ -50,33 +79,46 @@ print(f"Using timeline: {tl.GetName()}, item: {item.GetName()}")
 
 print("\n=== TimelineItem AI/Processing Methods ===")
 
+
 # TI.Stabilize — starts stabilization analysis (async, just check it accepts the call)
 def test_stabilize():
     r = item.Stabilize()
     return r  # may return True/False depending on clip type
+
+
 test("TI.Stabilize", test_stabilize)
+
 
 # TI.SmartReframe — starts smart reframe (async)
 def test_smart_reframe():
     r = item.SmartReframe()
     return r
+
+
 test("TI.SmartReframe", test_smart_reframe)
+
 
 # TI.CreateMagicMask — creates a magic mask (forward direction)
 def test_create_magic_mask():
     r = item.CreateMagicMask("F")
     return r
+
+
 test("TI.CreateMagicMask", test_create_magic_mask)
+
 
 # TI.RegenerateMagicMask — regenerates the magic mask
 def test_regenerate_magic_mask():
     r = item.RegenerateMagicMask()
     return r
+
+
 test("TI.RegenerateMagicMask", test_regenerate_magic_mask)
 
 # ─── Timeline tests ──────────────────────────────────────────
 
 print("\n=== Timeline Methods ===")
+
 
 # TL.CreateFusionClip — needs timeline items selected or passed
 # Create a throwaway timeline with 2 clips for this test
@@ -88,7 +130,9 @@ def test_create_fusion_clip():
         return "SKIP: need 2+ clips in media pool"
 
     # Create a throwaway timeline with 2 clips
-    test_tl = mp.CreateTimelineFromClips("_fusion_test_tl", [clips_in_pool[0], clips_in_pool[1]])
+    test_tl = mp.CreateTimelineFromClips(
+        "_fusion_test_tl", [clips_in_pool[0], clips_in_pool[1]]
+    )
     if not test_tl:
         return "Could not create test timeline"
     proj.SetCurrentTimeline(test_tl)
@@ -107,10 +151,12 @@ def test_create_fusion_clip():
 
     return r
 
+
 test("TL.CreateFusionClip", test_create_fusion_clip)
 
 # Switch back to main timeline
 proj.SetCurrentTimeline(tl)
+
 
 # TL.ConvertTimelineToStereo — converts a timeline to stereo 3D
 def test_convert_to_stereo():
@@ -132,6 +178,7 @@ def test_convert_to_stereo():
 
     return r
 
+
 test("TL.ConvertTimelineToStereo", test_convert_to_stereo)
 
 # Switch back to main timeline
@@ -140,6 +187,7 @@ proj.SetCurrentTimeline(tl)
 # ─── Gallery Still tests ─────────────────────────────────────
 
 print("\n=== Gallery Still Album Methods ===")
+
 
 def test_gallery_stills():
     gallery = proj.GetGallery()
@@ -185,7 +233,11 @@ def test_gallery_stills():
             results_inner["ExportStills"] = f"error: {e}"
 
         # GSA.ImportStills — import a DRX if exported
-        drx_files = [f for f in os.listdir(tmpdir) if f.endswith(".drx")] if os.path.exists(tmpdir) else []
+        drx_files = (
+            [f for f in os.listdir(tmpdir) if f.endswith(".drx")]
+            if os.path.exists(tmpdir)
+            else []
+        )
         if drx_files:
             try:
                 import_path = os.path.join(tmpdir, drx_files[0])
@@ -209,6 +261,7 @@ def test_gallery_stills():
 
         # cleanup temp
         import shutil
+
         shutil.rmtree(tmpdir, ignore_errors=True)
     else:
         results_inner["ExportStills"] = "skip: no stills"
@@ -217,11 +270,12 @@ def test_gallery_stills():
 
     return results_inner
 
+
 test("Gallery.StillAlbum ops (SetLabel/Export/Import/Delete)", test_gallery_stills)
 
 # ─── Summary ─────────────────────────────────────────────────
 
-print("\n" + "="*60)
+print("\n" + "=" * 60)
 print(f"PASS: {len(results['pass'])}")
 print(f"FAIL: {len(results['fail'])}")
 print(f"SKIP: {len(results['skip'])}")
@@ -229,8 +283,10 @@ for name, reason in results["fail"]:
     print(f"  FAIL: {name} — {reason}")
 for name, reason in results["skip"]:
     print(f"  SKIP: {name} — {reason}")
-print("="*60)
+print("=" * 60)
 
 # Save results
-with open("/Users/samuelgursky/davinci-resolve-mcp/tests/test_phase4_results.json", "w") as f:
+with open(
+    "/Users/samuelgursky/davinci-resolve-mcp/tests/test_phase4_results.json", "w"
+) as f:
     json.dump(results, f, indent=2, default=str)

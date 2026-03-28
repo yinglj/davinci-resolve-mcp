@@ -11,6 +11,7 @@ This module tests the connection to a real DaVinci Resolve instance and validate
 import sys
 import asyncio
 import logging
+import pytest
 from typing import Dict, Any, Optional, List, Tuple
 from pathlib import Path
 from datetime import datetime
@@ -420,6 +421,7 @@ class ResolveConnectionTester:
         print("=" * 80 + "\n")
 
 
+@pytest.mark.anyio
 async def test_resolve_connection_basic():
     """Test 1: Basic Resolve Connection"""
     logger.info("\n" + "=" * 80)
@@ -433,6 +435,7 @@ async def test_resolve_connection_basic():
     logger.info("✓ Test 1 passed: Basic connection successful")
 
 
+@pytest.mark.anyio
 async def test_resolve_project_access():
     """Test 2: Project Access"""
     logger.info("\n" + "=" * 80)
@@ -448,6 +451,7 @@ async def test_resolve_project_access():
     logger.info("✓ Test 2 passed: Project access successful")
 
 
+@pytest.mark.anyio
 async def test_resolve_media_pool():
     """Test 3: Media Pool Access"""
     logger.info("\n" + "=" * 80)
@@ -464,6 +468,7 @@ async def test_resolve_media_pool():
     logger.info("✓ Test 3 passed: Media pool access successful")
 
 
+@pytest.mark.anyio
 async def test_resolve_timeline():
     """Test 4: Timeline Access"""
     logger.info("\n" + "=" * 80)
@@ -480,6 +485,7 @@ async def test_resolve_timeline():
     logger.info("✓ Test 4 passed: Timeline access successful")
 
 
+@pytest.mark.anyio
 async def test_resolve_page_availability():
     """Test 5: Resolve Pages Availability (Fusion, Color, Fairlight)"""
     logger.info("\n" + "=" * 80)
@@ -504,6 +510,7 @@ async def test_resolve_page_availability():
     logger.info("✓ Test 5 passed: Pages availability check complete")
 
 
+@pytest.mark.anyio
 async def test_resolve_comprehensive():
     """Test 6: Comprehensive Connection Report"""
     logger.info("\n" + "=" * 80)

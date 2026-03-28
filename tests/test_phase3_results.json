@@ -1,11 +1,11 @@
 {
   "summary": {
-    "total": 33,
-    "tested": 18,
-    "passed": 18,
+    "total": 26,
+    "tested": 8,
+    "passed": 8,
     "failed": 0,
     "errors": 0,
-    "skipped": 15
+    "skipped": 18
   },
   "pass": [
     {
@@ -22,19 +22,7 @@
     },
     {
       "name": "MS.AddTimelineMattesToMediaPool",
-      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x13060a8d0>]"
-    },
-    {
-      "name": "GSA.SetLabel",
-      "value": "True"
-    },
-    {
-      "name": "GSA.ExportStills",
-      "value": "False"
-    },
-    {
-      "name": "GSA.DeleteStills",
-      "value": "True"
+      "value": "[<BlackmagicFusion.PyRemoteObject object at 0x10c703230>]"
     },
     {
       "name": "Project.InsertAudioToCurrentTrackAtPlayhead",
@@ -47,34 +35,6 @@
     {
       "name": "Folder.ClearTranscription",
       "value": "True"
-    },
-    {
-      "name": "TL.DetectSceneCuts",
-      "value": "True"
-    },
-    {
-      "name": "TL.CreateSubtitlesFromAudio",
-      "value": "True"
-    },
-    {
-      "name": "TI.Stabilize",
-      "value": "True"
-    },
-    {
-      "name": "TI.SmartReframe",
-      "value": "True"
-    },
-    {
-      "name": "TI.CreateMagicMask",
-      "value": "False"
-    },
-    {
-      "name": "TI.RegenerateMagicMask",
-      "value": "False"
-    },
-    {
-      "name": "TL.AnalyzeDolbyVision",
-      "value": "False"
     },
     {
       "name": "Resolve.Quit",
@@ -117,16 +77,28 @@
       "reason": "need 2 video clips"
     },
     {
-      "name": "GSA.ImportStills",
-      "reason": "no exported stills found"
-    },
-    {
       "name": "TL.CreateFusionClip",
       "reason": "need 2 clips for throwaway timeline"
     },
     {
       "name": "TL.ConvertTimelineToStereo",
       "reason": "need 2 clips"
+    },
+    {
+      "name": "TI.Stabilize",
+      "reason": "no real timeline item available"
+    },
+    {
+      "name": "TI.SmartReframe",
+      "reason": "no real timeline item available"
+    },
+    {
+      "name": "TI.CreateMagicMask",
+      "reason": "no real timeline item available"
+    },
+    {
+      "name": "TI.RegenerateMagicMask",
+      "reason": "no real timeline item available"
     },
     {
       "name": "PM.CreateCloudProject",
