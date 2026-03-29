@@ -10,6 +10,21 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger("davinci-resolve-mcp.media.pool")
 
+def _collect_clips_recursive(folder, all_clips: List[Any], all_folders: List[Any]) -> None:
+    """Collect clips from folder and all nested subfolders."""
+    if not folder:
+        return
+    all_folders.append(folder)
+    clips = folder.GetClipList()
+    if clips:
+        all_clips.extend(clips)
+    subfolders = folder.GetSubFolderList()
+    if not subfolders:
+        return
+    for sub in subfolders:
+        if sub:
+            _collect_clips_recursive(sub, all_clips, all_folders)
+
 
 def get_all_media_pool_clips(resolve):
     """Helper to get all clips from media pool (root and subfolders).
@@ -37,17 +52,8 @@ def get_all_media_pool_clips(resolve):
         return {"error": "Failed to get Root Folder"}
 
     all_clips = []
-
-    root_clips = root_folder.GetClipList()
-    if root_clips:
-        all_clips.extend(root_clips)
-
-    folders = root_folder.GetSubFolderList()
-    for folder in folders:
-        if folder:
-            folder_clips = folder.GetClipList()
-            if folder_clips:
-                all_clips.extend(folder_clips)
+    folders = []
+    _collect_clips_recursive(root_folder, all_clips, folders)
 
     return {
         "clips": all_clips,
@@ -59,38 +65,21 @@ def get_all_media_pool_clips(resolve):
 
 def list_media_pool_clips(resolve) -> List[Dict[str, Any]]:
     """List all clips in the media pool of the current project."""
-    if resolve is None:
-        return [{"error": "Not connected to DaVinci Resolve"}]
-
-    project_manager = resolve.GetProjectManager()
-    if not project_manager:
-        return [{"error": "Failed to get Project Manager"}]
-
-    current_project = project_manager.GetCurrentProject()
-    if not current_project:
-        return [{"error": "No project currently open"}]
-
-    media_pool = current_project.GetMediaPool()
-    if not media_pool:
-        return [{"error": "Failed to get Media Pool"}]
-
-    root_folder = media_pool.GetRootFolder()
-    if not root_folder:
-        return [{"error": "Failed to get Root Folder"}]
-
-    clips = root_folder.GetClipList()
+    pool_result = get_all_media_pool_clips(resolve)
+    if isinstance(pool_result, dict) and "error" in pool_result:
+        return [pool_result]
+    clips = pool_result["clips"]
 
     clip_info = []
     for clip in clips:
         if clip:
-            clip_info.append(
-                {
-                    "name": clip.GetName(),
-                    "type": clip.GetClipProperty()["Type"],
-                    "duration": clip.GetClipProperty()["Duration"],
-                    "fps": clip.GetClipProperty().get("FPS", "Unknown"),
-                }
-            )
+            props = clip.GetClipProperty()
+            clip_info.append({
+                "name": clip.GetName(),
+                "type": props.get("Type", "Unknown"),
+                "duration": props.get("Duration", "Unknown"),
+                "fps": props.get("FPS", "Unknown"),
+            })
 
     return clip_info if clip_info else [{"info": "No clips found in the media pool"}]
 

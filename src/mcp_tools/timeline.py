@@ -4,7 +4,7 @@ DaVinci Resolve MCP Timeline Tools
 Timeline operations and marker management
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, Union
 
 
 def register_timeline_tools(mcp, resolve, logger):
@@ -47,7 +47,7 @@ def register_timeline_tools(mcp, resolve, logger):
     @mcp.tool()
     def create_empty_timeline(
         name: str,
-        frame_rate: str = None,
+        frame_rate: Union[str, int, float, None] = None,
         resolution_width: int = None,
         resolution_height: int = None,
         start_timecode: str = None,
@@ -68,14 +68,18 @@ def register_timeline_tools(mcp, resolve, logger):
         Returns:
             str: Success or failure message.
         """
-        from src.api.timeline_operations import (
+        from src.api.timeline import (
             create_empty_timeline as create_empty_timeline_func,
         )
+
+        normalized_frame_rate: Optional[str] = None
+        if frame_rate is not None:
+            normalized_frame_rate = str(frame_rate)
 
         return create_empty_timeline_func(
             resolve,
             name,
-            frame_rate,
+            normalized_frame_rate,
             resolution_width,
             resolution_height,
             start_timecode,
@@ -93,7 +97,7 @@ def register_timeline_tools(mcp, resolve, logger):
         Returns:
             str: Success or failure message.
         """
-        from src.api.timeline_operations import delete_timeline as delete_timeline_func
+        from src.api.timeline import delete_timeline as delete_timeline_func
 
         return delete_timeline_func(resolve, name)
 
@@ -145,7 +149,7 @@ def register_timeline_tools(mcp, resolve, logger):
         Returns:
             str: Success or failure message.
         """
-        from src.api.timeline_operations import add_marker as add_marker_func
+        from src.api.timeline import add_marker as add_marker_func
 
         return add_marker_func(resolve, frame, color, note)
 

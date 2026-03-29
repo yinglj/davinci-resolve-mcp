@@ -20,7 +20,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: Success message with clip name or failure description.
         """
-        from src.api.media_operations import import_media as import_media_func
+        from src.api.media import import_media as import_media_func
 
         return import_media_func(resolve, file_path)
 
@@ -34,7 +34,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating whether the clip was successfully deleted.
         """
-        from src.api.media_operations import delete_media as delete_media_func
+        from src.api.media import delete_media as delete_media_func
 
         return delete_media_func(resolve, clip_name)
 
@@ -49,7 +49,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: Result of the move operation.
         """
-        from src.api.media_operations import move_media_to_bin as move_media_func
+        from src.api.media import move_media_to_bin as move_media_func
 
         return move_media_func(resolve, clip_name, bin_name)
 
@@ -71,7 +71,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        from src.api.media_operations import auto_sync_audio as auto_sync_audio_func
+        from src.api.media import auto_sync_audio as auto_sync_audio_func
 
         return auto_sync_audio_func(
             resolve, clip_names, sync_method, append_mode, target_bin
@@ -87,7 +87,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        from src.api.media_operations import unlink_clips as unlink_clips_func
+        from src.api.media import unlink_clips as unlink_clips_func
 
         return unlink_clips_func(resolve, clip_names)
 
@@ -109,7 +109,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        from src.api.media_operations import relink_clips as relink_clips_func
+        from src.api.media import relink_clips as relink_clips_func
 
         return relink_clips_func(
             resolve, clip_names, media_paths, folder_path, recursive
@@ -135,7 +135,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        from src.api.media_operations import create_sub_clip as create_sub_clip_func
+        from src.api.media import create_sub_clip as create_sub_clip_func
 
         return create_sub_clip_func(
             resolve, clip_name, start_frame, end_frame, sub_clip_name, bin_name
@@ -151,7 +151,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: Result message.
         """
-        from src.api.media_operations import create_bin as create_bin_func
+        from src.api.media import create_bin as create_bin_func
 
         return create_bin_func(resolve, name)
 
@@ -166,7 +166,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        from src.api.media_operations import add_clip_to_timeline as add_clip_func
+        from src.api.media import add_clip_to_timeline as add_clip_func
 
         return add_clip_func(resolve, clip_name, timeline_name)
 
@@ -196,7 +196,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             str: A message indicating the success or failure of the operation.
         """
-        from src.api.media_operations import append_to_timeline as append_func
+        from src.api.media import append_to_timeline as append_func
 
         return append_func(
             resolve,
@@ -218,7 +218,7 @@ def register_media_tools(mcp, resolve, logger):
         Returns:
             dict: Metadata properties or error message.
         """
-        from src.api.media_operations import get_clip_metadata as get_meta_func
+        from src.api.media import get_clip_metadata as get_meta_func
 
         return get_meta_func(resolve, clip_name)
 

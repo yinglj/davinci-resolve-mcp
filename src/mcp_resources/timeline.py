@@ -72,7 +72,7 @@ def register_timeline_resources(mcp, resolve, logger):
     def get_timeline_tracks(timeline_name: str = None) -> Dict[str, Any]:
         """Get the track structure of a timeline."""
         try:
-            from src.api.timeline_operations import (
+            from src.api.timeline import (
                 get_timeline_tracks as get_tracks_func,
             )
         except ImportError:
