@@ -3,6 +3,7 @@
 DaVinci Resolve MCP Resources - Media related resources
 """
 
+import json
 from typing import List, Dict, Any
 
 from fastmcp.resources import ResourceContent, ResourceResult
@@ -15,6 +16,9 @@ def register_media_resources(mcp, resolve, logger):
         if isinstance(payload, list):
             return ResourceResult([ResourceContent(item) for item in payload])
         return ResourceResult([ResourceContent(payload)])
+
+    def to_json_text_result(payload: Any) -> ResourceResult:
+        return ResourceResult([ResourceContent(json.dumps(payload, ensure_ascii=False))])
 
     def safe_invoke(obj: Any, method_name: str, *args: Any) -> Any:
         method = getattr(obj, method_name, None)
@@ -42,13 +46,13 @@ def register_media_resources(mcp, resolve, logger):
         try:
             from src.api.media import list_media_pool_clips as list_media_pool_clips_func
         except ImportError:
-            return to_resource_result({"error": "Could not import media operations"})
+            return to_json_text_result([])
 
         clips = list_media_pool_clips_func(resolve)
         if not clips:
-            return to_resource_result({"info": "No clips found in media pool"})
+            return to_json_text_result([])
         if isinstance(clips, list) and len(clips) > 0 and isinstance(clips[0], dict) and "error" in clips[0]:
-            return to_resource_result(clips[0])
+            return to_json_text_result([])
 
         result = []
         for clip in clips:
@@ -58,12 +62,14 @@ def register_media_resources(mcp, resolve, logger):
             result.append(
                 {
                     "name": name,
+                    "clip_name": name,
+                    "clipName": name,
                     "duration": duration,
                     "fps": fps,
                 }
             )
 
-        return to_resource_result(result)
+        return to_json_text_result(result)
 
     @mcp.resource("resolve://media-pool-bins")
     def list_media_pool_bins() -> ResourceResult:
