@@ -17,8 +17,8 @@ def register_media_resources(mcp, resolve, logger):
             return ResourceResult([ResourceContent(item) for item in payload])
         return ResourceResult([ResourceContent(payload)])
 
-    def to_json_text_result(payload: Any) -> ResourceResult:
-        return ResourceResult([ResourceContent(json.dumps(payload, ensure_ascii=False))])
+    def to_json_text(payload: Any) -> str:
+        return json.dumps(payload, ensure_ascii=False)
 
     def safe_invoke(obj: Any, method_name: str, *args: Any) -> Any:
         method = getattr(obj, method_name, None)
@@ -41,18 +41,18 @@ def register_media_resources(mcp, resolve, logger):
         return clip_prop if clip_prop not in (None, "") else 0
 
     @mcp.resource("resolve://media-pool-clips")
-    def list_media_pool_clips() -> ResourceResult:
+    def list_media_pool_clips() -> str:
         """List all clips in the root folder of the media pool."""
         try:
             from src.api.media import list_media_pool_clips as list_media_pool_clips_func
         except ImportError:
-            return to_json_text_result([])
+            return to_json_text([])
 
         clips = list_media_pool_clips_func(resolve)
         if not clips:
-            return to_json_text_result([])
+            return to_json_text([])
         if isinstance(clips, list) and len(clips) > 0 and isinstance(clips[0], dict) and "error" in clips[0]:
-            return to_json_text_result([])
+            return to_json_text([])
 
         result = []
         for clip in clips:
@@ -69,7 +69,7 @@ def register_media_resources(mcp, resolve, logger):
                 }
             )
 
-        return to_json_text_result(result)
+        return to_json_text(result)
 
     @mcp.resource("resolve://media-pool-bins")
     def list_media_pool_bins() -> ResourceResult:
