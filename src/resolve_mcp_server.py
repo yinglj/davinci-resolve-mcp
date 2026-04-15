@@ -8,6 +8,7 @@ Version: 2.0.7 - Security: path traversal protection for layout preset tools
 
 import os
 import sys
+import json
 import logging
 import platform
 import subprocess
@@ -695,23 +696,23 @@ def add_marker(frame: int = None, color: str = "Blue", note: str = "") -> str:
 # ------------------
 
 @mcp.resource("resolve://media-pool-clips")
-def list_media_pool_clips() -> List[Dict[str, Any]]:
+def list_media_pool_clips() -> str:
     """List all clips in the root folder of the media pool."""
     pm, current_project = get_current_project()
     if not current_project:
-        return [{"error": "No project currently open"}]
+        return json.dumps([{"error": "No project currently open"}], ensure_ascii=False)
     
     media_pool = current_project.GetMediaPool()
     if not media_pool:
-        return [{"error": "Failed to get Media Pool"}]
+        return json.dumps([{"error": "Failed to get Media Pool"}], ensure_ascii=False)
     
     root_folder = media_pool.GetRootFolder()
     if not root_folder:
-        return [{"error": "Failed to get root folder"}]
+        return json.dumps([{"error": "Failed to get root folder"}], ensure_ascii=False)
     
     clips = root_folder.GetClipList()
     if not clips:
-        return [{"info": "No clips found in the root folder"}]
+        return json.dumps([{"info": "No clips found in the root folder"}], ensure_ascii=False)
     
     # Return a simplified list with basic clip info
     result = []
@@ -722,7 +723,7 @@ def list_media_pool_clips() -> List[Dict[str, Any]]:
             "fps": clip.GetClipProperty("FPS")
         })
     
-    return result
+    return json.dumps(result, ensure_ascii=False)
 
 @mcp.tool()
 def import_media(file_path: str) -> str:
