@@ -7,7 +7,7 @@ This module registers all new tools with the MCP server.
 import json
 from typing import List, Dict, Any, Optional
 
-from mcp.types import ResourceResult
+from mcp.types import ReadResourceResult as ResourceResult
 
 
 def register_database_tools(mcp, resolve):
