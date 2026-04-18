@@ -11,6 +11,9 @@ import logging
 from pathlib import Path
 from typing import Literal, cast
 
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
+
 # Add the parent directory to sys.path to ensure imports work
 # This allows us to import src_1.4.0 components as a package
 project_dir = Path(__file__).parent.parent
@@ -38,6 +41,19 @@ except ModuleNotFoundError as e:
     from .utils.logger import logger
 
 # Remove manual basicConfig as CustomLogger handles it
+
+
+def build_http_middleware() -> list[Middleware]:
+    """Add CORS support so browser-based MCP clients can complete preflight."""
+    return [
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+            allow_headers=["*"],
+            expose_headers=["mcp-session-id", "mcp-protocol-version"],
+        )
+    ]
 
 
 def check_setup():
@@ -86,7 +102,12 @@ def run_server(
     if transport == "stdio":
         mcp.run(transport=transport)
     else:
-        mcp.run(transport=transport, host="0.0.0.0", port=port)
+        mcp.run(
+            transport=transport,
+            host="0.0.0.0",
+            port=port,
+            middleware=build_http_middleware(),
+        )
 
 
 def main():
