@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la /Users/Diameter/Downloads/davinci-resolve-mcp/src/resolve_mcp_server*)",
+      "Bash(ls -la /Users/Diameter/Downloads/davinci-resolve-mcp/src/*server*)",
+      "Bash(lsof -ti:8020)",
+      "Bash(xargs kill:*)",
+      "Bash(timeout 15 uv run src)",
+      "Bash(uv run:*)",
+      "Bash(pkill -f \"uv run src\")"
+    ]
+  }
+}

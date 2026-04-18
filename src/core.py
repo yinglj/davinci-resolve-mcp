@@ -181,27 +181,8 @@ except ImportError as e:
 except Exception as e:
     logger.warning(f"Error registering keyboard tools: {e}")
 
-try:
-    LegacyToolProvider = importlib.import_module(
-        "src.utils.legacy_tool_provider"
-    ).LegacyToolProvider
-    from . import resolve_mcp_server
-
-    mcp.add_provider(LegacyToolProvider(resolve_mcp_server.mcp))
-    logger.info("Mounted legacy resolve_mcp_server tools")
-except Exception as e:
-    logger.warning(f"Could not mount legacy resolve_mcp_server tools: {e}")
-
-try:
-    LegacyToolProvider = importlib.import_module(
-        "src.utils.legacy_tool_provider"
-    ).LegacyToolProvider
-    from . import server as compound_server
-
-    mcp.add_provider(LegacyToolProvider(compound_server.mcp))
-    logger.info("Mounted legacy compound server tools")
-except Exception as e:
-    logger.warning(f"Could not mount legacy compound server tools: {e}")
+# Note: Legacy resolve_mcp_server tools are NOT mounted here to avoid duplicates.
+# All tools are now provided via the new modular system in register_all_new_tools().
 
 
 # Note: This module should be imported, not run directly.

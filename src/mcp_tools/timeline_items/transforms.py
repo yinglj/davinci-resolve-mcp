@@ -4,15 +4,55 @@ DaVinci Resolve MCP Timeline Item Transform Tools
 Setting timeline item properties
 """
 
+from typing import Optional
+
 from .properties import find_timeline_item
 
 
 def register_timeline_item_transform_tools(mcp, resolve, logger):
     """Register timeline item transform MCP tools."""
 
+    def resolve_item_from_compat_params(
+        current_timeline,
+        timeline_item_id: Optional[str],
+        track_index: Optional[int],
+        item_index: Optional[int],
+    ):
+        if timeline_item_id:
+            item, _ = find_timeline_item(
+                current_timeline,
+                timeline_item_id,
+                search_video=True,
+                search_audio=False,
+            )
+            return item
+
+        if item_index is None:
+            return None
+
+        effective_track = track_index or 1
+        items = current_timeline.GetItemListInTrack("video", effective_track) or []
+        if len(items) == 0:
+            return None
+
+        # Compatibility: prefer 1-based index from orchestration plans; fallback to 0-based.
+        one_based = item_index - 1
+        if 0 <= one_based < len(items):
+            return items[one_based]
+        if 0 <= item_index < len(items):
+            return items[item_index]
+        return None
+
     @mcp.tool()
     def set_timeline_item_transform(
-        timeline_item_id: str, property_name: str, property_value: float
+        timeline_item_id: str = None,
+        property_name: str = None,
+        property_value: float = None,
+        timeline_name: str = None,
+        track_index: int = None,
+        item_index: int = None,
+        zoom_x: float = None,
+        zoom_y: float = None,
     ) -> str:
         """Set a transform property for a timeline item."""
         if resolve is None:
@@ -30,6 +70,9 @@ def register_timeline_item_transform_tools(mcp, resolve, logger):
         if not current_timeline:
             return "Error: No timeline currently active"
 
+        if timeline_name and current_timeline.GetName() != timeline_name:
+            return f"Error: Current timeline is '{current_timeline.GetName()}', expected '{timeline_name}'"
+
         valid_properties = [
             "Pan",
             "Tilt",
@@ -42,30 +85,48 @@ def register_timeline_item_transform_tools(mcp, resolve, logger):
             "Yaw",
         ]
 
-        if property_name not in valid_properties:
-            return f"Error: Invalid property. Must be one of: {', '.join(valid_properties)}"
+        timeline_item = resolve_item_from_compat_params(
+            current_timeline,
+            timeline_item_id,
+            track_index,
+            item_index,
+        )
+
+        if not timeline_item:
+            item_hint = timeline_item_id if timeline_item_id else f"track={track_index or 1}, index={item_index}"
+            return f"Error: Video timeline item not found ({item_hint})"
 
         try:
-            timeline_item, _ = find_timeline_item(
-                current_timeline,
-                timeline_item_id,
-                search_video=True,
-                search_audio=False,
-            )
-
-            if not timeline_item:
-                return (
-                    f"Error: Video timeline item with ID '{timeline_item_id}' not found"
-                )
-
             if timeline_item.GetType() != "Video":
-                return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
+                return "Error: Target timeline item is not a video item"
 
-            result = timeline_item.SetProperty(property_name, property_value)
-            if result:
-                return f"Successfully set {property_name} to {property_value}"
-            else:
-                return f"Failed to set {property_name}"
+            updates = []
+            if zoom_x is not None:
+                updates.append(("ZoomX", zoom_x))
+            if zoom_y is not None:
+                updates.append(("ZoomY", zoom_y))
+
+            if property_name is not None:
+                if property_name not in valid_properties:
+                    return f"Error: Invalid property. Must be one of: {', '.join(valid_properties)}"
+                if property_value is None:
+                    return "Error: property_value is required when property_name is provided"
+                updates.append((property_name, property_value))
+
+            if not updates:
+                return "Error: Must provide property_name/property_value or zoom_x/zoom_y"
+
+            applied = []
+            failed = []
+            for name, value in updates:
+                if timeline_item.SetProperty(name, value):
+                    applied.append(f"{name}={value}")
+                else:
+                    failed.append(name)
+
+            if failed:
+                return f"Partial success: applied [{', '.join(applied)}], failed [{', '.join(failed)}]"
+            return f"Successfully set {', '.join(applied)}"
         except Exception as e:
             return f"Error setting timeline item property: {str(e)}"
 
@@ -210,7 +271,12 @@ def register_timeline_item_transform_tools(mcp, resolve, logger):
 
     @mcp.tool()
     def set_timeline_item_retime(
-        timeline_item_id: str, speed: float = None, process: str = None
+        timeline_item_id: str = None,
+        speed: float = None,
+        process: str = None,
+        timeline_name: str = None,
+        track_index: int = None,
+        item_index: int = None,
     ) -> str:
         """Set retiming properties for a timeline item."""
         if resolve is None:
@@ -228,6 +294,9 @@ def register_timeline_item_transform_tools(mcp, resolve, logger):
         if not current_timeline:
             return "Error: No timeline currently active"
 
+        if timeline_name and current_timeline.GetName() != timeline_name:
+            return f"Error: Current timeline is '{current_timeline.GetName()}', expected '{timeline_name}'"
+
         if speed is None and process is None:
             return "Error: Must specify at least one of speed or process"
 
@@ -239,17 +308,16 @@ def register_timeline_item_transform_tools(mcp, resolve, logger):
             return f"Error: Invalid retime process"
 
         try:
-            timeline_item, _ = find_timeline_item(
+            timeline_item = resolve_item_from_compat_params(
                 current_timeline,
                 timeline_item_id,
-                search_video=True,
-                search_audio=False,
+                track_index,
+                item_index,
             )
 
             if not timeline_item:
-                return (
-                    f"Error: Video timeline item with ID '{timeline_item_id}' not found"
-                )
+                item_hint = timeline_item_id if timeline_item_id else f"track={track_index or 1}, index={item_index}"
+                return f"Error: Video timeline item not found ({item_hint})"
 
             success = True
 

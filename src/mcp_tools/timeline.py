@@ -4,7 +4,7 @@ DaVinci Resolve MCP Timeline Tools
 Timeline operations and marker management
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 
 
 def register_timeline_tools(mcp, resolve, logger):
@@ -47,12 +47,12 @@ def register_timeline_tools(mcp, resolve, logger):
     @mcp.tool()
     def create_empty_timeline(
         name: str,
-        frame_rate: Optional[str] = None,
-        resolution_width: Optional[int] = None,
-        resolution_height: Optional[int] = None,
-        start_timecode: Optional[str] = None,
-        video_tracks: Optional[int] = None,
-        audio_tracks: Optional[int] = None,
+        frame_rate: Union[str, int, float, None] = None,
+        resolution_width: int = None,
+        resolution_height: int = None,
+        start_timecode: str = None,
+        video_tracks: int = None,
+        audio_tracks: int = None,
     ) -> str:
         """Create a new timeline with custom settings.
 
@@ -72,10 +72,14 @@ def register_timeline_tools(mcp, resolve, logger):
             create_empty_timeline as create_empty_timeline_func,
         )
 
+        normalized_frame_rate: Optional[str] = None
+        if frame_rate is not None:
+            normalized_frame_rate = str(frame_rate)
+
         return create_empty_timeline_func(
             resolve,
             name,
-            frame_rate,
+            normalized_frame_rate,
             resolution_width,
             resolution_height,
             start_timecode,

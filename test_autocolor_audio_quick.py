@@ -2,17 +2,10 @@
 """Quick test for AutoColor & Audio integration"""
 
 import sys
+from pathlib import Path
 
-
-if __name__ != "__main__":
-    import pytest
-
-    pytest.skip(
-        "Resolve integration script; run directly, not under pytest.",
-        allow_module_level=True,
-    )
-
-sys.path.insert(0, "/Users/Diameter/Downloads/davinci-resolve-mcp")
+PROJECT_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.agent.executor.skills.resolve_color_and_audio import (
     create_color_grade_from_style,

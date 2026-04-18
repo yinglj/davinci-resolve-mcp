@@ -26,7 +26,9 @@ try:
     )
     from src.utils.network import get_all_ip_addresses
     from src.utils.logger import logger
-except ImportError:
+except ModuleNotFoundError as e:
+    if e.name not in {"src", "src.utils", "src.utils.resolve_connection", "src.utils.network", "src.utils.logger"}:
+        raise
     # Fallback for if we're inside the package
     from .utils.resolve_connection import (
         check_environment_variables,
@@ -57,9 +59,11 @@ def run_server(
 ):
     """Run the MCP server."""
     try:
-        from src.core import mcp
-    except ImportError:
-        from .core import mcp
+        from src.core import mcp, resolve
+    except ModuleNotFoundError as e:
+        if e.name not in {"src", "src.core"}:
+            raise
+        from .core import mcp, resolve
 
     # Set logging level based on debug flag
     if debug:
@@ -78,7 +82,11 @@ def run_server(
             for interface, ip in ip_list:
                 logger.print(f"http://{ip}:{port}/mcp")
 
-    mcp.run(transport=mode, host="0.0.0.0", port=port)
+    transport = "http" if mode == "streamable-http" else mode
+    if transport == "stdio":
+        mcp.run(transport=transport)
+    else:
+        mcp.run(transport=transport, host="0.0.0.0", port=port)
 
 
 def main():

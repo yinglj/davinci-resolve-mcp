@@ -4,13 +4,10 @@ Tool Registration for DaVinci Resolve MCP Server.
 This module registers all new tools with the MCP server.
 """
 
+import json
 from typing import List, Dict, Any, Optional
 
-from fastmcp.resources import ResourceContent, ResourceResult
-
-
-def to_resource_result(payload: Any) -> ResourceResult:
-    return ResourceResult([ResourceContent(payload)])
+from mcp.types import ResourceResult
 
 
 def register_database_tools(mcp, resolve):
@@ -187,14 +184,14 @@ def register_gallery_tools(mcp, resolve):
     )
 
     @mcp.resource("resolve://gallery/still-albums")
-    def get_still_albums() -> ResourceResult:
-        """Get list of gallery still albums."""
-        return to_resource_result(gal_get_albums(resolve))
+    def get_still_albums() -> str:
+        """Get list of gallery still albums as JSON text content."""
+        return json.dumps(gal_get_albums(resolve), ensure_ascii=False)
 
     @mcp.resource("resolve://gallery/powergrade-albums")
-    def get_powergrade_albums() -> ResourceResult:
-        """Get list of gallery PowerGrade albums."""
-        return to_resource_result(gal_get_pg_albums(resolve))
+    def get_powergrade_albums() -> str:
+        """Get list of gallery PowerGrade albums as JSON text content."""
+        return json.dumps(gal_get_pg_albums(resolve), ensure_ascii=False)
 
     @mcp.resource("resolve://gallery/current-album")
     def get_current_album() -> ResourceResult:
