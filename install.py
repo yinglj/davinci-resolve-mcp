@@ -702,10 +702,11 @@ def main():
     if args.server:
         server_path = Path(args.server).resolve()
     else:
-        # Try to find the server script (prefer compound 26-tool server)
+        # Try to find the server script (prefer modular entry point)
         candidates = [
-            project_dir / "src" / "server.py",
+            project_dir / "src" / "__main__.py",
             project_dir / "src" / "resolve_mcp_server.py",
+            project_dir / "src" / "server.py",
             project_dir / "src" / "main.py",
             project_dir / "resolve_mcp_server.py",
         ]
