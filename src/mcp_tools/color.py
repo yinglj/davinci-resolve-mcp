@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 def register_color_tools(mcp, resolve, logger):
     """Register color page MCP tools."""
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: apply_lut is in granular (prefer upstream)
     def apply_lut(lut_path: str, node_index: Optional[int] = None) -> str:
         """Apply a Look-Up Table (LUT) to a specific node in the color page.
 
@@ -25,7 +25,7 @@ def register_color_tools(mcp, resolve, logger):
 
         return apply_lut_func(resolve, lut_path, node_index)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: set_color_wheel_param is in granular (prefer upstream)
     def set_color_wheel_param(
         wheel: str, param: str, value: float, node_index: Optional[int] = None
     ) -> str:
@@ -44,7 +44,7 @@ def register_color_tools(mcp, resolve, logger):
 
         return set_param_func(resolve, wheel, param, value, node_index)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: add_node is in granular (prefer upstream)
     def add_node(node_type: str = "serial", label: Optional[str] = None) -> str:
         """Add a new node to the current clip's node graph.
 
@@ -59,7 +59,7 @@ def register_color_tools(mcp, resolve, logger):
 
         return add_node_func(resolve, node_type, label)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: copy_grade is in granular (prefer upstream)
     def copy_grade(
         source_clip_name: Optional[str] = None,
         target_clip_name: Optional[str] = None,

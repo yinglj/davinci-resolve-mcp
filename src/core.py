@@ -171,6 +171,20 @@ except ImportError as e:
 except Exception as e:
     logger.warning(f"Error registering modular tools: {e}")
 
+# Mount granular server tools under /granular prefix
+try:
+    from src.granular import folder, gallery, graph, media_pool, media_pool_item
+    from src.granular import media_storage, project, resolve_control, timeline, timeline_item
+    from src.granular import render, presets, layout, cloud
+    from src.granular.common import mcp as granular_mcp
+
+    mcp.mount(granular_mcp, namespace="granular")
+    logger.info("Mounted granular server (342 tools) under /granular prefix")
+except ImportError as e:
+    logger.warning(f"Could not mount granular tools: {e}")
+except Exception as e:
+    logger.warning(f"Error mounting granular tools: {e}")
+
 try:
     from .tools.keyboard import register_keyboard_tools
 

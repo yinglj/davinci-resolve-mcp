@@ -70,12 +70,12 @@ def register_database_tools(mcp, resolve):
         """Open a folder by name."""
         return db_open_folder(resolve, folder_name)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: create_project_folder is in granular (prefer upstream)
     def create_project_folder(folder_name: str) -> str:
         """Create a new folder in the current location."""
         return db_create_folder(resolve, folder_name)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: delete_project_folder is in granular (prefer upstream)
     def delete_project_folder(folder_name: str) -> str:
         """Delete a folder by name."""
         return db_delete_folder(resolve, folder_name)
@@ -146,12 +146,12 @@ def register_media_storage_tools(mcp, resolve):
         """Get list of mounted volumes in Media Storage."""
         return to_resource_result(ms_get_volumes(resolve))
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: get_media_storage_subfolders is in granular (prefer upstream)
     def get_media_storage_subfolders(folder_path: str) -> List[str]:
         """Get list of subfolders in a Media Storage path."""
         return ms_get_subfolders(resolve, folder_path)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: get_media_storage_files is in granular (prefer upstream)
     def get_media_storage_files(folder_path: str) -> List[str]:
         """Get list of files in a Media Storage path."""
         return ms_get_files(resolve, folder_path)
@@ -198,7 +198,7 @@ def register_gallery_tools(mcp, resolve):
         """Get the current still album."""
         return to_resource_result(gal_get_current(resolve))
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: create_gallery_still_album is in granular (prefer upstream)
     def create_gallery_still_album() -> str:
         """Create a new gallery still album."""
         return gal_create_still(resolve)
@@ -228,12 +228,12 @@ def register_gallery_tools(mcp, resolve):
         """Grab stills from all clips. source: 1=first frame, 2=middle frame."""
         return gal_grab_all(resolve, source)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: import_stills_to_album is in granular (prefer upstream)
     def import_stills_to_album(album_name: str, file_paths: List[str]) -> str:
         """Import still images into a gallery album."""
         return gal_import(resolve, album_name, file_paths)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: export_stills_from_album is in granular (prefer upstream)
     def export_stills_from_album(
         album_name: str,
         folder_path: str,
@@ -245,7 +245,7 @@ def register_gallery_tools(mcp, resolve):
 
 
 def register_timeline_advanced_tools(mcp, resolve):
-    """Register advanced timeline tools."""
+    """Register advanced timeline tools. All skipped: prefer granular upstream."""
     from src.api.timeline_advanced import (
         duplicate_timeline as tl_duplicate,
         create_compound_clip as tl_compound,
@@ -257,7 +257,7 @@ def register_timeline_advanced_tools(mcp, resolve):
         insert_fusion_title as tl_insert_fusion_title,
     )
 
-    @mcp.tool()
+    # All @mcp.tool() decorators below are commented out - tools exist in granular
     def duplicate_current_timeline(
         timeline_name: Optional[str] = None,
         new_name: Optional[str] = None,
@@ -265,7 +265,6 @@ def register_timeline_advanced_tools(mcp, resolve):
         """Duplicate a timeline."""
         return tl_duplicate(resolve, timeline_name, new_name)
 
-    @mcp.tool()
     def create_compound_clip_from_items(
         clip_names: List[str],
         compound_name: Optional[str] = None,
@@ -274,32 +273,26 @@ def register_timeline_advanced_tools(mcp, resolve):
         """Create a compound clip from timeline items."""
         return tl_compound(resolve, clip_names, compound_name, start_timecode)
 
-    @mcp.tool()
     def create_fusion_clip_from_items(clip_names: List[str]) -> str:
         """Create a Fusion clip from timeline items."""
         return tl_fusion_clip(resolve, clip_names)
 
-    @mcp.tool()
     def insert_generator_to_timeline(generator_name: str) -> str:
         """Insert a generator into the timeline."""
         return tl_insert_gen(resolve, generator_name)
 
-    @mcp.tool()
     def insert_fusion_generator_to_timeline(generator_name: str) -> str:
         """Insert a Fusion generator into the timeline."""
         return tl_insert_fusion_gen(resolve, generator_name)
 
-    @mcp.tool()
     def insert_fusion_composition_to_timeline() -> str:
         """Insert a Fusion composition into the timeline."""
         return tl_insert_fusion_comp(resolve)
 
-    @mcp.tool()
     def insert_title_to_timeline(title_name: str) -> str:
         """Insert a title into the timeline."""
         return tl_insert_title(resolve, title_name)
 
-    @mcp.tool()
     def insert_fusion_title_to_timeline(title_name: str) -> str:
         """Insert a Fusion title into the timeline."""
         return tl_insert_fusion_title(resolve, title_name)
@@ -317,7 +310,7 @@ def register_timeline_export_tools(mcp, resolve):
         export_current_frame_as_still as tl_export_frame,
     )
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: import_timeline is in granular (prefer upstream)
     def import_timeline(
         file_path: str,
         timeline_name: Optional[str] = None,
@@ -329,7 +322,7 @@ def register_timeline_export_tools(mcp, resolve):
             resolve, file_path, timeline_name, import_source_clips, source_clips_path
         )
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: export_current_timeline is in granular (prefer upstream)
     def export_current_timeline(
         file_path: str, export_type: str, export_subtype: str = "NONE"
     ) -> str:
@@ -341,24 +334,24 @@ def register_timeline_export_tools(mcp, resolve):
         """Get the current playhead timecode."""
         return to_resource_result(tl_get_tc(resolve))
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: set_playhead_timecode is in granular (prefer upstream)
     def set_playhead_timecode(timecode: str) -> str:
         """Set the playhead to a specific timecode (e.g., '01:00:00:00')."""
         return tl_set_tc(resolve, timecode)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: detect_timeline_scene_cuts is in granular (prefer upstream)
     def detect_timeline_scene_cuts() -> str:
         """Detect and create scene cuts along the timeline."""
         return tl_detect_cuts(resolve)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: create_subtitles_from_timeline_audio is in granular (prefer upstream)
     def create_subtitles_from_timeline_audio(
         language: str = None, chars_per_line: int = None
     ) -> str:
         """Create subtitles from audio. Languages: auto,english,japanese,etc."""
         return tl_subtitles(resolve, language, chars_per_line)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: export_current_frame is in granular (prefer upstream)
     def export_current_frame(file_path: str) -> str:
         """Export the current frame as a still image."""
         return tl_export_frame(resolve, file_path)
@@ -384,7 +377,7 @@ def register_marker_tools(mcp, resolve):
         """Get all markers from the current timeline."""
         return to_resource_result(mk_get_timeline(resolve))
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: add_marker_to_timeline is in granular (prefer upstream)
     def add_marker_to_timeline(
         frame: int,
         color: str = "Blue",
@@ -396,32 +389,32 @@ def register_marker_tools(mcp, resolve):
         """Add a marker to the current timeline."""
         return mk_add_timeline(resolve, frame, color, name, note, duration, custom_data)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: delete_timeline_marker is in granular (prefer upstream)
     def delete_timeline_marker(frame: int) -> str:
         """Delete a marker at the specified frame."""
         return mk_del_at_frame(resolve, frame)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: delete_markers_by_color is in granular (prefer upstream)
     def delete_markers_by_color(color: str) -> str:
         """Delete all markers of the specified color. Use 'All' for all markers."""
         return mk_del_by_color(resolve, color)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: find_marker_by_custom_data is in granular (prefer upstream)
     def find_marker_by_custom_data(custom_data: str) -> Dict[str, Any]:
         """Find a marker by its custom data."""
         return mk_get_by_data(resolve, custom_data)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: update_marker_data is in granular (prefer upstream)
     def update_marker_data(frame: int, custom_data: str) -> str:
         """Update the custom data of a marker at the specified frame."""
         return mk_update_data(resolve, frame, custom_data)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: get_marker_data is in granular (prefer upstream)
     def get_marker_data(frame: int) -> str:
         """Get the custom data of a marker at the specified frame."""
         return mk_get_data(resolve, frame)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: delete_marker_with_custom_data is in granular (prefer upstream)
     def delete_marker_with_custom_data(custom_data: str) -> str:
         """Delete the first marker with the specified custom data."""
         return mk_del_by_data(resolve, custom_data)
@@ -431,7 +424,7 @@ def register_marker_tools(mcp, resolve):
         """Get all markers from a media pool clip."""
         return to_resource_result(mk_get_clip(resolve, clip_name))
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: add_marker_to_clip is in granular (prefer upstream)
     def add_marker_to_clip(
         clip_name: str,
         frame: int,

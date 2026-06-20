@@ -33,7 +33,7 @@ def register_core_tools(mcp, resolve, logger):
             # Fallback if manager isn't easily accessible
             return "Reconnection tool error: Could not access connection manager."
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: switch_page is in granular (prefer upstream)
     def switch_page(page: str) -> str:
         """Switch to a specific page in DaVinci Resolve.
 

@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 def register_media_tools(mcp, resolve, logger):
     """Register media pool MCP tools."""
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: import_media is in granular (prefer upstream)
     def import_media(file_path: str) -> str:
         """Import a media file from the local filesystem into the current project's media pool.
 
@@ -24,7 +24,7 @@ def register_media_tools(mcp, resolve, logger):
 
         return import_media_func(resolve, file_path)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: delete_media is in granular (prefer upstream)
     def delete_media(clip_name: str) -> str:
         """Delete a media clip from the media pool by its name.
 
@@ -38,7 +38,7 @@ def register_media_tools(mcp, resolve, logger):
 
         return delete_media_func(resolve, clip_name)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: move_media_to_bin is in granular (prefer upstream)
     def move_media_to_bin(clip_name: str, bin_name: str) -> str:
         """Move a media clip to a specific bin (folder) in the media pool.
 
@@ -53,7 +53,7 @@ def register_media_tools(mcp, resolve, logger):
 
         return move_media_func(resolve, clip_name, bin_name)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: auto_sync_audio is in granular (prefer upstream)
     def auto_sync_audio(
         clip_names: List[str],
         sync_method: str = "waveform",
@@ -77,7 +77,7 @@ def register_media_tools(mcp, resolve, logger):
             resolve, clip_names, sync_method, append_mode, target_bin
         )
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: unlink_clips is in granular (prefer upstream)
     def unlink_clips(clip_names: List[str]) -> str:
         """Unlink specified clips, disconnecting them from their media files.
 
@@ -91,7 +91,7 @@ def register_media_tools(mcp, resolve, logger):
 
         return unlink_clips_func(resolve, clip_names)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: relink_clips is in granular (prefer upstream)
     def relink_clips(
         clip_names: List[str],
         media_paths: Optional[List[str]] = None,
@@ -115,7 +115,7 @@ def register_media_tools(mcp, resolve, logger):
             resolve, clip_names, media_paths, folder_path, recursive
         )
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: create_sub_clip is in granular (prefer upstream)
     def create_sub_clip(
         clip_name: str,
         start_frame: int,
@@ -141,7 +141,7 @@ def register_media_tools(mcp, resolve, logger):
             resolve, clip_name, start_frame, end_frame, sub_clip_name, bin_name
         )
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: create_bin is in granular (prefer upstream)
     def create_bin(name: str) -> str:
         """Create a new bin (folder) in the media pool root folder.
 
@@ -155,7 +155,7 @@ def register_media_tools(mcp, resolve, logger):
 
         return create_bin_func(resolve, name)
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: add_clip_to_timeline is in granular (prefer upstream)
     def add_clip_to_timeline(
         clip_name: str, timeline_name: Optional[str] = None
     ) -> str:
@@ -210,7 +210,7 @@ def register_media_tools(mcp, resolve, logger):
             timeline_name,
         )
 
-    @mcp.tool()
+    # @mcp.tool() - SKIPPED: get_clip_metadata is in granular (prefer upstream)
     def get_clip_metadata(clip_name: str) -> Dict[str, Any]:
         """Get detailed metadata for a media pool clip (FPS, duration, resolution, etc.).
 
