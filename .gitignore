@@ -108,3 +108,5 @@ autoresearch/
 # Autoresearch artifacts
 run.log
 *.log.bak
+
+.claude
