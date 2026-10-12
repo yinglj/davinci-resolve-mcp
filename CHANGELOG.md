@@ -2,6 +2,49 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.10.6 — names that need xml escaping reach their bin and their color group
+
+### Fixes
+
+- **`drt(action="assemble_project")` failed outright when a timeline placed
+  in a bin had `&`, `"` or `'` in its name.** The pool clip stores the name
+  escaped (`Reel 1 &amp; 2`), but the step that moves it into its bin searched
+  for the raw `Reel 1 & 2`, found nothing, and threw
+  `could not locate pool clip for timeline Reel 1 & 2 to move into folder Reels`.
+  No archive was written. The lookup now matches the escaped name.
+  - **The bin's own name was written unescaped**, so `folder: "R&D"` produced
+    a `MpFolder.xml` that does not parse. It is escaped now.
+  - A name without those characters escapes to itself, so existing archives
+    come out byte-for-byte unchanged.
+  - Lands #283 from @Dev-next-gen, as submitted, with two tests that fail on
+    the old code.
+- **The same mistake in reverse affected color-group grade reads.** The
+  helpers behind `drp(action="extract_group_grades")` and
+  `drx(action="grade_transfer")` found a group by searching `project.xml` for
+  `<Name>` plus the raw name:
+  - asking for a group called `Night & Day` returned `group not found`, because
+    the file stores `Night &amp; Day`;
+  - the unfiltered listing reported the stored form, `Night &amp; Day`, as the
+    group's name;
+  - a clip or other element with the same name as a group, placed before it in
+    the file, made the lookup return a segment that spanned two groups and
+    both of their grades.
+
+  Group names are now decoded when read and compared as plain text. An
+  apostrophe resolves whether the file spells it `'` or `&apos;`. The lookup
+  only looks inside `<Sm2Group>` elements, and the label passed to the
+  decoder is escaped. A caller that passed the escaped form back
+  (`Night &amp; Day`) must now pass the plain name.
+
+### Validation
+
+- Offline file handling only; nothing calls Resolve. Advanced suite green,
+  with two new group-name tests that fail on the old code; Python suite green.
+- `assemble_project` changes the offline `.drp` authoring tier. The
+  round-trip harness was not run: it needs a Resolve 21.x Studio host, and
+  this machine runs 19.1.3.7. For a name without `&`, `"` or `'`, the archive
+  is byte-identical to before.
+
 ## What's New in v4.10.5 — `rename_plan` sees a name the plan keeps
 
 ### Fixes
