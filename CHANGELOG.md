@@ -2,6 +2,33 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.10.5 — `rename_plan` sees a name the plan keeps
+
+### Fixes
+
+- **`media(action="rename_plan")` missed a rename onto a name that stays in
+  place.** It counted collisions only among the names it renames *to*, so a
+  name it leaves alone was invisible to the check. With
+  `names: ["A001_C001.mov", "dailies_A001_C001.mov"]`, `find: "dailies_"`,
+  `replace: ""`, the camera original was correctly refused, and the plan then
+  proposed renaming `dailies_A001_C001.mov` onto it with `collisions: 0`.
+  Applying that plan overwrites the file the refusal was protecting.
+  - A name the plan keeps now occupies its target: a refused camera original,
+    and a name `find` leaves unchanged. The same call returns
+    `action: "collision"`, `collisions: 1`, `renameCount: 0`.
+  - **`reel_normalize` had the same gap**: a reel already at its normalized
+    name was not counted, so `["card1", "CARD001"]` both landed on `CARD001`
+    with no collision. It is counted now.
+  - A swap (`b → x` while `x → y`) is still not a collision, since `x` is
+    leaving. Noops stay noops and refusals stay refusals.
+- Lands #284 from @Dev-next-gen, as submitted, with two tests that fail on
+  the old code.
+
+### Validation
+
+- Planning code only; nothing touches Resolve or media. Advanced suite
+  green; Python suite green.
+
 ## What's New in v4.10.4 — enrolled in Anthropic's OSS Scanner
 
 ### Security
