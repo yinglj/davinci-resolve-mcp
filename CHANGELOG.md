@@ -2,6 +2,40 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.10.7 — `retargetDRT` moves the `<ProjectVersion>` import gate, not only the comment stamp
+
+### Fixes
+
+- **`retargetDRT` / `retargetDRP` produced files an older Resolve still
+  refused.** Resolve decides "A newer version of DaVinci Resolve is needed to
+  import" on project.xml's `<ProjectVersion>` element; it never reads the
+  `DbAppVer="…" DbPrjVer="…"` comment for that decision. The vendored
+  `drt-format/resolve-versions.js` rewrote the comment on every XML member and
+  left the element alone, so a DRP "retargeted" to 19 still carried 17 inside.
+  - **The bundled project shell had the same hole.** It is a 20.3.2 export
+    with `<ProjectVersion>15</ProjectVersion>`, so a tool-built DRT retargeted
+    to 19 shipped a shell Resolve 19 cannot open.
+  - `restampVersions` now also moves any `<ProjectVersion>` element to the
+    target's DbPrjVer, whatever its current value. A DRP's kept project.xml
+    and the added shell both land on the target schema. DRX and
+    SeqContainer/MpFolder XML carry no such element and are unchanged;
+    unrelated numbers in the body are untouched.
+  - The `drt` tool's `downgrade` and `assemble` actions patched the element
+    themselves and were never affected; the library on its own was.
+
+### Validation
+
+- Tests: gate moved for a DRP's project.xml and for the shell at every
+  registry target (19, 20, 21); null control that XML without the element
+  gains none and keeps its other numbers; the pre-fix module leaves the gate
+  at 17 on the same input.
+- Vendored drt-format suites: 51 pass, 0 fail, 1 pre-existing skip (missing
+  fixture). Server drt suites (downgrade, assemble, events): 32/32.
+- Manual import, 2026-10-13: a Resolve 21.0.3 timeline (schema 17) imported
+  into Resolve 19.1.3 once the element read 14. The `.drp` round-trip harness
+  was not run: it needs a Resolve 21.x Studio host, and this machine runs
+  19.1.3.7.
+
 ## What's New in v4.10.6 — names that need xml escaping reach their bin and their color group
 
 ### Fixes
