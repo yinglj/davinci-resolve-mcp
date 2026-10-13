@@ -105,6 +105,11 @@ def read_cube(path: str) -> Dict[str, Any]:
             if upper.startswith("DOMAIN_MAX"):
                 domain_max = [float(value) for value in line.split()[1:4]]
                 continue
+            if upper.startswith("LUT_3D_INPUT_RANGE"):
+                # Resolve's form of DOMAIN_MIN/MAX: one min and one max for all channels.
+                low, high = (float(value) for value in line.split()[1:3])
+                domain_min, domain_max = [low] * 3, [high] * 3
+                continue
             parts = line.split()
             if len(parts) != 3:
                 raise CubeLutError(f"{path}:{line_number}: expected 3 values, got {len(parts)}")
