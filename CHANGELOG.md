@@ -2,6 +2,51 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.1 — Windows: liveness checks no longer kill the process they check, and the offline suite runs clean
+
+Closes #278, reported by @AllastorV with the failures grouped by cause. Nobody
+here runs Windows, so everything below was worked out from the code and
+simulated on macOS: the Windows-only API calls are covered by tests that run
+only on Windows.
+
+### Fixes
+
+- **On Windows, three pid liveness checks terminated the process they asked
+  about.** Python's `os.kill(pid, 0)` is a harmless existence check on POSIX,
+  but on Windows any signal other than `CTRL_C_EVENT`/`CTRL_BREAK_EVENT` goes
+  through `TerminateProcess`. `resolve_busy._pid_alive` (the busy sidecar),
+  `mcp_transport.read_transport_state` (the networked-transport state file)
+  and `server._control_panel_pid_alive` (the control-panel pidfile) used it,
+  and all three are routinely asked about the server's own pid. On Windows they
+  now use `proc.windows_pid_alive` (`OpenProcess` + `WaitForSingleObject`, the
+  approach the bridge already used); POSIX is unchanged. A new AST guard fails
+  the suite if a signal-0 probe lands in `src/` without a Windows branch.
+- **`.gitattributes` pins `eol=lf` on the 32 generated agent-rule files**, so
+  a default `core.autocrlf=true` checkout no longer fails
+  `generate.mjs --check`. Existing Windows clones need
+  `git add --renormalize .` or a fresh checkout.
+
+### Tests (Windows portability, no behaviour change)
+
+- **SQLite handles closed before temp dirs are removed** (56 tests across
+  `test_resolve_ai_ledger`, `test_resolve_ai_governance`,
+  `test_resolve21_actions`, `test_provenance`, `MediaAnalysisPlanningTests` and
+  others). Each class follows the existing pattern, closing with
+  `timeline_brain_db.close_all` registered so it runs before the removal. No
+  central hook was added, so a test that leaks a handle still shows. The list
+  came from a macOS run that flags any removal under a live connection: 56
+  before, 0 after.
+- Path expectations are built the way the code builds them, not as POSIX
+  strings (`test_cdl_and_install_config` and others).
+- Symlink-dependent cases skip, with the `OSError` as the reason, when the
+  process cannot create symlinks.
+- One-offs: `sys.executable` instead of `python3`/`cat`; `tempfile.gettempdir()`
+  instead of a literal `/tmp`; the home directory stays resolvable
+  (`USERPROFILE` as well as `HOME`); sandbox-container installer tests pinned
+  to macOS; the unwritable-target installer tests reworked so they still test
+  Windows; a stale `taskkill` expectation updated; `proc.kill()` instead of
+  `SIGKILL`.
+
 ## What's New in v4.13.0 — Resolve 21.1 render-setting parity, `SetHighPriority(bool)`, and a project-destroying preset order
 
 Lands the three items queued for @legionsound in #207. The 21.1 behaviour
