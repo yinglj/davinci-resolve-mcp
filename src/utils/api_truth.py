@@ -3471,6 +3471,39 @@ API_TRUTH: List[Dict[str, Any]] = [
         "tags": ["dctl", "validation", "unreliable-return", "version-gated", "reported"],
         "submit": "bug",
     },
+    {
+        "symbol": "Project.StartRendering",
+        "object": "Project",
+        "signature": "(jobIds: list[str], isInteractiveMode=False) -> bool  (21.1 typed stub)",
+        "reality": "STATE-DEPENDENT RETURN. Reported by @legionsound (issue #207) "
+                   "from Studio 21.1.0.14 on macOS, 2026-09-09; NOT reproduced "
+                   "here (no 21.1 install). In one session, some freshly "
+                   "configured render jobs made StartRendering return False and "
+                   "remain Ready, while an identical job configured later in the "
+                   "same session started and completed. Official direct calls "
+                   "reproduced BOTH outcomes, so a False from one interface and a "
+                   "True from another in that sequence is not an interface "
+                   "difference. The trigger was not isolated; no root cause is "
+                   "established. The same session confirmed the two 21.1 "
+                   "RenderSettings keys the compound whitelist used to drop: "
+                   "UseUniqueFilenames=True gave queued filenames Resolve's "
+                   "'_V1-0001' suffix, and AudioFormat='wav' with LPCM produced "
+                   "complete 14-second stereo 48 kHz 24-bit WAVs whose decoded PCM "
+                   "matched byte for byte across both community interfaces.",
+        "recommended": "Treat the boolean as a hint in both directions. After "
+                       "start, read render(action='get_job_status') and "
+                       "render(action='verify_output') for the actual output file "
+                       "before reporting a render as running or done; a False "
+                       "with the job still Ready means nothing rendered. Do not "
+                       "auto-retry in a wrapper: the measured later success was a "
+                       "NEW identical job, not a retry of the same one, so a loop "
+                       "would hide the state it depends on. Surface the False and "
+                       "let the caller decide whether to re-queue.",
+        "tags": ["render", "unreliable-return", "state-dependent", "version-gated", "reported"],
+        "submit": "bug",
+        "issue": 207,
+        "verified_on": "DaVinci Resolve Studio 21.1.0.14",
+    },
     # ── Measured on Studio 21.1.0.14, 2026-09-09 (trap-aware execution work) ──
     {
         "symbol": "TimelineItem.CopyGrades",
@@ -3714,6 +3747,7 @@ ACTION_SYMBOLS: Dict[Tuple[str, str], List[str]] = {
     ("fusion_comp", "add_modifier"): ["Tool.AddModifier", "Tool.AddModifier (NestControl inputs)"],
     ("fusion_comp", "add_keyframe"): ["Tool.AddModifier (NestControl inputs)"],
     ("project_manager", "safe_project_archive"): ["ProjectManager.ArchiveProject"],
+    ("render", "start"): ["Project.StartRendering"],
 }
 
 

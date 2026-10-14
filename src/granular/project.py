@@ -1,6 +1,7 @@
 """Project, render, cache, cloud, and project-property tools."""
 
 from src.granular.common import *  # noqa: F401,F403
+from src.utils.bool_params import recognised_bool
 from src.utils.page_lock import restoring_page
 
 resolve = ResolveProxy()
@@ -1109,6 +1110,11 @@ def get_render_job_list() -> Dict[str, Any]:
 def start_rendering_jobs(job_ids: Optional[List[str]] = None, is_interactive_mode: bool = False) -> Dict[str, Any]:
     """Start rendering jobs. If no job IDs specified, renders all queued jobs.
 
+    StartRendering is state-dependent on Resolve 21.1 (api_truth
+    'Project.StartRendering'): a freshly configured job can return False and
+    stay Ready while an identical later job completes. Check job status and the
+    output file afterwards; this tool does not retry.
+
     Args:
         job_ids: Optional list of job IDs to render. If None, renders all.
         is_interactive_mode: If True, enables interactive rendering mode.
@@ -1224,8 +1230,19 @@ def set_render_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
             ExportAlpha (bool), EncodingProfile (str), MultiPassEncode (bool),
             AlphaMode (int), NetworkOptimization (bool), ClipStartFrame (int),
             TimelineStartTimecode (str), ReplaceExistingFilesInPlace (bool),
-            ExportSubtitle (bool), SubtitleFormat ("BurnIn", "EmbeddedCaptions", "SeparateFile").
+            ExportSubtitle (bool), SubtitleFormat ("BurnIn", "EmbeddedCaptions", "SeparateFile"),
+            and the Resolve 21.1 typed keys UseUniqueFilenames (bool; "true"/"false"
+            strings are coerced, anything else is refused before the call) and
+            AudioFormat (audio file extension, e.g. "wav"; documented for
+            ExportVideo false). A True return means the settings were taken, not
+            that a render will succeed: verify job status and the output file
+            after starting (see api_truth 'Project.StartRendering').
     """
+    if isinstance(settings, dict) and "UseUniqueFilenames" in settings:
+        coerced = recognised_bool(settings["UseUniqueFilenames"])
+        if coerced is None:
+            return {"error": "UseUniqueFilenames must be a boolean (true/false)"}
+        settings = dict(settings, UseUniqueFilenames=coerced)
     resolve = get_resolve()
     if resolve is None:
         return {"error": "Not connected to DaVinci Resolve"}

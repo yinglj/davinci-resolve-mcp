@@ -79,7 +79,11 @@ from src.utils.proc import safe_run
 from src.utils.readback import verify_by_readback, verification_stats as _verification_stats
 from src.utils import operation_result as _operation_result
 from src.utils import operation_log as _operation_log
-from src.utils.bool_params import coerce_bool as _coerce_bool, explicit_bool_param as _explicit_bool_param
+from src.utils.bool_params import (
+    coerce_bool as _coerce_bool,
+    explicit_bool_param as _explicit_bool_param,
+    recognised_bool as _recognised_bool,
+)
 from src.utils.confirm_tokens import (
     ConfirmTokenStore as _ConfirmTokenStore,
     gate_required_from as _gate_required_from,
@@ -20300,6 +20304,7 @@ _RENDER_SETTING_KEYS = [
     "MarkOut",
     "TargetDir",
     "CustomName",
+    "UseUniqueFilenames",
     "UniqueFilenameStyle",
     "ExportVideo",
     "ExportAudio",
@@ -20308,6 +20313,7 @@ _RENDER_SETTING_KEYS = [
     "FrameRate",
     "PixelAspectRatio",
     "VideoQuality",
+    "AudioFormat",
     "AudioCodec",
     "AudioBitDepth",
     "AudioSampleRate",
@@ -20560,6 +20566,12 @@ def _render_settings_warnings(settings: Dict[str, Any], version_major: Optional[
             "AddFrameHandles is ignored while UseFullExtents is true: Resolve renders the "
             "clip's full extents and the handle count silently does nothing. Drop one of the two."
         )
+    if "AudioFormat" in settings and settings.get("ExportVideo") is True:
+        warnings.append(
+            "AudioFormat is documented for audio-only renders (ExportVideo false) in the "
+            "Resolve 21.1 typed stub; with ExportVideo true the container comes from the "
+            "render format instead. Verify the output's container before relying on it."
+        )
     if ("ExportSubtitle" in settings or "SubtitleFormat" in settings) and (
         version_major is not None and version_major < 21
     ):
@@ -20574,11 +20586,40 @@ def _render_settings_warnings(settings: Dict[str, Any], version_major: Optional[
     return warnings
 
 
+#: RenderSettings keys typed `bool` in the 21.1 stub that are COERCED rather than
+#: required to be a JSON boolean: an MCP client that sends "false" means false,
+#: and forwarding the string would hand Resolve a truthy value. Only keys added
+#: alongside this helper are listed; the older bool keys keep their strict check.
+_RENDER_COERCED_BOOL_KEYS = ("UseUniqueFilenames",)
+
+
+def _coerce_render_bool_settings(settings: Any):
+    """Return ``(settings_copy, errors)`` with the coerced bool keys normalised.
+
+    A value that does not unambiguously name a boolean is an error, never a
+    default: ``UseUniqueFilenames: "maybe"`` must not quietly become False.
+    """
+    if not isinstance(settings, dict):
+        return settings, []
+    out = dict(settings)
+    errors = []
+    for key in _RENDER_COERCED_BOOL_KEYS:
+        if key not in out:
+            continue
+        coerced = _recognised_bool(out[key])
+        if coerced is None:
+            errors.append(f"{key} must be a boolean (true/false)")
+        else:
+            out[key] = coerced
+    return out, errors
+
+
 def _validate_render_settings_payload(settings: Dict[str, Any], *, require_temp_target: bool = False):
     if not isinstance(settings, dict) or not settings:
         return None, _err("settings must be a non-empty object")
+    settings, coerce_errors = _coerce_render_bool_settings(settings)
     unknown = sorted(key for key in settings if key not in _RENDER_SETTING_KEYS)
-    errors = []
+    errors = list(coerce_errors)
     target_dir = settings.get("TargetDir")
     if target_dir is not None:
         if not isinstance(target_dir, str) or not target_dir:
@@ -20597,6 +20638,8 @@ def _validate_render_settings_payload(settings: Dict[str, Any], *, require_temp_
             errors.append(f"{key} must be a boolean")
     if "AddFrameHandles" in settings and isinstance(settings["AddFrameHandles"], int) and settings["AddFrameHandles"] < 0:
         errors.append("AddFrameHandles must be >= 0")
+    if "AudioFormat" in settings and (not isinstance(settings["AudioFormat"], str) or not settings["AudioFormat"].strip()):
+        errors.append("AudioFormat must be a non-empty string (an audio file extension, e.g. 'wav')")
     if "DataBurnIn" in settings and not isinstance(settings["DataBurnIn"], str):
         errors.append("DataBurnIn must be a string (a burn-in preset name, 'Same as project', or 'None')")
     if "MarkIn" in settings and "MarkOut" in settings and settings["MarkOut"] < settings["MarkIn"]:
@@ -20641,6 +20684,7 @@ def _safe_set_render_settings(proj, p: Dict[str, Any]):
         return {"success": False, "validation": validation}
     if _coerce_bool(p.get("dry_run")):
         return _ok(validation=validation)
+    settings = validation["settings"]  # coerced bool keys, see _coerce_render_bool_settings
     before = _render_settings_snapshot(proj)
     success = bool(proj.SetRenderSettings(settings))
     after_settings = _ser(proj.GetRenderSettings()) if _has_method(proj, "GetRenderSettings") else {}
@@ -20675,6 +20719,7 @@ def _prepare_render_job(proj, p: Dict[str, Any]):
         return {"success": False, "validation": validation}
     if _coerce_bool(p.get("dry_run")):
         return _ok(validation=validation, format=p.get("format"), codec=p.get("codec"))
+    settings = validation["settings"]  # coerced bool keys, see _coerce_render_bool_settings
     before = _render_settings_snapshot(proj)
     # Pin the base render state before layering explicit settings on top. Without
     # this the job inherits the Deliver page's loaded preset for every key the
@@ -21096,6 +21141,10 @@ def render(action: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, An
         collapse warning unless the stated expectation matches the mark range.
         Verify BEFORE deleting the job; deleted jobs carry no TargetDir.
       start(job_ids?, interactive?) -> {success}
+        StartRendering is state-dependent on 21.1 (api_truth
+        'Project.StartRendering'): a freshly configured job can return False
+        and stay Ready while an identical later job completes. Read the job
+        status and the output; this action does not retry.
       stop() -> {success}
       is_rendering() -> {rendering}
       get_formats() -> {formats}
@@ -21118,6 +21167,14 @@ def render(action: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, An
         burn-in, sidecar, or caption track — so setting them on a pre-21
         host comes back in warnings; verify the output before claiming
         caption delivery.
+        Resolve 21.1 typed keys: UseUniqueFilenames (bool; "true"/"false"
+        strings are coerced, anything else is refused before the call) and
+        AudioFormat (audio file extension, e.g. "wav" — the stub documents it
+        for ExportVideo false, so pairing it with ExportVideo true warns).
+        Reported on Studio 21.1.0.14: UseUniqueFilenames=true gave queued
+        files a "_V1-0001" suffix, and AudioFormat "wav" + LPCM rendered
+        48 kHz/24-bit WAVs. A True here only means the settings were taken;
+        verify the job (get_job_status / verify_output) after start.
       list_presets() -> {presets}
       load_preset(name) -> {success}
       save_preset(name) -> {success}
@@ -21427,6 +21484,14 @@ def render(action: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, An
         # Whitelist to documented keys; SetRenderSettings silently ignores unknown
         # keys, so a typo'd setting would be dropped with no signal (P1 #6).
         settings, ignored_settings = _filter_to_keys(p["settings"], _RENDER_SETTING_KEYS)
+        settings, bool_errors = _coerce_render_bool_settings(settings)
+        if bool_errors:
+            return _err(
+                "; ".join(bool_errors),
+                code="INVALID_RENDER_SETTING",
+                category="invalid_input",
+                reason="Nothing was sent to SetRenderSettings.",
+            )
         result = {"success": bool(proj.SetRenderSettings(settings))}
         if ignored_settings:
             result["ignored_settings"] = ignored_settings
