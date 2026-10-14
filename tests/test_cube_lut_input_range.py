@@ -64,5 +64,21 @@ class InputRangeTests(unittest.TestCase):
             lut_files.attenuate_lut("wide.cube", 0.5, "wide_half.cube")
 
 
+    def test_a_malformed_domain_header_is_a_cube_error_naming_the_line(self):
+        # A short or non-numeric header used to escape as a bare ValueError
+        # (or, for DOMAIN_MIN/MAX, a silently short domain list).
+        cases = {
+            "short_range.cube": ("LUT_3D_INPUT_RANGE 0.0 1.0", "LUT_3D_INPUT_RANGE 0.0"),
+            "word_range.cube": ("LUT_3D_INPUT_RANGE 0.0 1.0", "LUT_3D_INPUT_RANGE low high"),
+            "short_min.cube": ("LUT_3D_INPUT_RANGE 0.0 1.0", "DOMAIN_MIN 0.0 0.0"),
+            "word_max.cube": ("LUT_3D_INPUT_RANGE 0.0 1.0", "DOMAIN_MAX 1.0 one 1.0"),
+        }
+        for name, (old, new) in cases.items():
+            with self.subTest(header=new):
+                path = self.write(name, RANGED_CUBE.replace(old, new, 1))
+                with self.assertRaisesRegex(cube_lut.CubeLutError, r":3: malformed "):
+                    cube_lut.read_cube(path)
+
+
 if __name__ == "__main__":
     unittest.main()
