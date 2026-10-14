@@ -1403,6 +1403,14 @@ class InstallerTargetTests(unittest.TestCase):
         import pathlib
         import tempfile
 
+        if os.name == "nt":
+            # Windows ignores the read-only attribute on directories, so mode
+            # bits cannot make one unwritable. A regular file where the parent
+            # directory should be makes creating the target fail with OSError
+            # just the same, which is the failure install() has to survive.
+            blocker = pathlib.Path(tempfile.mkdtemp(prefix="readonly_")) / "not-a-directory"
+            blocker.write_bytes(b"")
+            return blocker / "Utility"
         if hasattr(os, "geteuid") and os.geteuid() == 0:
             self.skipTest("root ignores mode bits, so nothing is unwritable")
         parent = pathlib.Path(tempfile.mkdtemp(prefix="readonly_"))
