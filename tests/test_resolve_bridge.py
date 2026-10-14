@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 import time
 import unittest
@@ -833,7 +834,8 @@ class InstallerTargetTests(unittest.TestCase):
         home = pathlib.Path(tempfile.mkdtemp(prefix="fake_home_"))
         container = home / "Library/Containers/com.blackmagic-design.DaVinciResolveLite"
         (container / "Data").mkdir(parents=True)  # container only; NO Fusion tree
-        with mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
+        with mock.patch.object(sys, "platform", "darwin"), \
+                mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
             targets = self.installer.script_targets()
         expected = container / "Data" / self.installer._SCRIPTS_SUFFIX
         self.assertIn(expected, targets, f"container skipped because its tree is absent: {targets}")
@@ -852,7 +854,8 @@ class InstallerTargetTests(unittest.TestCase):
         home = pathlib.Path(tempfile.mkdtemp(prefix="fake_home_"))
         container = home / "Library/Containers/com.blackmagic-design.DaVinciResolveLite"
         (container / "Data").mkdir(parents=True)
-        with mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
+        with mock.patch.object(sys, "platform", "darwin"), \
+                mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
             targets = self.installer.script_targets()
 
         documented = container / "Data" / self.installer._SCRIPTS_SUFFIX
@@ -874,7 +877,8 @@ class InstallerTargetTests(unittest.TestCase):
 
         home = pathlib.Path(tempfile.mkdtemp(prefix="fake_home_"))
         (home / self.installer._SANDBOX_FALLBACK_SUFFIX).mkdir(parents=True)
-        with mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
+        with mock.patch.object(sys, "platform", "darwin"), \
+                mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
             targets = self.installer.script_targets()
         self.assertNotIn(
             home / self.installer._SANDBOX_FALLBACK_SUFFIX, targets,
@@ -939,7 +943,8 @@ class InstallerTargetTests(unittest.TestCase):
         home = pathlib.Path(tempfile.mkdtemp(prefix="fake_home_"))
         for name in ("com.blackmagic-design.BlackmagicRawPlayer", "com.blackmagic-design.IOXPC"):
             (home / "Library/Containers" / name / "Data").mkdir(parents=True)
-        with mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
+        with mock.patch.object(sys, "platform", "darwin"), \
+                mock.patch.object(pathlib.Path, "home", staticmethod(lambda: home)):
             targets = self.installer.script_targets()
         self.assertFalse(
             [t for t in targets if "RawPlayer" in str(t) or "IOXPC" in str(t)],
