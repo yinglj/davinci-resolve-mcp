@@ -1218,7 +1218,7 @@ class InstallerTargetTests(unittest.TestCase):
             self.assertNotIn("homebrew", str(root).lower())
             self.assertIn("Python.framework", str(root))
         self.assertNotIn("homebrew", str(self.installer._FALLBACK_PYTHON3).lower())
-        self.assertEqual(str(self.installer._FALLBACK_PYTHON3), "/usr/local/bin/python3")
+        self.assertEqual(self.installer._FALLBACK_PYTHON3.as_posix(), "/usr/local/bin/python3")
 
     def test_a_lua_canary_ships_with_every_probe(self) -> None:
         # Lua always enumerates, so the canary separates "Python not detected"
