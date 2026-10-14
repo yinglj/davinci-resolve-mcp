@@ -5237,6 +5237,7 @@ class KillProcessTreeWindowsTests(unittest.TestCase):
             _kill_process_tree(12345)
         mock_run.assert_called_once_with(
             ["taskkill", "/F", "/T", "/PID", "12345"],
+            stdin=subprocess.DEVNULL,
             capture_output=True, check=False,
         )
 
