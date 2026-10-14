@@ -168,7 +168,8 @@ class InstallConfigTests(unittest.TestCase):
         )
         self.assertIn("native_import_attempted = True", captured["script"])
         self.assertIn("os._exit(0)", captured["script"])
-        self.assertIn(repo_root, captured["script"])
+        # install.py embeds the path with !r, so Windows backslashes appear doubled.
+        self.assertIn(repr(repo_root), captured["script"])
         # RESOLVE_SCRIPT_HOST propagated into the probe env by build_server_env.
         self.assertEqual(captured["env"].get("RESOLVE_SCRIPT_HOST"), "127.0.0.1")
         # Process timeout accommodates the configured network timeout (12.5 + 2).
