@@ -2,6 +2,60 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.0 — Resolve 21.1 render-setting parity, `SetHighPriority(bool)`, and a project-destroying preset order
+
+Lands the three items queued for @legionsound in #207. The 21.1 behaviour
+below is **their measurement on Studio 21.1.0.14 / macOS**, recorded as
+*reported*; this machine runs 19.1.3.7 and did not reproduce it.
+
+### New
+
+- **`resolve_control set_high_priority` takes `high`** (alias
+  `high_priority`, default `true`), and there is a new granular
+  **`set_high_priority(high)`** tool. On 21.1+ it calls
+  `SetHighPriority(bool)`, which 21.1 types as script execution priority and
+  which is reversible there: `high=false` restores normal. The no-argument call
+  this server used to make returns `False` on 21.1 and does nothing. Builds
+  before 21.1 keep the no-argument call, and `high=false` is refused on them,
+  because they cannot lower priority without a restart. `high` is coerced
+  (`"false"` is false); anything that doesn't name a boolean is refused before
+  any call. No build has a getter, so results carry `readback: null` and claim
+  no readback. Registered as a write in both the destructive registry and the
+  lifecycle risk sets (MEDIUM).
+- **Compound render settings accept `AudioFormat` and `UseUniqueFilenames`.**
+  The compound whitelist held 31 of the 33 typed `RenderSettings` fields and
+  reported these two as ignored; granular already forwarded them. A test now
+  checks the whitelist against every field of the bundled 21.1 stub's
+  `RenderSettings`. `UseUniqueFilenames` is coerced on every path (compound
+  `set_settings`, `safe_set_render_settings`, `prepare_render_job`, granular
+  `set_render_settings`), and an unrecognised value is refused with
+  `INVALID_RENDER_SETTING`. `AudioFormat` with `ExportVideo: true` warns,
+  since the stub documents it for audio-only renders.
+
+### API truth ledger
+
+- **`Project.StartRendering` is state-dependent** (reported, 21.1.0.14):
+  freshly configured jobs sometimes return `False` and stay Ready, while an
+  identical later job completes. Direct official calls reproduced both
+  outcomes. Mapped to `render start`, so the fact rides on its results. Verify
+  job status and output; nothing retries automatically.
+- **Project-settings presets mutated before a project's first `SaveProject`
+  destroy the project** (reported, 21.1.0.14, reproduced twice): saving a
+  preset, changing resolution, then updating, applying or deleting the preset,
+  then saving and closing. Every call returned `True` and SQLite
+  `integrity_check` said `ok`, but `LoadProject` then failed with "DaVinci
+  Resolve failed to open project". Save the project once before any preset
+  write, and prove it survived only by reloading it. No preset-write wrappers
+  ship yet; this entry lands first on purpose.
+- The `Resolve.SetHighPriority` entry is now version-scoped: irreversible with
+  no argument before 21.1 (measured on 19.1.3.7), and a reversible boolean on
+  21.1 (reported).
+
+### Counts
+
+- Granular tools 389 → 390; compound stays at 37. Docs and generated agent
+  rules updated.
+
 ## What's New in v4.12.0 — Live subtitle presets and title text across Fusion title tools
 
 Contributed by @sidevconcept (#281). The live behaviour below rests on their
