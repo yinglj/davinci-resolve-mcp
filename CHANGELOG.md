@@ -2,6 +2,228 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.10.7 — `retargetDRT` moves the `<ProjectVersion>` import gate, not only the comment stamp
+
+### Fixes
+
+- **`retargetDRT` / `retargetDRP` produced files an older Resolve still
+  refused.** Resolve decides "A newer version of DaVinci Resolve is needed to
+  import" on project.xml's `<ProjectVersion>` element; it never reads the
+  `DbAppVer="…" DbPrjVer="…"` comment for that decision. The vendored
+  `drt-format/resolve-versions.js` rewrote the comment on every XML member and
+  left the element alone, so a DRP "retargeted" to 19 still carried 17 inside.
+  - **The bundled project shell had the same hole.** It is a 20.3.2 export
+    with `<ProjectVersion>15</ProjectVersion>`, so a tool-built DRT retargeted
+    to 19 shipped a shell Resolve 19 cannot open.
+  - `restampVersions` now also moves any `<ProjectVersion>` element to the
+    target's DbPrjVer, whatever its current value. A DRP's kept project.xml
+    and the added shell both land on the target schema. DRX and
+    SeqContainer/MpFolder XML carry no such element and are unchanged;
+    unrelated numbers in the body are untouched.
+  - The `drt` tool's `downgrade` and `assemble` actions patched the element
+    themselves and were never affected; the library on its own was.
+
+### Validation
+
+- Tests: gate moved for a DRP's project.xml and for the shell at every
+  registry target (19, 20, 21); null control that XML without the element
+  gains none and keeps its other numbers; the pre-fix module leaves the gate
+  at 17 on the same input.
+- Vendored drt-format suites: 51 pass, 0 fail, 1 pre-existing skip (missing
+  fixture). Server drt suites (downgrade, assemble, events): 32/32.
+- Manual import, 2026-10-13: a Resolve 21.0.3 timeline (schema 17) imported
+  into Resolve 19.1.3 once the element read 14. The `.drp` round-trip harness
+  was not run: it needs a Resolve 21.x Studio host, and this machine runs
+  19.1.3.7.
+
+## What's New in v4.10.6 — names that need xml escaping reach their bin and their color group
+
+### Fixes
+
+- **`drt(action="assemble_project")` failed outright when a timeline placed
+  in a bin had `&`, `"` or `'` in its name.** The pool clip stores the name
+  escaped (`Reel 1 &amp; 2`), but the step that moves it into its bin searched
+  for the raw `Reel 1 & 2`, found nothing, and threw
+  `could not locate pool clip for timeline Reel 1 & 2 to move into folder Reels`.
+  No archive was written. The lookup now matches the escaped name.
+  - **The bin's own name was written unescaped**, so `folder: "R&D"` produced
+    a `MpFolder.xml` that does not parse. It is escaped now.
+  - A name without those characters escapes to itself, so existing archives
+    come out byte-for-byte unchanged.
+  - Lands #283 from @Dev-next-gen, as submitted, with two tests that fail on
+    the old code.
+- **The same mistake in reverse affected color-group grade reads.** The
+  helpers behind `drp(action="extract_group_grades")` and
+  `drx(action="grade_transfer")` found a group by searching `project.xml` for
+  `<Name>` plus the raw name:
+  - asking for a group called `Night & Day` returned `group not found`, because
+    the file stores `Night &amp; Day`;
+  - the unfiltered listing reported the stored form, `Night &amp; Day`, as the
+    group's name;
+  - a clip or other element with the same name as a group, placed before it in
+    the file, made the lookup return a segment that spanned two groups and
+    both of their grades.
+
+  Group names are now decoded when read and compared as plain text. An
+  apostrophe resolves whether the file spells it `'` or `&apos;`. The lookup
+  only looks inside `<Sm2Group>` elements, and the label passed to the
+  decoder is escaped. A caller that passed the escaped form back
+  (`Night &amp; Day`) must now pass the plain name.
+
+### Validation
+
+- Offline file handling only; nothing calls Resolve. Advanced suite green,
+  with two new group-name tests that fail on the old code; Python suite green.
+- `assemble_project` changes the offline `.drp` authoring tier. The
+  round-trip harness was not run: it needs a Resolve 21.x Studio host, and
+  this machine runs 19.1.3.7. For a name without `&`, `"` or `'`, the archive
+  is byte-identical to before.
+
+## What's New in v4.10.5 — `rename_plan` sees a name the plan keeps
+
+### Fixes
+
+- **`media(action="rename_plan")` missed a rename onto a name that stays in
+  place.** It counted collisions only among the names it renames *to*, so a
+  name it leaves alone was invisible to the check. With
+  `names: ["A001_C001.mov", "dailies_A001_C001.mov"]`, `find: "dailies_"`,
+  `replace: ""`, the camera original was correctly refused, and the plan then
+  proposed renaming `dailies_A001_C001.mov` onto it with `collisions: 0`.
+  Applying that plan overwrites the file the refusal was protecting.
+  - A name the plan keeps now occupies its target: a refused camera original,
+    and a name `find` leaves unchanged. The same call returns
+    `action: "collision"`, `collisions: 1`, `renameCount: 0`.
+  - **`reel_normalize` had the same gap**: a reel already at its normalized
+    name was not counted, so `["card1", "CARD001"]` both landed on `CARD001`
+    with no collision. It is counted now.
+  - A swap (`b → x` while `x → y`) is still not a collision, since `x` is
+    leaving. Noops stay noops and refusals stay refusals.
+- Lands #284 from @Dev-next-gen, as submitted, with two tests that fail on
+  the old code.
+
+### Validation
+
+- Planning code only; nothing touches Resolve or media. Advanced suite
+  green; Python suite green.
+
+## What's New in v4.10.4 — enrolled in Anthropic's OSS Scanner
+
+### Security
+
+- **The repository now carries an OSS Scanner build and threat model**
+  under `.oss-scanner/`. [OSS Scanner](https://github.com/anthropics/oss-scanner)
+  builds a project in an isolated VM, scans it offline, and emails findings
+  to the maintainer. Keeping both files here means they can change without a
+  pull request to the scanner's repository.
+  - `.oss-scanner/Dockerfile` mirrors CI: Python 3.11, Node 22, ffmpeg, both
+    lockfiles via `npm ci`, then the offline suites. Built with the
+    scanner's `tools/check`: Python 4027 passed (26 skipped), advanced
+    server 1113 passed (60 skipped), 0 failed. Resolve is not in the image;
+    the suite stubs it as in CI.
+  - `.oss-scanner/threat_model.md` treats every MCP tool argument as
+    untrusted (LLM context can carry attacker text), and names the
+    properties a finding would break: no caller-supplied code execution,
+    the destructive-op gate, immutable source media, and the token- and
+    Host/Origin-gated local listeners. It points at the subprocess call
+    sites and the archive/XML/SQLite parsers, cites the four published
+    advisories as examples of each class, and sets severity tiers.
+- No server code changed.
+
+## What's New in v4.10.3 — the conform-qc tests run, and run in `npm test`
+
+### Tests
+
+- **The vendored conform-qc suite was never part of `npm test`, and 20 of its
+  118 tests failed** (reported from a macOS validation run in the #273
+  thread). Three causes, all fixed:
+  - **The synthetic fixture was never committed.** `synthetic/generate.js`
+    builds a small, anonymised turnover XML, test-pattern frames and their
+    answer keys, and its own docs say the output is committed under
+    `__fixtures__/synthetic/`. It now is: 9 files, about 224 KB, every name
+    and path a `SYNTH_` placeholder, and byte-for-byte reproducible (generated
+    twice and compared). The npm packages exclude it.
+  - **Tests that need the client answer key crashed instead of skipping.**
+    `__fixtures__/sample-reel-01` is derived from client material and stays
+    out of the repository; `reelFixtureDir()` documents that its tests skip
+    when it is absent. A shared `test/_client-fixture.js` now does that.
+    Seven files whose setup is built on the key skip as a whole, with a
+    reason. In `compare`, `geometry`, `verify` and `workflow-driver` only the
+    tests that read the key skip, so their client-free tests keep running.
+  - **The runbook check had gone stale.** It expected "two surfaces" and a
+    "Cloud" surface. The runbook now says it "covers both surfaces" and that
+    the engine "ships only the local path" with other hosts composing their
+    own, and its bold markup and line wrapping broke one more pattern. The
+    patterns follow the runbook; the runbook is unchanged.
+- `resolve-advanced`'s `npm test` and `test:libs` now include
+  `vendor/conform-qc/test/*.test.js`: the advanced suite runs 1,173 tests
+  (from 1,036), 0 failed, with every skip carrying its reason.
+
+### Validation
+
+- Test and packaging changes only; no server or engine code changed. Python
+  suite green; advanced suite 1,173 / 0 failed in a clean worktree.
+
+## What's New in v4.10.2 — place_fusion_title measured on another build; the .drp harness says when it can't run
+
+### Documentation
+
+- **`place_fusion_title` is inert on the free edition 21.1.0 too.** The
+  harness's `RT_TITLE` project was built offline and imported into free
+  Resolve 21.1.0 through the Project Manager. A second into the title the
+  viewer was black, while a `place_generator` SMPTE Color Bar project built and
+  imported the same way rendered. `vendor/drp-format/README.md` now lists the
+  builds measured: inert on Studio 21.0.4.5 and free 21.1.0, with one
+  contributor-reported visible render on Studio 21.0.3.7 (#273 thread) that has
+  not been reproduced here. The harness keeps `place_fusion_title` as
+  known-broken.
+- `docs/process/release-process.md`: the round-trip harness needs a Resolve
+  21.x host, and external scripting cannot drive the free edition. When no
+  21.x Studio is available, the release notes say the harness was not run.
+
+### Changed
+
+- `tests/live_drp_roundtrip_verification.py` stops with `CANNOT RUN` (exit 2)
+  on a Resolve older than 21, instead of reporting every case as a failure.
+  It authors the Resolve 21 project format, which 19.1.3.7 refuses at
+  `ImportProject` (all six cases failed there before any frame was checked).
+
+### Validation
+
+- No server code changed; offline suite green. The free 21.1.0 result is a
+  manual import and viewer check, not a harness run.
+
+## What's New in v4.10.1 — the server's own tools stay first on PATH; portable runtime tests
+
+### Fixed
+
+- **A tool installed alongside the server could be shadowed by an older
+  system copy.** At import, `media_analysis` adds the interpreter's script
+  directory and the standard tool directories (`/opt/homebrew/bin`,
+  `/usr/local/bin`, …) to `PATH`, meaning to put the server's own venv first.
+  When the venv was already on `PATH` (an activated environment) but the
+  Homebrew directories were not, the missing directories were prepended in
+  front of it, so a `whisper` or `ffmpeg` in `/opt/homebrew/bin` won over the
+  one installed with the server. The venv's script directory now always comes
+  first; every other entry is kept, and the call stays idempotent. Reported
+  by @sidevconcept from a macOS validation run (#273); the existing test only
+  caught it on a host whose `PATH` lacked Homebrew.
+
+### Tests
+
+- `tests/test_child_process_text_encoding.py`: with `PATH` pinned to the venv
+  plus system directories, the venv stays first, whether it was listed first
+  or in the middle. Fails on v4.10.0.
+- `tests/test_headless_runtime.py` and `tests/test_dashboard_source_review.py`
+  (@sidevconcept, #282, related to #278): the macOS process-table fixtures pin
+  their platform instead of following the test host, a launch-path assertion
+  normalizes separators, and the source-review test closes its cached SQLite
+  connection before its temporary directory is removed, which Windows
+  requires. Test-only.
+
+### Validation
+
+- Offline suite green. No Resolve scripting call changed.
+
 ## What's New in v4.10.0 — subtitle caption and preset editing in saved projects
 
 ### Added
