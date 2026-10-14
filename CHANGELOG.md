@@ -2,6 +2,34 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.11.0 — `rename_plan` collides names a case-insensitive volume treats as one
+
+### Fixes
+
+- **`media(action="rename_plan")` missed collisions that only differ in case
+  or Unicode form.** macOS (default APFS) and Windows volumes are
+  case-insensitive, and APFS also ignores Unicode normalization, so renaming
+  `take_A.mov` to `A.mov` overwrites an existing `a.mov`. The plan compared
+  names byte-for-byte and reported that rename as free (`collisions: 0`).
+  - Targets are now compared after NFC normalization and lowercasing, so
+    `A.mov` / `a.mov` and `café` spelled precomposed or with a combining
+    accent each count as one file.
+  - A case-only rename of a single file (`clip.MOV` → `clip.mov`) is still a
+    `rename`, not a collision.
+
+### New parameter
+
+- `rename_plan` takes `caseSensitive` (default `false`). Pass `true` only for
+  a case-sensitive volume to restore exact comparison. The result reports the
+  mode used as `caseSensitive`.
+
+### Validation
+
+- Offline planning only; nothing calls Resolve or touches files. New
+  `media-ops` test fails on the old code and passes now; `group-grade-read`
+  gains a case for a group name with `"`, `<` and `>`, as Studio 19.1.3.7
+  escapes them.
+
 ## What's New in v4.10.7 — `retargetDRT` moves the `<ProjectVersion>` import gate, not only the comment stamp
 
 ### Fixes
