@@ -1129,7 +1129,12 @@ class InstallerTargetTests(unittest.TestCase):
             (prefix / "lib").mkdir()
             (prefix / "lib" / "libpython3.13.dylib").write_bytes(b"")
             (prefix / "bin").mkdir()
-            (prefix / "bin" / "python3").symlink_to(prefix / "bin" / "gone")
+            try:
+                (prefix / "bin" / "python3").symlink_to(prefix / "bin" / "gone")
+            except OSError as exc:
+                # Windows needs Developer Mode or SeCreateSymbolicLinkPrivilege
+                # (WinError 1314); a dangling link cannot be made without one.
+                self.skipTest(f"symlink creation is unavailable: {exc}")
             home = self._python3_home_for(str(prefix))
 
         self.assertFalse(home["usable"])
