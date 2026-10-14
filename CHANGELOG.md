@@ -2,6 +2,64 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.11.1 — `.cube` input ranges, `"false"` import flags and the caption character cap
+
+Three fixes from @Dev-next-gen (#286, #287, #288), each with a reproduction and a
+regression test.
+
+### Fixes
+
+- **A 3D `.cube` carrying `LUT_3D_INPUT_RANGE` could not be read** (#288).
+  `read_cube` knew `DOMAIN_MIN`/`DOMAIN_MAX` but not Resolve's own header form,
+  so the line fell through to the data-row branch and the whole file was refused
+  as a "non-numeric entry". `read_lut_summary` and `attenuate_lut_file` both
+  failed on it. The keyword is now read as one domain for all three channels;
+  attenuation still refuses a non-unit range, exactly as it does for
+  `DOMAIN_MIN`/`DOMAIN_MAX`.
+  - **On landing:** a short or non-numeric `LUT_3D_INPUT_RANGE` escaped as a bare
+    `ValueError`, and a short `DOMAIN_MIN`/`DOMAIN_MAX` produced a silently short
+    domain list. All three headers now go through one reader that raises
+    `CubeLutError` naming the file, line and keyword.
+- **`timeline(action="import_timeline_checked")` read `"false"` as true** (#287).
+  `sanitize_media` / `relink_media` and `import_source_clips` were read with bare
+  `bool()`, so `sanitize_media="false"` still handed Resolve the sanitized copy
+  instead of the file passed, and `import_source_clips="false"` reached
+  `ImportTimelineFromFile` as `importSourceClips: True`. Both now go through
+  `_coerce_bool`, as the rest of `server.py` has since v4.8.20.
+- **Caption orphan rebalancing could break `max_chars_per_line`** (#286).
+  Moving the last word of the penultimate line onto a one-word final line never
+  re-checked the cap, so "we had a wonderful conversation" at 20 characters came
+  out with a 22-character second line in the SRT/WebVTT. The move now happens
+  only when the merged line fits; a lone last word is the lesser fault.
+
+## What's New in v4.11.0 — `rename_plan` collides names a case-insensitive volume treats as one
+
+### Fixes
+
+- **`media(action="rename_plan")` missed collisions that only differ in case
+  or Unicode form.** macOS (default APFS) and Windows volumes are
+  case-insensitive, and APFS also ignores Unicode normalization, so renaming
+  `take_A.mov` to `A.mov` overwrites an existing `a.mov`. The plan compared
+  names byte-for-byte and reported that rename as free (`collisions: 0`).
+  - Targets are now compared after NFC normalization and lowercasing, so
+    `A.mov` / `a.mov` and `café` spelled precomposed or with a combining
+    accent each count as one file.
+  - A case-only rename of a single file (`clip.MOV` → `clip.mov`) is still a
+    `rename`, not a collision.
+
+### New parameter
+
+- `rename_plan` takes `caseSensitive` (default `false`). Pass `true` only for
+  a case-sensitive volume to restore exact comparison. The result reports the
+  mode used as `caseSensitive`.
+
+### Validation
+
+- Offline planning only; nothing calls Resolve or touches files. New
+  `media-ops` test fails on the old code and passes now; `group-grade-read`
+  gains a case for a group name with `"`, `<` and `>`, as Studio 19.1.3.7
+  escapes them.
+
 ## What's New in v4.10.7 — `retargetDRT` moves the `<ProjectVersion>` import gate, not only the comment stamp
 
 ### Fixes

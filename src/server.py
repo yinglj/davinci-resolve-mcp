@@ -11,7 +11,7 @@ Usage:
     python src/server.py --full       # Start the 377-tool granular server instead
 """
 
-VERSION = "4.10.7"
+VERSION = "4.11.1"
 
 import base64
 import os
@@ -7709,7 +7709,7 @@ def _import_timeline_checked(proj, mp, p: Dict[str, Any]):
     # abort Resolve's scripting-API import and leave the timeline fully offline.
     # The original is only read; the sanitized copy lands in a temp dir, so the
     # temp-path guard never applies to it.
-    sanitize_requested = bool(p.get("sanitize_media") or p.get("relink_media"))
+    sanitize_requested = _coerce_bool(p.get("sanitize_media")) or _coerce_bool(p.get("relink_media"))
     binary_relink_note = None
     _binary_has_roots = bool(p.get("relink_search_roots") or p.get("search_roots"))
     if is_binary and _binary_has_roots:
@@ -7740,7 +7740,7 @@ def _import_timeline_checked(proj, mp, p: Dict[str, Any]):
     if p.get("timeline_name") and "timelineName" not in options:
         options["timelineName"] = p["timeline_name"]
     if "import_source_clips" in p and "importSourceClips" not in options:
-        options["importSourceClips"] = bool(p["import_source_clips"])
+        options["importSourceClips"] = _coerce_bool(p["import_source_clips"])
 
     # Optional fuzzy relink: when search roots are given, missing-at-original-path
     # clips are matched against on-disk media (exact/ext-agnostic/normalized/reel)
