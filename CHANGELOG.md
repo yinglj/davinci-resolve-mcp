@@ -2,6 +2,62 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.12.0 — Live subtitle presets and title text across Fusion title tools
+
+Contributed by @sidevconcept (#281). The live behaviour below rests on their
+synthetic runs on **Resolve Studio 21.1.0.17 / Windows**; this release was not
+re-measured live here (the maintainer's machine runs 19.1.3.7).
+
+### New
+
+- **`timeline_ai(action="list_title_presets")`** inventories the installed
+  factory Fusion titles and subtitle presets: local archive, category and full
+  template ID. `templates_archive` points it at a custom installation. It is an
+  inventory, not a claim that each preset works live.
+- **`timeline_ai(action="set_subtitle_preset")`** applies an installed subtitle
+  preset and common literal style inputs (font, size, position and so on) to a
+  subtitle track while Resolve stays open. It writes a **new timeline
+  revision** and keeps the original, compares the edit inventory, and re-exports
+  through Resolve to confirm the preset and controls were kept. It restores the
+  original timeline on failure.
+  - `dry_run` / `dryRun` are coerced at the dispatcher, so `"true"` previews
+    and never imports. A preview that would need a live capture is refused.
+  - The result lists `verified_components` (track counts, item names and
+    bounds, media IDs, preset controls) and `unverified_components` (markers,
+    grades, other Fusion comps, audio). Native readback is not render
+    verification, and the revision is not certified as a full copy.
+  - Staging exports are removed on success and kept for diagnosis on failure
+    (`staging_retained`, `staging_directory`).
+- **`timeline.set_title_text` / `get_title_text` reach more than TextPlus.** The
+  Fusion-comp fallback now finds literal text on TextPlus, sText, Text3D and
+  MultiText (`TextN.StyledText` in native `TextOrder`). It follows
+  `StyledTextFollower` and `PublishText` without disconnecting animation, and it
+  skips connected, expression-driven, locked and disabled inputs rather than
+  flattening them. MultiText editing was validated only on Studio 21.1.0.17 /
+  Windows.
+- **`scripts/edit_subtitle_timeline.mjs`** (backed by
+  `resolve-advanced/server/subtitle-timeline.mjs`) inspects an exported
+  subtitle track, or writes a new file with a bundled preset reference
+  (`Word Highlight`, `Lollipop`) or a native subtitle-template reference applied.
+- Synthetic title-library validation scripts write private QA reports with
+  relative image links; `src/utils/qa_privacy.py` replaces host paths and
+  project/timeline names in saved records.
+
+### Docs
+
+- New guides: `docs/guides/title-library-automation.md` and
+  `docs/guides/subtitle-track-editing.md`.
+
+### Verification
+
+- Contributor (Studio 21.1.0.17 / Windows, synthetic media): all 134 installed
+  factory Fusion presets passed native application, literal text/property
+  readback and sampled rendered-frame checks; all 23 subtitle presets applied
+  without a restart.
+- Here: Python offline suite and Node advanced suite (fresh `npm ci`) green;
+  API parity, api-limitations, read/write symmetry, agent-rule drift and
+  `npm pack` clean.
+
 ## What's New in v4.11.1 — `.cube` input ranges, `"false"` import flags and the caption character cap
 
 Three fixes from @Dev-next-gen (#286, #287, #288), each with a reproduction and a
