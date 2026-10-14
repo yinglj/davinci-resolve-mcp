@@ -75,7 +75,7 @@ from src.utils.page_lock import (
     restoring_page as _restoring_page,
     page_lock as _page_lock,
 )
-from src.utils.proc import safe_run
+from src.utils.proc import safe_run, windows_pid_alive
 from src.utils.readback import verify_by_readback, verification_stats as _verification_stats
 from src.utils import operation_result as _operation_result
 from src.utils import operation_log as _operation_log
@@ -18015,6 +18015,9 @@ def _control_panel_pid_alive(pid: int) -> bool:
     """Check whether a PID is alive on this OS without killing it."""
     if not pid or pid <= 0:
         return False
+    if os.name == "nt":
+        # os.kill(pid, 0) is TerminateProcess on Windows, not a probe.
+        return windows_pid_alive(pid) is True
     try:
         os.kill(pid, 0)  # signal 0 = existence check
     except (ProcessLookupError, PermissionError):
