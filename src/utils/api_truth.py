@@ -3527,6 +3527,53 @@ API_TRUTH: List[Dict[str, Any]] = [
         "issue": 207,
         "verified_on": "DaVinci Resolve Studio 21.1.0.14",
     },
+    {
+        "symbol": "Project settings presets mutated before the project's first SaveProject",
+        "object": "Project",
+        "signature": "SaveCurrentProjectSettingsAsNewPreset / UpdateProjectSettingsPreset / "
+                     "SetProjectSettingsPreset / DeleteProjectSettingsPreset (presetName) "
+                     "-> bool  (21.1+)",
+        "reality": "DESTROYS THE PROJECT ITSELF, NOT A GRADE, AND REPORTS SUCCESS "
+                   "THROUGHOUT. Reported by @legionsound (issue #207) from Studio "
+                   "21.1.0.14 on macOS, 2026-09-09; NOT reproduced here (no 21.1 "
+                   "install). On a NEW project that had never been saved: save a "
+                   "project-settings preset (SaveCurrentProjectSettingsAsNewPreset), "
+                   "change the timeline resolution, then update "
+                   "(UpdateProjectSettingsPreset), apply (SetProjectSettingsPreset) "
+                   "and delete (DeleteProjectSettingsPreset) the preset, then "
+                   "SaveProject and close. Every native call returned True. "
+                   "SQLite PRAGMA integrity_check on the project database still "
+                   "reported ok, but its Sm2MultiSysData table had ZERO rows, and "
+                   "LoadProject then failed with 'DaVinci Resolve failed to open "
+                   "project.' Reproduced twice, through community wrappers and "
+                   "through direct native calls. The control — the same sequence "
+                   "with one explicit SaveProject BEFORE any preset mutation — kept "
+                   "its Sm2MultiSysData row and reopened. Which single call in the "
+                   "sequence is responsible was not isolated, and preset "
+                   "Export/Import were not part of it, so do not assume any preset "
+                   "write is safe on an unsaved project. "
+                   "ProjectManager.GetProjectLastModifiedTime cannot serve as a "
+                   "'has this project been saved' guard: it returned None even for "
+                   "saved projects on the same build.",
+        "recommended": "Before ANY project-settings-preset write on 21.1, call "
+                       "ProjectManager.SaveProject() on the current project and "
+                       "require it to return True; never mutate presets on a "
+                       "project created in this session that has not been saved. "
+                       "Do not read the True returns, a clean integrity_check, or "
+                       "the absence of an error as evidence the project survived "
+                       "— the only proof is closing it and reloading it. A "
+                       "wrapper must not save silently on the caller's behalf "
+                       "(the first save is the caller's decision), so it should "
+                       "require an explicit assertion that the project has been "
+                       "saved, and refuse without one. If the project already "
+                       "holds work, back it up (export a .drp) before the first "
+                       "preset write.",
+        "tags": ["destructive", "unrecoverable", "project", "order-dependent",
+                 "silent-failure", "unreliable-return", "version-gated", "reported"],
+        "submit": "bug",
+        "issue": 207,
+        "verified_on": "DaVinci Resolve Studio 21.1.0.14",
+    },
     # ── Measured on Studio 21.1.0.14, 2026-09-09 (trap-aware execution work) ──
     {
         "symbol": "TimelineItem.CopyGrades",

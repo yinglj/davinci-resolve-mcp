@@ -12,7 +12,7 @@ that none exists).
 
 **Verified on:** DaVinci Resolve Studio 21.0.2
 
-**Totals:** 42 missing capabilities, 57 bugs / unreliable behaviors.
+**Totals:** 42 missing capabilities, 58 bugs / unreliable behaviors.
 
 The authoritative source is the runtime-queryable `api_truth` ledger
 (`resolve_control api_truth "<query>"`); this document is generated from
@@ -805,6 +805,15 @@ values, or automation-hostile modal prompts.
 - **Workaround / current handling:** Treat the boolean as a hint in both directions. After start, read render(action='get_job_status') and render(action='verify_output') for the actual output file before reporting a render as running or done; a False with the job still Ready means nothing rendered. Do not auto-retry in a wrapper: the measured later success was a NEW identical job, not a retry of the same one, so a loop would hide the state it depends on. Surface the False and let the caller decide whether to re-queue.
 - **Reference:** [issue #207](https://github.com/samuelgursky/davinci-resolve-mcp/issues/207)
 - **Tags:** render, unreliable-return, state-dependent, version-gated, reported
+
+### Project settings presets mutated before the project's first SaveProject
+
+- **Object:** `Project`
+- **Signature:** `SaveCurrentProjectSettingsAsNewPreset / UpdateProjectSettingsPreset / SetProjectSettingsPreset / DeleteProjectSettingsPreset (presetName) -> bool  (21.1+)`
+- **Behavior:** DESTROYS THE PROJECT ITSELF, NOT A GRADE, AND REPORTS SUCCESS THROUGHOUT. Reported by @legionsound (issue #207) from Studio 21.1.0.14 on macOS, 2026-09-09; NOT reproduced here (no 21.1 install). On a NEW project that had never been saved: save a project-settings preset (SaveCurrentProjectSettingsAsNewPreset), change the timeline resolution, then update (UpdateProjectSettingsPreset), apply (SetProjectSettingsPreset) and delete (DeleteProjectSettingsPreset) the preset, then SaveProject and close. Every native call returned True. SQLite PRAGMA integrity_check on the project database still reported ok, but its Sm2MultiSysData table had ZERO rows, and LoadProject then failed with 'DaVinci Resolve failed to open project.' Reproduced twice, through community wrappers and through direct native calls. The control — the same sequence with one explicit SaveProject BEFORE any preset mutation — kept its Sm2MultiSysData row and reopened. Which single call in the sequence is responsible was not isolated, and preset Export/Import were not part of it, so do not assume any preset write is safe on an unsaved project. ProjectManager.GetProjectLastModifiedTime cannot serve as a 'has this project been saved' guard: it returned None even for saved projects on the same build.
+- **Workaround / current handling:** Before ANY project-settings-preset write on 21.1, call ProjectManager.SaveProject() on the current project and require it to return True; never mutate presets on a project created in this session that has not been saved. Do not read the True returns, a clean integrity_check, or the absence of an error as evidence the project survived — the only proof is closing it and reloading it. A wrapper must not save silently on the caller's behalf (the first save is the caller's decision), so it should require an explicit assertion that the project has been saved, and refuse without one. If the project already holds work, back it up (export a .drp) before the first preset write.
+- **Reference:** [issue #207](https://github.com/samuelgursky/davinci-resolve-mcp/issues/207)
+- **Tags:** destructive, unrecoverable, project, order-dependent, silent-failure, unreliable-return, version-gated, reported
 
 ### TimelineItem.ExportLUT
 
