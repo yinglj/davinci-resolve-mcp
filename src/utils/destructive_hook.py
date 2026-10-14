@@ -109,7 +109,10 @@ DESTRUCTIVE_ACTIONS_BY_TOOL: Dict[str, FrozenSet[str]] = {
     "project_settings": frozenset({"delete_color_group"}),
     "render": frozenset({"delete_all_jobs", "delete_job", "delete_preset"}),
     "render_presets": frozenset({"delete_burnin"}),
-    "resolve_control": frozenset({"delete_user_preferences_preset"}),
+    # set_high_priority: an app-wide setting with no getter on any build, and
+    # irreversible for the session before 21.1 (issue #207). A write every gate
+    # must see, even though it touches no project content.
+    "resolve_control": frozenset({"delete_user_preferences_preset", "set_high_priority"}),
     "media_pool": frozenset({
         "delete_clips",
         "delete_folders",

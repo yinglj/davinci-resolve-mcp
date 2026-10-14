@@ -2955,17 +2955,40 @@ API_TRUTH: List[Dict[str, Any]] = [
         "submit": "missing",
     },
     {
-        "symbol": "Resolve.SetHighPriority (write-only, irreversible per session)",
+        "symbol": "Resolve.SetHighPriority (write-only; irreversible before 21.1)",
         "object": "Resolve",
-        "signature": "() -> Bool",
-        "reality": "Raises the Resolve process priority; there is no getter "
-                   "and no way to lower it again through the API (confirmed "
-                   "absent from dir() on Studio 19.1.3.7).",
-        "recommended": "Call it only when the user asked for a long render on "
-                       "a dedicated machine; state cannot be read back or "
-                       "undone without restarting Resolve.",
-        "tags": ["app-control", "missing-method", "readback"],
+        "signature": "() -> Bool  (19.x); (highPriority: bool) -> bool  (21.1 typed stub)",
+        "reality": "VERSION-SCOPED. On Studio 19.1.3.7 (measured here) the "
+                   "method takes no argument and raises priority; there is no "
+                   "getter and no way to lower it again through the API "
+                   "(no getter in dir()), so it is irreversible for the session. "
+                   "Resolve 21.1 retyped it SetHighPriority(highPriority: bool) "
+                   "-> bool, documented as 'script execution priority to high or "
+                   "normal'. Reported by @legionsound (issue #207) from Studio "
+                   "21.1.0.14 on macOS, 2026-09-09; NOT reproduced here (no 21.1 "
+                   "install). One live session, in order: (False) -> True, "
+                   "(True) -> True, () -> False, (1) -> False, ('high') -> False, "
+                   "(False) -> True. So on 21.1 the no-argument call is a NO-OP "
+                   "that reports its own failure, only a real bool is accepted "
+                   "(1 and 'high' are rejected like the missing argument), and "
+                   "the setting is REVERSIBLE: SetHighPriority(False) restores "
+                   "normal. There is still no getter on any build — dir() on the "
+                   "live 21.1 Resolve object shows SetHighPriority as the only "
+                   "priority-related name — so the current state cannot be read "
+                   "back on either generation.",
+        "recommended": "On 21.1+ pass a real bool; never forward 1 or a string "
+                       "(coerce first — resolve_control set_high_priority and "
+                       "granular set_high_priority do, and refuse values that "
+                       "name no boolean). On older builds call it only when the "
+                       "user asked for a long scripted job on a dedicated "
+                       "machine: it cannot be lowered without restarting "
+                       "Resolve, which is why both tools refuse high=false "
+                       "there. No build offers readback, so report the native "
+                       "return, never a confirmed state.",
+        "tags": ["app-control", "missing-method", "readback", "version-gated", "reported"],
         "submit": "missing",
+        "issue": 207,
+        "mitigation": ["resolve_control.set_high_priority", "set_high_priority"],
     },
     {
         "symbol": "Project.IsRenderingInProgress (stuck True after deleting the rendering project)",
@@ -3748,6 +3771,9 @@ ACTION_SYMBOLS: Dict[Tuple[str, str], List[str]] = {
     ("fusion_comp", "add_keyframe"): ["Tool.AddModifier (NestControl inputs)"],
     ("project_manager", "safe_project_archive"): ["ProjectManager.ArchiveProject"],
     ("render", "start"): ["Project.StartRendering"],
+    ("resolve_control", "set_high_priority"): [
+        "Resolve.SetHighPriority (write-only; irreversible before 21.1)",
+    ],
 }
 
 

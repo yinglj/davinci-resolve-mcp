@@ -282,6 +282,12 @@ class RiskClassificationHook(LifecycleHook):
         # wrappers refuse those unless acknowledge_trap. See archive_guard.py.
         ("project_manager", "archive"),
         ("project_manager", "safe_project_archive"),
+        # Script execution priority. App-wide, no getter on any build, and
+        # before 21.1 it cannot be lowered again within the session; on 21.1
+        # SetHighPriority(False) restores normal (reported, issue #207).
+        # MEDIUM: a real write to state nothing can read back, but no content
+        # is touched, so safe mode should not block it.
+        ("resolve_control", "set_high_priority"),
         # 21.0 AI deblur renders NEW media and never touches the source (it is
         # confirm-token gated for that reason). The `remove_` prefix rule rated
         # it HIGH on its name alone, which would make safe mode block a create.

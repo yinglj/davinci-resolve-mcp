@@ -17096,7 +17096,13 @@ def resolve_control(action: str, params: Optional[Dict[str, Any]] = None) -> Dic
         — one 'Class.Method' or one TypedDict name. No connection needed.
       api_surface() -> {methods, option_types, option_fields, objects}
         — what the shipped stub contains. No connection needed.
-      set_high_priority() -> {success}
+      set_high_priority(high?) -> {success, high_priority, signature, reversible, readback: null}
+        — script execution priority. high: true (default, the old meaning)
+          or false for normal. Resolve 21.1+ calls SetHighPriority(bool) and
+          is reversible (reported on 21.1.0.14: the old no-argument call is a
+          no-op there). Older builds take no argument and can only RAISE it
+          for the session, so high=false is refused there. No getter exists
+          on any build: nothing is read back.
       disable_background_tasks_for_current_session() -> {success}  — Resolve 21+
       list_user_preferences_presets() -> {presets}  — Resolve 21.0.4+
       save_user_preferences_preset(name) -> {success}  — Resolve 21.0.4+
@@ -17541,7 +17547,23 @@ def resolve_control(action: str, params: Optional[Dict[str, Any]] = None) -> Dic
             return missing
         return {"presets": _ser(r.GetFairlightPresets())}
     elif action == "set_high_priority":
-        return {"success": bool(r.SetHighPriority())}
+        from src.utils.app_control import set_high_priority as _set_high_priority
+        # `high` defaults to True so a bare call keeps its old meaning; the
+        # helper picks SetHighPriority(bool) on 21.1+ and the no-arg form below.
+        # The raw value goes to the helper, which coerces it with
+        # recognised_bool and REFUSES a value naming no boolean, rather than
+        # _coerce_bool's fall-back-to-default (that would turn "hgih" into True).
+        _high_key = next((k for k in ("high", "high_priority") if k in p), None)
+        _hp = _set_high_priority(r, p[_high_key] if _high_key else True)
+        if _hp.get("refused"):
+            return _err(
+                _hp["error"],
+                code="HIGH_PRIORITY_REFUSED",
+                category="invalid_input",
+                reason="Nothing was sent to Resolve.SetHighPriority.",
+                state={k: v for k, v in _hp.items() if k not in ("error", "refused", "success")},
+            )
+        return _hp
     elif action == "disable_background_tasks_for_current_session":
         missing = _requires_method(r, "DisableBackgroundTasksForCurrentResolveSession", "21.0")
         if missing:
