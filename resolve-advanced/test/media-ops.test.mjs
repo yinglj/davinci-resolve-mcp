@@ -92,6 +92,26 @@ test('rename_plan flags a target a name in the set keeps', () => {
   assert.equal(n.collisions, 1);
 });
 
+test('rename_plan treats names differing only in case or Unicode form as one file', () => {
+  // macOS (default APFS) and Windows file systems ignore case, and APFS ignores Unicode
+  // normalization: renaming onto `A001.mov` overwrites `a001.mov`.
+  const r = renamePlan(['take_A.mov', 'a.mov'], { find: 'take_', replace: '' });
+  assert.equal(r.plan.find((p) => p.from === 'take_A.mov').action, 'collision');
+  assert.equal(r.collisions, 1);
+  const nfd = 'cafe\u0301.mov'; // é as e + combining accent
+  const u = renamePlan(['x_caf\u00e9.mov', nfd], { find: 'x_', replace: '' });
+  assert.equal(u.plan.find((p) => p.from === 'x_caf\u00e9.mov').action, 'collision');
+  // A case-only rename of one file is its own target, not a collision.
+  const c = renamePlan(['clip.MOV'], { find: 'MOV$', replace: 'mov' });
+  assert.equal(c.plan[0].action, 'rename');
+  assert.equal(c.collisions, 0);
+  // On a case-sensitive volume the caller can say so.
+  const s = renamePlan(['take_A.mov', 'a.mov'], { find: 'take_', replace: '', caseSensitive: true });
+  assert.equal(s.plan.find((p) => p.from === 'take_A.mov').action, 'rename');
+  assert.equal(s.caseSensitive, true);
+  assert.equal(r.caseSensitive, false);
+});
+
 test('reel_normalize flags a reel already at its normalized name', () => {
   const r = reelNormalize(['card1', 'CARD001']);
   assert.equal(r.plan.find((p) => p.from === 'card1').action, 'collision');
