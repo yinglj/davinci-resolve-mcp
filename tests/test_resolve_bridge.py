@@ -20,6 +20,17 @@ from src.utils import resolve_bridge as rb
 REPO = Path(__file__).resolve().parent.parent
 
 
+def _home_env() -> dict:
+    """The variables `Path.home()` reads, for tests that clear `os.environ`.
+
+    POSIX falls back to the password database when HOME is unset; Windows has
+    no fallback, so with USERPROFILE gone `Path.home()` and `expanduser()`
+    raise "Could not determine home directory".
+    """
+    names = ("HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH")
+    return {name: os.environ[name] for name in names if name in os.environ}
+
+
 def signed(token: str, *, timestamp: int, nonce: str, operation: str = "health", request_id: str = "1"):
     request = {
         "protocol": rb.PROTOCOL_VERSION,
@@ -698,7 +709,7 @@ class InstallerTargetTests(unittest.TestCase):
 
         with mock.patch.dict(
             os.environ,
-            {self.installer.ENV_CONFIG_PATH: "~/private/resolve-bridge.json"},
+            {self.installer.ENV_CONFIG_PATH: "~/private/resolve-bridge.json", **_home_env()},
             clear=True,
         ):
             self.assertEqual(
@@ -741,7 +752,7 @@ class InstallerTargetTests(unittest.TestCase):
         config = pathlib.Path(tempfile.mkdtemp(prefix="bridge_invalid_config_")) / "bridge.json"
         config.write_text("{not valid json", encoding="utf-8")
         with mock.patch.dict(
-            os.environ, {self.installer.ENV_CONFIG_PATH: str(config)}, clear=True
+            os.environ, {self.installer.ENV_CONFIG_PATH: str(config), **_home_env()}, clear=True
         ):
             result = self.installer.ensure_config(port=50125, rotate=False)
 
@@ -759,7 +770,7 @@ class InstallerTargetTests(unittest.TestCase):
         root = pathlib.Path(tempfile.mkdtemp(prefix="bridge_custom_config_"))
         config = root / "private config" / "bridge.json"
         target = root / "Fusion/Scripts/Utility"
-        env = {self.installer.ENV_CONFIG_PATH: str(config)}
+        env = {self.installer.ENV_CONFIG_PATH: str(config), **_home_env()}
         with mock.patch.dict(os.environ, env, clear=True), \
                 mock.patch.object(self.installer, "script_targets", return_value=[target]), \
                 mock.patch.object(self.installer, "python_preflight", return_value={"ok": True}), \
