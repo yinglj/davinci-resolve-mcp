@@ -26,15 +26,18 @@ test('listGroupNames pulls Sm2Group names, de-duped', () => {
 });
 
 test('group names are read and matched as text, not as their xml escaping', () => {
-  // project.xml stores `&` as `&amp;`. The listing reported `Night &amp; Day`, and a
-  // caller asking for `Night & Day` got "group not found". Apostrophes may be stored
-  // either way, so both spellings resolve.
+  // project.xml stores `&` as `&amp;` (and `"` `<` `>` as entities; Studio 19.1.3.7
+  // leaves `'` bare). The listing reported `Night &amp; Day`, and a caller asking for
+  // `Night & Day` got "group not found". Both apostrophe spellings resolve.
   const xml = [
     '<Sm2GroupList><Element><Sm2Group><FieldsBlob/><Name>Night &amp; Day</Name><Body>aa</Body></Sm2Group></Element>',
     "<Element><Sm2Group><FieldsBlob/><Name>Sam's</Name><Body>bb</Body></Sm2Group></Element>",
-    '<Element><Sm2Group><FieldsBlob/><Name>Ann&apos;s</Name><Body>cc</Body></Sm2Group></Element></Sm2GroupList>',
+    '<Element><Sm2Group><FieldsBlob/><Name>Ann&apos;s</Name><Body>cc</Body></Sm2Group></Element>',
+    // As Studio 19.1.3.7 exported a group named `Say "hi" <now>`.
+    '<Element><Sm2Group><FieldsBlob/><Name>Say &quot;hi&quot; &lt;now&gt;</Name><Body>dd</Body></Sm2Group></Element></Sm2GroupList>',
   ].join('');
-  assert.deepEqual(listGroupNames(xml), ['Night & Day', "Sam's", "Ann's"]);
+  assert.deepEqual(listGroupNames(xml), ['Night & Day', "Sam's", "Ann's", 'Say "hi" <now>']);
+  assert.match(groupSegment(xml, 'Say "hi" <now>'), /<Body>dd<\/Body>/);
   assert.match(groupSegment(xml, 'Night & Day'), /<Body>aa<\/Body>/);
   assert.match(groupSegment(xml, "Sam's"), /<Body>bb<\/Body>/);
   assert.match(groupSegment(xml, "Ann's"), /<Body>cc<\/Body>/);
