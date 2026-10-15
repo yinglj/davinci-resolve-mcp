@@ -2,6 +2,29 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.2 — Three more Windows test failures fixed
+
+Lands #289 from @AllastorV, who re-ran the offline suite on v4.13.1 on Windows
+11 (Python 3.13): 7 failures left, down from 90. This release fixes the three
+that were in the tests themselves. No production code changed.
+
+### Tests (Windows portability, no behaviour change)
+
+- **`test_control_panel_ipv6_loopback`** (2 tests): on Windows `os.kill` is
+  `TerminateProcess`, which returns before the child exits, so the child still
+  held `.control_panel.log` when the temp dir was removed (`WinError 32`). The
+  cleanup now waits, up to 5 s, until `proc.windows_pid_alive` reports the child
+  gone. POSIX is unchanged.
+- **`test_doctor_paths`**: the patched `Path.exists` compares
+  `Path.as_posix()`, since `str(Path)` uses backslashes on Windows.
+- **`test_cdl_and_install_config`**: asserts on `repr(repo_root)`, which is how
+  `install.py` writes the path into the verify probe (`!r`), so Windows
+  backslashes appear doubled.
+
+The other four Windows failures from that run point at production behaviour
+(the bridge port bind, the no-bridge error on a slow refused connect, and
+volume-root detection for Windows paths) and are tracked in #278.
+
 ## What's New in v4.13.1 — Windows: liveness checks no longer kill the process they check, and the offline suite runs clean
 
 Closes #278, reported by @AllastorV with the failures grouped by cause. Nobody
