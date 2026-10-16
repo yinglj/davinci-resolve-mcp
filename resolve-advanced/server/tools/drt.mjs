@@ -128,12 +128,80 @@ function resolveTargetProjectVersion({ targetProjectVersion, targetAppVersion })
   throw new Error('provide targetProjectVersion (int) or targetAppVersion (e.g. "19.1.3")');
 }
 
+/**
+ * The verified registry row (vendor/drt-format/resolve-versions.js) for a targetAppVersion, keyed
+ * by MAJOR version like the registry's own resolveVersion. null when the major has no row — the
+ * caller must then say it fell back, never borrow another version's stamp.
+ */
+function registryRowFor(targetAppVersion) {
+  if (targetAppVersion === undefined || targetAppVersion === null || targetAppVersion === '') return null;
+  const { VERSIONS } = drt().resolveVersions;
+  const row = VERSIONS[String(targetAppVersion).split('.')[0]];
+  return row || null;
+}
+
+/**
+ * The gate value and comment stamp a downgrade writes, and where each came from. Precedence:
+ * - <ProjectVersion>/DbPrjVer: explicit targetProjectVersion, else the registry row's dbPrjVer,
+ *   else PROJECT_VERSION_BY_APP (confirmed gate points with no full stamp, e.g. 18 → 11).
+ * - DbAppVer: explicit appVersionString, else the registry row's dbAppVer — only when the row's
+ *   dbPrjVer is the gate being written (a 19 build stamp beside DbPrjVer 11 would be a lie) —
+ *   else a PADDED fallback ("18.0" → "18.0.0.0") that names no real build and is labelled so.
+ */
+function resolveDowngradeStamp(p) {
+  const row = registryRowFor(p.targetAppVersion);
+  let targetPV;
+  let projectVersionSource;
+  if (Number.isInteger(p.targetProjectVersion)) {
+    targetPV = p.targetProjectVersion;
+    projectVersionSource = 'targetProjectVersion';
+  } else if (row) {
+    targetPV = Number(row.dbPrjVer);
+    projectVersionSource = 'registry';
+  } else {
+    targetPV = resolveTargetProjectVersion(p);
+    projectVersionSource = 'version-map';
+  }
+
+  const warnings = [];
+  let appVer;
+  let appVersionSource;
+  if (p.appVersionString) {
+    appVer = p.appVersionString;
+    appVersionSource = 'appVersionString';
+  } else if (row && Number(row.dbPrjVer) === targetPV) {
+    appVer = row.dbAppVer;
+    appVersionSource = 'registry';
+  } else if (p.targetAppVersion) {
+    const parts = String(p.targetAppVersion).split('.');
+    appVer = `${p.targetAppVersion}${'.0'.repeat(Math.max(0, 4 - parts.length))}`;
+    appVersionSource = 'padded-fallback';
+    warnings.push(
+      row
+        ? `DbAppVer "${appVer}" is padded, not a verified build: the registry row for Resolve ${row.marketing} is schema ${row.dbPrjVer}, not the ${targetPV} being written. Pass appVersionString to stamp a real build.`
+        : `DbAppVer "${appVer}" is padded, not a verified build: the registry has no row for Resolve ${parts[0]} (known: ${Object.values(drt().resolveVersions.VERSIONS).map((v) => v.marketing).join(', ')}). The gate (<ProjectVersion> ${targetPV}) is unaffected; pass appVersionString to stamp a real build.`,
+    );
+  } else {
+    appVer = `${targetPV}.0.0.0000`;
+    appVersionSource = 'placeholder';
+    warnings.push(`DbAppVer "${appVer}" is a placeholder (only targetProjectVersion was given). Pass targetAppVersion or appVersionString to stamp a real build.`);
+  }
+  return {
+    targetPV,
+    appVer,
+    projectVersionSource,
+    appVersionSource,
+    registryRow: row ? { marketing: row.marketing, dbAppVer: row.dbAppVer, dbPrjVer: row.dbPrjVer } : null,
+    warnings,
+  };
+}
+
 const downgradeSchema = z.object({
   drtPath: z.string().describe('Source .drt/.drp (e.g. exported from a newer Resolve)'),
   outputPath: z.string().describe('Where to write the downgraded file'),
   targetProjectVersion: z.number().int().optional().describe('On-disk <ProjectVersion> to stamp (overrides targetAppVersion)'),
-  targetAppVersion: z.string().optional().describe('Target Resolve app version, e.g. "19.1.3" — mapped to ProjectVersion'),
-  appVersionString: z.string().optional().describe('DbAppVer comment to stamp (default derived from targetAppVersion, else "<v>.0.0.0000")'),
+  targetAppVersion: z.string().optional().describe('Target Resolve app version, e.g. "19.1.3" — a major with a verified registry row (19, 20, 21) takes its DbAppVer/DbPrjVer from it; other majors use the ProjectVersion map'),
+  appVersionString: z.string().optional().describe('DbAppVer comment to stamp (overrides the registry; default = the verified registry build for targetAppVersion, else a padded fallback, labelled in appVersionSource)'),
 });
 
 /**
@@ -718,10 +786,8 @@ export const drtTool = {
     }
     if (action === 'downgrade') {
       const p = downgradeSchema.parse(args);
-      const targetPV = resolveTargetProjectVersion(p);
-      const appVer =
-        p.appVersionString ||
-        (p.targetAppVersion ? `${p.targetAppVersion}${'.0'.repeat(Math.max(0, 4 - String(p.targetAppVersion).split('.').length))}` : `${targetPV}.0.0.0000`);
+      const stamp = resolveDowngradeStamp(p);
+      const { targetPV, appVer } = stamp;
       const zip = await JSZip.loadAsync(await fs.readFile(p.drtPath));
       const out = new JSZip();
       let elementPatches = 0;
@@ -758,6 +824,10 @@ export const drtTool = {
         bytes: buf.length,
         targetProjectVersion: targetPV,
         appVersion: appVer,
+        projectVersionSource: stamp.projectVersionSource,
+        appVersionSource: stamp.appVersionSource,
+        registryRow: stamp.registryRow,
+        ...(stamp.warnings.length ? { warnings: stamp.warnings } : {}),
         projectVersionElementsPatched: elementPatches,
         commentStampsPatched: stampPatches,
         note: 'Stamp downgrade clears the import GATE only; verify content imports cleanly (fine clip corrections can drop across a multi-version gap).',
