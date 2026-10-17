@@ -8455,29 +8455,48 @@ def _probe_interchange_roundtrip(proj, mp, tl, p: Dict[str, Any]):
     }
 
 
+_WINDOWS_DRIVE_PATH = re.compile(r"[A-Za-z]:[\\/]")
+
+
+def _media_path_parts(text: str) -> List[str]:
+    # Resolve stores a path the way the OS that wrote it gave it, and a project
+    # moves between machines, so split on both separators rather than `os.sep`:
+    # a macOS path stays a macOS path when the project opens on Windows (#278).
+    return [part for part in re.split(r"[\\/]", text) if part]
+
+
 def _sanitize_media_path(path: Any, *, keep_filename: bool = True) -> Optional[str]:
     if not path:
         return None
     text = str(path)
-    filename = os.path.basename(text.rstrip(os.sep))
-    parts = [part for part in text.split(os.sep) if part]
+    parts = _media_path_parts(text)
+    filename = parts[-1] if keep_filename and parts else ""
     if text.startswith("/Volumes/") and len(parts) >= 2:
-        root = f"/Volumes/{parts[1]}"
-        return f"{root}/.../{filename}" if keep_filename and filename else f"{root}/..."
-    if text.startswith(os.sep):
-        return f"/.../{filename}" if keep_filename and filename else "/..."
-    return f".../{filename}" if keep_filename and filename else "..."
+        prefix, sep = f"/Volumes/{parts[1]}/...", "/"
+    elif text.startswith("\\\\") and len(parts) >= 2:
+        prefix, sep = f"\\\\{parts[0]}\\{parts[1]}\\...", "\\"
+    elif _WINDOWS_DRIVE_PATH.match(text):
+        prefix, sep = f"{text[:2]}\\...", "\\"
+    elif text.startswith(("/", "\\")):
+        prefix, sep = "/...", "/"
+    else:
+        prefix, sep = "...", "/"
+    return f"{prefix}{sep}{filename}" if filename else prefix
 
 
 def _media_path_volume_root(path: Any) -> Optional[str]:
     if not path:
         return None
     text = str(path)
-    parts = [part for part in text.split(os.sep) if part]
+    parts = _media_path_parts(text)
     if text.startswith("/Volumes/") and len(parts) >= 2:
         return f"/Volumes/{parts[1]}"
-    if text.startswith(os.sep) and parts:
-        return os.sep + parts[0]
+    if text.startswith("\\\\") and len(parts) >= 2:
+        return f"\\\\{parts[0]}\\{parts[1]}"
+    if _WINDOWS_DRIVE_PATH.match(text):
+        return f"{text[:2]}\\"
+    if text.startswith(("/", "\\")) and parts:
+        return text[0] + parts[0]
     return None
 
 
