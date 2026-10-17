@@ -1688,6 +1688,36 @@ class ProxyTests(unittest.TestCase):
         with self.assertRaises(self.rbc.BridgeUnavailable):
             self.rbc.BridgeProxy(dead, "resolve").GetProductName()
 
+    def _patched_transport(self):
+        return self.rbc.BridgeTransport(
+            {"host": "127.0.0.1", "port": 9, "token": TOKEN, "auth_clock_skew_seconds": 60},
+            timeout=1.0,
+        )
+
+    def test_a_connect_timeout_is_unavailable_not_a_dialog(self) -> None:
+        # Windows retries a refused loopback SYN for ~2 s, so a short timeout
+        # fires inside connect (#278). The kernel completes the handshake even
+        # while a modal dialog blocks Resolve, so a connect that times out means
+        # no bridge. Patched so Linux and macOS CI exercise the Windows timing.
+        import socket as _socket
+        from unittest import mock
+
+        with mock.patch("socket.create_connection", side_effect=_socket.timeout("timed out")):
+            with self.assertRaises(self.rbc.BridgeUnavailable):
+                self._patched_transport().request("health", {})
+
+    def test_a_timeout_after_connecting_still_reports_bridge_timeout(self) -> None:
+        import socket as _socket
+        from unittest import mock
+
+        sock = mock.MagicMock()
+        sock.__enter__.return_value = sock
+        sock.makefile.return_value.readline.side_effect = _socket.timeout("timed out")
+        with mock.patch("socket.create_connection", return_value=sock):
+            with self.assertRaises(self.rbc.BridgeCallError) as ctx:
+                self._patched_transport().request("health", {})
+        self.assertEqual(ctx.exception.code, "bridge_timeout")
+
 
 class BridgeForceFlagTests(unittest.TestCase):
     """`DAVINCI_RESOLVE_BRIDGE` forces the bridge; it does not gate it.

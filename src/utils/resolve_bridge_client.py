@@ -155,6 +155,13 @@ class BridgeTransport:
             truncated.get("limit"),
         )
 
+    def _unavailable(self, exc: OSError) -> BridgeUnavailable:
+        return BridgeUnavailable(
+            "Cannot reach the in-Resolve bridge on "
+            f"{self.host}:{self.port} ({exc}). Start it from "
+            "Workspace > Scripts > resolve_bridge."
+        )
+
     def request(self, operation: str, arguments: Dict[str, Any]) -> Any:
         payload = {
             "protocol": _bridge.PROTOCOL_VERSION,
@@ -171,7 +178,15 @@ class BridgeTransport:
 
         with self._lock:
             try:
-                with socket.create_connection((self.host, self.port), timeout=self.timeout) as sock:
+                # A connect that times out means no bridge, never a dialog: the
+                # kernel completes the handshake even while a modal dialog blocks
+                # Resolve. Windows retries a refused loopback SYN for ~2 s, so a
+                # short timeout fires here before the refusal does (#278).
+                sock = socket.create_connection((self.host, self.port), timeout=self.timeout)
+            except OSError as exc:
+                raise self._unavailable(exc) from exc
+            try:
+                with sock:
                     sock.settimeout(self.timeout)
                     sock.sendall(line)
                     raw = sock.makefile("rb").readline(_bridge.MAX_REQUEST_BYTES + 1)
@@ -182,11 +197,7 @@ class BridgeTransport:
                     "which blocks its scripting API entirely",
                 ) from exc
             except OSError as exc:
-                raise BridgeUnavailable(
-                    "Cannot reach the in-Resolve bridge on "
-                    f"{self.host}:{self.port} ({exc}). Start it from "
-                    "Workspace > Scripts > resolve_bridge."
-                ) from exc
+                raise self._unavailable(exc) from exc
 
         if not raw:
             raise BridgeCallError("bridge_protocol_error", "bridge closed without replying")
