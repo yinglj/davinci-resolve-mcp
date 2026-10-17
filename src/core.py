@@ -54,6 +54,18 @@ logger.info(f"Using Resolve library path: {RESOLVE_LIB_PATH}")
 # Create MCP server instance
 mcp = FastMCP("DaVinciResolveMCP", on_duplicate="ignore")
 
+# Register tasks extension for background task support
+try:
+    from fastmcp_tasks import TasksExtension
+
+    mcp.add_extension(TasksExtension())
+    logger.info("Tasks extension registered for background task support")
+except ImportError:
+    logger.warning(
+        "fastmcp-tasks not installed; task-enabled tools will not function. "
+        "Install with: pip install 'fastmcp[tasks]'"
+    )
+
 
 resolve_manager = importlib.import_module("src.utils.resolve_manager").resolve_manager
 

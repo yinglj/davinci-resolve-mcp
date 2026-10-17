@@ -7,7 +7,7 @@ import mcp.types
 from mcp.types import Icon, ToolAnnotations
 from fastmcp.server.providers.base import Provider
 from fastmcp.tools.tool import Tool, ToolResult
-from fastmcp.server.tasks.config import TaskMeta
+from fastmcp.utilities.tasks import TaskMeta
 from fastmcp.utilities.versions import VersionSpec
 from mcp.server.fastmcp.server import FastMCP as LegacyFastMCP
 

@@ -6,7 +6,7 @@ These are high-level operations that might take longer and combine multiple tool
 
 import time
 from typing import List, Optional
-from fastmcp.server.tasks import TaskConfig
+from fastmcp.utilities.tasks import TaskConfig
 
 
 def register_workflow_tasks(mcp, resolve, logger):

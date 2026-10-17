@@ -161,7 +161,7 @@ def _get_log_level() -> int:
                 config.read(config_path)
                 log_level_str = config.get('logging', 'level', fallback='INFO').upper()
             else:
-                log_level_str = 'DEBUG'
+                log_level_str = 'INFO'
         except configparser.Error:
             print(f"Warning: Error reading log level from '{config_path}'. Defaulting to DEBUG.", file=sys.stderr)
             log_level_str = 'DEBUG'

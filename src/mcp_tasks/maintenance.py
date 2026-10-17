@@ -3,7 +3,7 @@
 DaVinci Resolve MCP Tasks - Maintenance related tasks
 """
 
-from fastmcp.server.tasks import TaskConfig
+from fastmcp.utilities.tasks import TaskConfig
 
 
 def register_maintenance_tasks(mcp, resolve, logger):
