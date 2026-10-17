@@ -540,13 +540,22 @@ class _Handler(socketserver.StreamRequestHandler):
 
 
 class _Server(socketserver.ThreadingTCPServer):
-    allow_reuse_address = True
+    # On POSIX SO_REUSEADDR only lets a restart rebind past TIME_WAIT. On
+    # Windows it lets a second socket share a live port, so a stale bridge and a
+    # new one could both listen and the orphan check in `start` never fired
+    # (#278). There the port is claimed exclusively instead.
+    allow_reuse_address = os.name != "nt"
     daemon_threads = True
     address_family = socket.AF_INET
 
     def __init__(self, address: Tuple[str, int], bridge: "Bridge") -> None:
         self.bridge = bridge
         super().__init__(address, _Handler)
+
+    def server_bind(self) -> None:
+        if os.name == "nt":  # pragma: no cover - exercised on Windows
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 class Bridge:
