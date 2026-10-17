@@ -2,6 +2,28 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.5 — Missing-media diagnosis finds Windows drive and UNC volumes
+
+Lands #293 from @AllastorV, case 4 of the Windows failures tracked in #278.
+With #291 and #292, his Windows 11 run of the offline suite is now clean.
+
+### Fixed
+
+- **Volume roots (`src/server.py`, `_media_path_volume_root` and
+  `_sanitize_media_path`)**: both helpers split on `os.sep`, so they followed
+  the OS running the server rather than the path's own form. Neither recognised
+  a Windows drive or UNC root. An unplugged card (`E:\DCIM\...`,
+  `\\nas\share\...`) never produced `volume_not_mounted`, and the relink plan
+  ran a full search instead of saying "mount the volume". On Windows a
+  `/Volumes/<name>` path came out as a single part. Both helpers now split on
+  `/` and `\`, and treat `X:\` and `\\server\share` as the volume root
+  alongside the existing `/Volumes/<name>` rule.
+- Sanitized paths keep the volume and hide the rest, in the path's own
+  separator: `E:\...\clip.mov`, `\\nas\share\...\clip.mov`. POSIX output is
+  unchanged.
+- New `MediaPathFormTests` use Windows-form fixtures and pure string checks, so
+  they run on every platform.
+
 ## What's New in v4.13.4 — Windows: the bridge claims its port exclusively
 
 Lands #292 from @AllastorV, case 2 of the Windows failures tracked in #278.
