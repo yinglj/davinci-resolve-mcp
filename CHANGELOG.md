@@ -2,6 +2,25 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.3 — No bridge running is reported as unavailable, not as a modal dialog
+
+Lands #291 from @AllastorV, case 3 of the Windows failures tracked in #278.
+
+### Fixed
+
+- **Bridge client (`src/utils/resolve_bridge_client.py`)**: a timeout while
+  connecting to the in-Resolve bridge now raises `BridgeUnavailable` ("Start it
+  from Workspace > Scripts > resolve_bridge") instead of `bridge_timeout`
+  ("check for an open modal dialog"). On Windows a refused loopback connect
+  retries the SYN for about 2 s (measured 2.04 s), so with the 1 s timeout a
+  user with no bridge running was sent looking for a dialog. The kernel
+  completes the TCP handshake even while a modal dialog blocks Resolve, so a
+  connect that times out never means a dialog. A timeout after the connection
+  is up is still `bridge_timeout`. One timeout value, no new setting.
+- Two tests patch `socket.create_connection`, so Linux and macOS CI exercise the
+  Windows timing: a connect timeout is `BridgeUnavailable`, a read timeout is
+  still `bridge_timeout`.
+
 ## What's New in v4.13.2 — Three more Windows test failures fixed
 
 Lands #289 from @AllastorV, who re-ran the offline suite on v4.13.1 on Windows
