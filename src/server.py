@@ -21,6 +21,7 @@ import inspect
 import json
 import logging
 import math
+import ntpath
 import platform
 import re
 import shutil
@@ -8465,6 +8466,43 @@ def _media_path_parts(text: str) -> List[str]:
     return [part for part in re.split(r"[\\/]", text) if part]
 
 
+def _media_path_basename(path: Any) -> str:
+    # `os.path.basename` splits on the running OS's separator only, so on macOS
+    # the basename of `E:\DCIM\P1047043.MOV` is the whole string and a search
+    # for it can never match. Go by the path's own form instead.
+    parts = _media_path_parts(str(path or ""))
+    return parts[-1] if parts else ""
+
+
+def _media_path_form(path: Any) -> Optional[str]:
+    # "windows" for a drive letter or UNC share, "posix" for a /-rooted path,
+    # None for a relative path, which says nothing about the OS that wrote it.
+    text = str(path or "")
+    if text.startswith("\\\\") or _WINDOWS_DRIVE_PATH.match(text):
+        return "windows"
+    if text.startswith("/"):
+        return "posix"
+    return None
+
+
+def _host_media_path_form() -> str:
+    return "windows" if os.name == "nt" else "posix"
+
+
+def _media_path_is_foreign(path: Any) -> bool:
+    # A path another OS wrote: `E:\` on macOS, `/Volumes/X` on Windows. Its
+    # volume can never be mounted on this machine, so "mount it" is the wrong
+    # advice; the media has to be found under a root this OS can see.
+    form = _media_path_form(path)
+    return form is not None and form != _host_media_path_form()
+
+
+def _media_path_dirname(text: str) -> str:
+    # ntpath understands drive letters, UNC shares and both separators on any
+    # OS; posix-form paths keep the running OS's own dirname.
+    return ntpath.dirname(text) if _media_path_form(text) == "windows" else os.path.dirname(text)
+
+
 def _sanitize_media_path(path: Any, *, keep_filename: bool = True) -> Optional[str]:
     if not path:
         return None
@@ -8508,7 +8546,8 @@ def _missing_media_diagnosis(missing_rows: List[Dict[str, Any]]) -> Dict[str, An
     for row in missing_rows:
         file_path = row.get("file_path")
         media_pool_item_id = row.get("media_pool_item_id") or file_path or row.get("name")
-        basename = os.path.basename(str(file_path or row.get("media_pool_item_name") or row.get("name") or ""))
+        basename = _media_path_basename(file_path or row.get("media_pool_item_name") or row.get("name"))
+        foreign = _media_path_is_foreign(file_path)
         item = by_media_pool_item.setdefault(
             str(media_pool_item_id),
             {
@@ -8517,6 +8556,7 @@ def _missing_media_diagnosis(missing_rows: List[Dict[str, Any]]) -> Dict[str, An
                 "wanted_basename": basename,
                 "file_path_sanitized": _sanitize_media_path(file_path),
                 "volume_root_sanitized": _sanitize_media_path(_media_path_volume_root(file_path), keep_filename=False),
+                "foreign_os_path": foreign,
                 "timeline_occurrence_count": 0,
                 "track_refs": [],
             },
@@ -8536,7 +8576,11 @@ def _missing_media_diagnosis(missing_rows: List[Dict[str, Any]]) -> Dict[str, An
                 volume_root,
                 {
                     "volume_root_sanitized": _sanitize_media_path(volume_root, keep_filename=False),
-                    "mounted": os.path.isdir(volume_root),
+                    # Never probed: this OS reads the name as something else
+                    # (`/Volumes/X` is a folder on the current Windows drive,
+                    # `E:\` a relative name on macOS).
+                    "mounted": False if foreign else os.path.isdir(volume_root),
+                    "foreign_os_path": foreign,
                     "clip_count": 0,
                     "sample_basenames": [],
                 },
@@ -8545,13 +8589,14 @@ def _missing_media_diagnosis(missing_rows: List[Dict[str, Any]]) -> Dict[str, An
             if basename and basename not in volume_row["sample_basenames"] and len(volume_row["sample_basenames"]) < 8:
                 volume_row["sample_basenames"].append(basename)
 
-        folder = os.path.dirname(str(file_path)) if file_path else ""
+        folder = _media_path_dirname(str(file_path)) if file_path else ""
         if folder:
             folder_row = missing_folders.setdefault(
                 folder,
                 {
                     "folder_sanitized": _sanitize_media_path(folder, keep_filename=False),
-                    "exists": os.path.isdir(folder),
+                    "exists": False if foreign else os.path.isdir(folder),
+                    "foreign_os_path": foreign,
                     "clip_count": 0,
                     "sample_basenames": [],
                 },
@@ -8563,14 +8608,28 @@ def _missing_media_diagnosis(missing_rows: List[Dict[str, Any]]) -> Dict[str, An
     unique_items = list(by_media_pool_item.values())
     missing_volume_rows = list(missing_volumes.values())
     missing_folder_rows = list(missing_folders.values())
-    absent_volumes = [row for row in missing_volume_rows if not row.get("mounted")]
+    foreign_volumes = [row for row in missing_volume_rows if row.get("foreign_os_path")]
+    absent_volumes = [row for row in missing_volume_rows if not row.get("mounted") and not row.get("foreign_os_path")]
     absent_folders = [row for row in missing_folder_rows if not row.get("exists")]
+    foreign_labels = ", ".join(row["volume_root_sanitized"] for row in foreign_volumes[:3])
     primary_cause = "none"
     recommended_next_step = "No offline media detected."
     if absent_volumes:
         primary_cause = "volume_not_mounted"
         labels = ", ".join(row["volume_root_sanitized"] for row in absent_volumes[:3])
         recommended_next_step = f"Mount the missing volume(s): {labels}."
+        if foreign_volumes:
+            recommended_next_step += (
+                f" Paths written on another operating system ({foreign_labels}) cannot be mounted here;"
+                " relink those from approved media roots by basename."
+            )
+    elif foreign_volumes:
+        primary_cause = "foreign_os_path"
+        recommended_next_step = (
+            f"These media paths were written on another operating system, so their volume(s)"
+            f" ({foreign_labels}) cannot be mounted here. Search approved media roots for the wanted basenames"
+            " (build_relink_plan), then relink with media_pool.safe_relink."
+        )
     elif absent_folders:
         primary_cause = "folder_not_found"
         labels = ", ".join(row["folder_sanitized"] for row in absent_folders[:3])
@@ -8731,8 +8790,10 @@ def _build_relink_plan(tl, p: Dict[str, Any]):
         return _err(f"search_roots must be existing directories: {invalid}")
     missing_report = _detect_missing_media(tl, p)
     diagnosis = missing_report.get("diagnosis") or _missing_media_diagnosis(missing_report.get("missing", []))
+    # A volume another OS wrote can never be mounted here, so it never holds the
+    # search back: approved roots are the only place its media can turn up.
     if _coerce_bool(p.get("skip_search_when_volume_missing"), True) and any(
-        not row.get("mounted") for row in diagnosis.get("missing_volumes", [])
+        not row.get("mounted") and not row.get("foreign_os_path") for row in diagnosis.get("missing_volumes", [])
     ):
         return {
             "success": True,
@@ -8749,7 +8810,10 @@ def _build_relink_plan(tl, p: Dict[str, Any]):
     candidates = []
     rows_by_basename: Dict[str, List[Dict[str, Any]]] = {}
     for row in missing_report.get("missing", []):
-        wanted = os.path.basename(str(row.get("file_path") or row.get("media_pool_item_name") or row.get("name") or ""))
+        # A sanitized report drops `file_path`; its sanitized form keeps the
+        # filename and the root's form, which is all the search needs.
+        path = row.get("file_path") or row.get("file_path_sanitized")
+        wanted = _media_path_basename(path or row.get("media_pool_item_name") or row.get("name"))
         if wanted:
             rows_by_basename.setdefault(wanted, []).append(row)
     for wanted, rows in rows_by_basename.items():
@@ -8763,6 +8827,7 @@ def _build_relink_plan(tl, p: Dict[str, Any]):
             {
                 **row,
                 "wanted_basename": wanted,
+                "foreign_os_path": _media_path_is_foreign(row.get("file_path") or row.get("file_path_sanitized")),
                 "timeline_occurrence_count": len(rows),
                 "candidate_paths": [] if _coerce_bool(p.get("sanitize_paths")) or _coerce_bool(p.get("sanitized")) else matches,
                 "candidate_paths_sanitized": sanitized_matches,

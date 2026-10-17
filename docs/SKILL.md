@@ -1806,7 +1806,11 @@ missing volume roots, sample basenames, and a recommended next step. If a source
 volume such as a camera card is not mounted, `build_relink_plan` skips broad
 search by default and reports `skip_reason="missing_source_volume_not_mounted"`;
 mount the volume or pass `skip_search_when_volume_missing=false` only when a
-bounded scan of approved roots is intentional.
+bounded scan of approved roots is intentional. Paths written on another OS
+(`E:\...` on macOS, `/Volumes/...` on Windows, after a project moves between
+machines) are flagged `foreign_os_path`: their volume can never be mounted
+here, so they report `primary_cause="foreign_os_path"`, do not hold back the
+search, and are matched by their own basename under the approved roots.
 
 Audio / Fairlight kernel actions (v2.14.0+) add live-tested audio state,
 mapping, voice-isolation, sync, transcription, subtitle, and Fairlight boundary
