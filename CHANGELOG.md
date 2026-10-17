@@ -2,6 +2,45 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.7 — Missing-media relink works for paths written on another OS
+
+Lands #294, the follow-up to #293 for the Windows/macOS path work tracked in
+#278. A project moved between macOS and Windows keeps the paths the other OS
+wrote, so the missing-media diagnosis and relink plan now go by the path's own
+form.
+
+### Fixed
+
+- **Wanted basename (`src/server.py`, `_missing_media_diagnosis` and
+  `_build_relink_plan`)**: both used `os.path.basename`, which splits on the
+  running OS's separator only. On macOS the basename of `E:\DCIM\P1047043.MOV`
+  was the whole string, so a bounded search could never match. Both now split
+  on `/` and `\`.
+- **Volumes from another OS**: after #293, `E:\` on macOS (or `/Volumes/X` on
+  Windows) counted as an unmounted volume. That skipped the relink search and
+  advised mounting a volume this OS can never mount. Such roots are now flagged
+  `foreign_os_path` on volume, folder, item and candidate rows, and are never
+  probed with `isdir`. They report the new
+  `primary_cause="foreign_os_path"`, which advises searching the approved roots,
+  and they no longer trigger `skip_search_when_volume_missing`. A same-OS
+  unmounted volume behaves as before. When both kinds are present, the advice
+  names both.
+- **Sanitized relink plans**: with `sanitized=true`, `file_path` is dropped, so
+  the plan searched by the Resolve clip name. It now takes the basename from
+  `file_path_sanitized`, which keeps the filename.
+
+### Documentation
+
+- `docs/SKILL.md` documents `foreign_os_path`.
+
+### Validation
+
+- New `ForeignOsMediaPathTests` and basename/form tables pin the host OS, so
+  Linux, macOS and Windows CI all run both directions. Linux CI green on the PR.
+- Full offline suite and release static checks pass on macOS.
+- Diagnosis only, with no Resolve API call changed, so a live test is not
+  required.
+
 ## What's New in v4.13.6 — `drt` downgrade stamps the real Resolve build
 
 ### Fixed
