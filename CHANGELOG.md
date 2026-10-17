@@ -2,6 +2,24 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.4 — Windows: the bridge claims its port exclusively
+
+Lands #292 from @AllastorV, case 2 of the Windows failures tracked in #278.
+
+### Fixed
+
+- **In-Resolve bridge (`src/utils/resolve_bridge.py`)**: on Windows
+  `SO_REUSEADDR` means "share a live port", not "rebind past `TIME_WAIT`", so a
+  new bridge bound on top of a stale one, the orphan check never raised
+  `BridgeConfigError`, and which bridge answered was undefined. On Windows the
+  listener now sets `SO_EXCLUSIVEADDRUSE` and leaves `allow_reuse_address` off,
+  so a second bind fails and the existing orphan message explains it. POSIX is
+  unchanged. Stopping and immediately restarting on the same port still works on
+  Windows (checked after 1 and 20 requests, with 20 `TIME_WAIT` rows).
+- **Windows users of the free-edition bridge:** the installer copies
+  `resolve_bridge.py` into Resolve's scripts folder, so re-run
+  `python scripts/install_resolve_bridge.py` to pick up this fix.
+
 ## What's New in v4.13.3 — No bridge running is reported as unavailable, not as a modal dialog
 
 Lands #291 from @AllastorV, case 3 of the Windows failures tracked in #278.
