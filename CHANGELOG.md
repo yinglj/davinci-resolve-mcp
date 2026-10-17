@@ -2,6 +2,33 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.13.6 — `drt` downgrade stamps the real Resolve build
+
+### Fixed
+
+- **`drt(action='downgrade')` (`resolve-advanced/server/tools/drt.mjs`)**: the
+  `DbAppVer` stamp was built by padding `targetAppVersion` to four parts, so
+  `19.1.3` became `19.1.3.0`, a build no Resolve has ever written. The vendored
+  version registry already records the real stamps read from Resolve's own
+  exports (19 → `19.1.3.0007` / 14, 20 → `20.3.2.0009` / 15, 21 →
+  `21.0.0.0048` / 17), and the vendored retarget path used them, so the two
+  re-stamp paths disagreed in every XML member. `DbPrjVer` now comes from an
+  explicit `targetProjectVersion`, then the registry row for that major, then
+  the known gate map. Resolve 20, which the map never had, now resolves to
+  schema 15 instead of throwing. `DbAppVer` comes from an explicit
+  `appVersionString`, then the registry row (only when its schema matches the
+  one being written), then the old padded form, which is now labelled and
+  warned about.
+- The result gains `projectVersionSource`, `appVersionSource`, `registryRow`
+  and, when a fallback was used, `warnings`.
+
+### Validation
+
+- 6 new cases in `resolve-advanced/test/drt-downgrade.test.mjs`. All 6 fail
+  against the previous `drt.mjs`. All `drt*.test.mjs` pass: 42/42.
+- Offline Python suite and the release static checks pass. Offline file
+  authoring only; no live Resolve import was run for this change.
+
 ## What's New in v4.13.5 — Missing-media diagnosis finds Windows drive and UNC volumes
 
 Lands #293 from @AllastorV, case 4 of the Windows failures tracked in #278.
