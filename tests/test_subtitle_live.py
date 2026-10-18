@@ -99,7 +99,8 @@ class SubtitleLiveTest(unittest.TestCase):
         root = Path(self.tmp.name) / 'tree'
         advanced = root / 'resolve-advanced'
         advanced.mkdir(parents=True)
-        (advanced / 'package.json').write_text(json.dumps({'dependencies': {'jszip': '^3.10.1'}}))
+        (advanced / 'package.json').write_text(
+            json.dumps({'dependencies': {'jszip': '^3.10.1'}}), encoding='utf-8')
         real = self.gap.temp_original
         with patch.object(live, 'ROOT', root), patch.object(live, '_ADVANCED', advanced):
             gap = real()
