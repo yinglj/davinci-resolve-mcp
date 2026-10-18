@@ -251,6 +251,34 @@ class InstallConfigTests(unittest.TestCase):
         )
         self.assertEqual(advanced["env"]["AAF_PROBE_PYTHON"], TMP_PYTHON)
 
+    def test_provision_skips_npm_when_deps_are_already_present(self):
+        server = self._bootable_tree()
+        root = server.parents[1]
+        with patch.object(install.subprocess, "run") as run:
+            status = install.provision_advanced_node_deps(root)
+        self.assertEqual(status, "already installed")
+        run.assert_not_called()
+
+    def test_provision_installs_missing_node_deps(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        advanced = root / "resolve-advanced"
+        (advanced / "server").mkdir(parents=True)
+        (advanced / "server" / "index.mjs").write_text("", encoding="utf-8")
+        (advanced / "package.json").write_text(
+            '{"dependencies": {"zod": "^3.0.0"}}', encoding="utf-8")
+
+        def fake_npm(argv, **kwargs):
+            (advanced / "node_modules" / "zod").mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        with patch.object(install.subprocess, "run", side_effect=fake_npm) as run:
+            status = install.provision_advanced_node_deps(root)
+        self.assertEqual(status, "installed")
+        self.assertEqual(run.call_args.args[0][1:], ["install", "--omit=dev", "--omit=optional", "--no-audit", "--no-fund"])
+        self.assertEqual(run.call_args.kwargs["cwd"], str(advanced))
+
     def test_advanced_entry_omits_env_without_python_path(self):
         # No interpreter known → no AAF_PROBE_PYTHON pin (falls back to `python3` on PATH).
         entry = install.build_advanced_entry(self._bootable_tree())

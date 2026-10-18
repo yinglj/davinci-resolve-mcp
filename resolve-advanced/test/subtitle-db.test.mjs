@@ -95,6 +95,24 @@ test('QC flags gaps, invalid words, overlap and length without claiming pixel ve
   for (const code of ['overflow_length', 'word_gap', 'zero_or_negative_word_duration']) assert.ok(qc.issues.some((r) => r.code === code));
   assert.match(qc.note, /heuristic/);
 });
+test('Word Highlight shadow and alignment round-trip; scale and other templates do not', () => {
+  const xml = fs.readFileSync(new URL('../assets/word-highlight-track.xml', import.meta.url), 'utf8');
+  const blob = Buffer.from(xml.match(/<CompositionBA>([^<]+)<\/CompositionBA>/)[1], 'hex');
+  const before = decodePreset(blob);
+  assert.equal(before.inputs.shadowEnabled, 1);
+  assert.deepEqual(before.inputs.shadowOffset, [0.05, -0.05]);
+  assert.equal(before.inputs.horizontalAlign, 3);
+  assert.equal(before.inputs.verticalAlign, 3);
+  assert.ok(before.editableInputs.includes('shadowEnabled'));
+  assert.ok(before.editableInputs.includes('horizontalAlign'));
+  const inputs = { shadowRed: 0.2, shadowOffset: [0.08, -0.02], shadowSoftnessX: 5, horizontalAlign: 3 };
+  const read = decodePreset(setPresetInputs(blob, inputs));
+  for (const [key, value] of Object.entries(inputs)) assert.deepEqual(read.inputs[key], value);
+  const lollipop = fs.readFileSync(new URL('../assets/lollipop-track.xml', import.meta.url), 'utf8');
+  const other = Buffer.from(lollipop.match(/<CompositionBA>([^<]+)<\/CompositionBA>/)[1], 'hex');
+  assert.throws(() => setPresetInputs(other, { shadowEnabled: 0 }), /unknown or unsupported/);
+});
+
 test('preset codec updates scoped controls, preserves other tools and all framing', () => {
   const blob = compBlob();
   const inputs = { font: 'Test "Font"', position: [0.5, 0.8], highlightRed: 0.2, thickness: 0.08, textAlpha: 1 };

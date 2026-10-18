@@ -22,6 +22,17 @@ const inputs = z.object({
   highlightRed: rgb.optional(), highlightGreen: rgb.optional(), highlightBlue: rgb.optional(),
   outlineRed: rgb.optional(), outlineGreen: rgb.optional(), outlineBlue: rgb.optional(),
   outlineEnabled: z.union([z.literal(0), z.literal(1)]).optional(), thickness: z.number().min(0).max(1).optional(),
+  // Word Highlight shading element 8 (a drop shadow) and its justification
+  // integers. The centred bundled reference stores 3. Per-word scale and cue
+  // in/out are not literal inputs on this macro and stay refused.
+  shadowEnabled: z.union([z.literal(0), z.literal(1)]).optional(),
+  shadowRed: rgb.optional(), shadowGreen: rgb.optional(), shadowBlue: rgb.optional(),
+  shadowOffset: z.tuple([z.number().min(-1).max(1), z.number().min(-1).max(1)]).optional(),
+  shadowSoftness: z.number().min(0).max(20).optional(),
+  shadowSoftnessX: z.number().min(0).max(20).optional(),
+  shadowSoftnessY: z.number().min(0).max(20).optional(),
+  horizontalAlign: z.number().int().min(0).max(8).optional(),
+  verticalAlign: z.number().int().min(0).max(8).optional(),
 }).strict();
 export const subtitleSchemas = {
   list_subtitle_presets: z.object({ ...target, timeline: z.string().optional() }).strict(),

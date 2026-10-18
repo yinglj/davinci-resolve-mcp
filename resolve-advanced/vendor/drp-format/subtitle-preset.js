@@ -12,6 +12,14 @@ const INPUTS = {
   highlightRed: 'HighlightColorRed', highlightGreen: 'HighlightColorGreen', highlightBlue: 'HighlightColorBlue',
   outlineRed: 'HOutlineR', outlineGreen: 'HOutlineG', outlineBlue: 'HOutlineB',
   outlineEnabled: 'HOutline', thickness: 'HOutlineThickness',
+  // Shading element 8 on the bundled Word Highlight is a drop shadow (offset
+  // plus softness), not a stroke on the unhighlighted words. HOutline remains
+  // the spoken-word outline. The centred reference stores justification 3.
+  shadowEnabled: 'Enabled8',
+  shadowRed: 'Red8', shadowGreen: 'Green8', shadowBlue: 'Blue8',
+  shadowOffset: 'Offset8',
+  shadowSoftness: 'Softness8', shadowSoftnessX: 'SoftnessX8', shadowSoftnessY: 'SoftnessY8',
+  horizontalAlign: 'HorizontalJustificationNew', verticalAlign: 'VerticalJustificationNew',
 };
 const COMMON_INPUTS = Object.fromEntries(Object.entries(INPUTS).filter(([key]) =>
   ['font', 'fontStyle', 'size', 'position', 'textRed', 'textGreen', 'textBlue', 'textAlpha', 'textFillMode'].includes(key)));
@@ -116,7 +124,7 @@ function setPresetInputs(blob, changes) {
   const range = inputTable(u.text);
   let inputs = u.text.slice(range.start, range.end);
   for (const [key, value] of Object.entries(changes)) {
-    const name = INPUTS[key];
+    const name = mapping[key];
     if (!name) throw new Error(`unknown preset input ${key}`);
     const r = inputRange(inputs, name), replacement = `${name} = Input { Value = ${literal(key === 'textFillMode' ? 0 : value)}, }, `;
     if (r) {

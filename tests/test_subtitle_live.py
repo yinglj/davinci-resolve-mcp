@@ -23,6 +23,11 @@ class SubtitleLiveTest(unittest.TestCase):
         self.imported.GetUniqueId.return_value = 'revision'
         self.imported.GetCurrentTimecode.return_value = '01:00:01:00'
         self.p.SetCurrentTimeline.side_effect = lambda timeline: setattr(self.p.GetCurrentTimeline, 'return_value', timeline) or True
+        # The codec-dep check reads this checkout. Tests that mock Node must
+        # not fail when resolve-advanced/node_modules is absent.
+        self.gap = patch.object(live, 'subtitle_codec_gap', return_value=None)
+        self.gap.start()
+        self.addCleanup(self.gap.stop)
 
     def call(self, params=None, inventories=None):
         with patch.object(live.shutil, 'which', return_value='node'), \
@@ -78,6 +83,32 @@ class SubtitleLiveTest(unittest.TestCase):
         self.assertFalse(result['success'])
         self.assertIn('did not retain', result['error'])
         self.p.SetCurrentTimeline.assert_called_once_with(self.t)
+
+    def test_missing_node_deps_fail_before_node_is_spawned(self):
+        with patch.object(live.shutil, 'which', return_value='node'), \
+             patch.object(live, 'subtitle_codec_gap', return_value='missing jszip'), \
+             patch.object(live.subprocess, 'run') as run:
+            result = live.set_subtitle_preset(
+                self.r, self.p, self.t, {'inputs': {'textRed': 0}}, lambda _: self.tmp.name)
+        self.assertFalse(result['success'])
+        self.assertIn('jszip', result['error'])
+        run.assert_not_called()
+        self.t.Export.assert_not_called()
+
+    def test_codec_gap_names_the_install_command(self):
+        root = Path(self.tmp.name) / 'tree'
+        advanced = root / 'resolve-advanced'
+        advanced.mkdir(parents=True)
+        (advanced / 'package.json').write_text(
+            json.dumps({'dependencies': {'jszip': '^3.10.1'}}), encoding='utf-8')
+        real = self.gap.temp_original
+        with patch.object(live, 'ROOT', root), patch.object(live, '_ADVANCED', advanced):
+            gap = real()
+        self.assertIn('jszip', gap)
+        self.assertIn('npm install --omit=dev --omit=optional', gap)
+        (advanced / 'node_modules' / 'jszip').mkdir(parents=True)
+        with patch.object(live, 'ROOT', root), patch.object(live, '_ADVANCED', advanced):
+            self.assertIsNone(real())
 
     def test_uncoerced_helper_input_refuses_before_export_or_import(self):
         result = self.call({'dry_run': 'true'})

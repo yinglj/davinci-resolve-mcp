@@ -1232,6 +1232,42 @@ def advanced_is_bootable(project_dir):
     return True
 
 
+def provision_advanced_node_deps(project_dir, dry_run=False):
+    """Install resolve-advanced runtime deps when the tree is present and they are not.
+
+    The live subtitle path imports those packages from this checkout. Registering
+    the advanced server as an npx fallback does not install them for that path
+    (issue #297). Returns a short status string and never raises: a missing npm
+    must not abort the Python install.
+    """
+    project_dir = Path(project_dir)
+    advanced = project_dir / "resolve-advanced"
+    if not (advanced / "package.json").is_file():
+        return "advanced server tree is not present"
+    if advanced_is_bootable(project_dir):
+        return "already installed"
+    command = "npm install --omit=dev --omit=optional"
+    if dry_run:
+        return f"would run {command}"
+    npm = "npm.cmd" if platform.system() == "Windows" else "npm"
+    try:
+        result = subprocess.run(
+            [npm, "install", "--omit=dev", "--omit=optional", "--no-audit", "--no-fund"],
+            cwd=str(advanced),
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return f"npm was not found; from {advanced} run: {command}"
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip().splitlines()
+        tail = detail[-1] if detail else f"exit {result.returncode}"
+        return f"npm install failed: {tail}. From {advanced} run: {command}"
+    if not advanced_is_bootable(project_dir):
+        return f"npm install finished but Node dependencies are still missing. From {advanced} run: {command}"
+    return "installed"
+
+
 def build_advanced_npx_entry(python_path=None):
     """Fallback advanced entry that runs from the npm package, not this tree.
 
@@ -2277,6 +2313,15 @@ def main():
         print(f"  Server:    {green(str(server_path))}")
     else:
         print(f"  Server:    {yellow(str(server_path))} {dim('(file not found — check path)')}")
+
+    # The live subtitle preset path imports jszip from this tree. The advanced
+    # server entry can fall back to npx; that fallback does not install the
+    # packages this checkout's timeline_ai call actually loads (issue #297).
+    node_deps = provision_advanced_node_deps(project_dir, dry_run=args.dry_run)
+    if node_deps in ("installed", "already installed"):
+        print(f"  Node deps: {green(node_deps)}")
+    else:
+        print(f"  Node deps: {yellow(node_deps)}")
 
     # ══════════════════════════════════════════════════════════════════════
     # STEP 4: Configure MCP Clients

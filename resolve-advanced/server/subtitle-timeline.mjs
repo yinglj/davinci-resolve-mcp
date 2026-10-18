@@ -76,6 +76,8 @@ export async function editSubtitleTimeline({ source, output, track = 1, inputs =
   exported.zip.file(exported.entry, xml);
   const buffer = await exported.zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   await fs.writeFile(output, buffer, { flag: 'wx' });
-  return { output, templateId: chosen.decoded.templateId, before: before?.decoded.inputs ?? null, after: decodePreset(patched).inputs,
+  const decoded = decodePreset(patched);
+  return { output, templateId: chosen.decoded.templateId, before: before?.decoded.inputs ?? null, after: decoded.inputs,
+    editableInputs: decoded.editableInputs,
     verification: 'exported_preset_readback', restart_required: false };
 }

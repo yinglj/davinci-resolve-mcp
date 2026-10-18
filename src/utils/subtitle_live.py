@@ -16,6 +16,34 @@ from src.utils.title_library import find_subtitle_preset
 
 ROOT = Path(__file__).resolve().parents[2]
 BRIDGE = ROOT / "scripts" / "edit_subtitle_timeline.mjs"
+_ADVANCED = ROOT / "resolve-advanced"
+
+
+def subtitle_codec_gap():
+    """Why the live subtitle codec cannot run, or None when its Node deps are present.
+
+    timeline_ai set_subtitle_preset imports jszip from resolve-advanced/. The
+    advanced MCP entry falls back to npx when those packages are missing; this
+    path does not, so a fresh installer/control-panel setup that never ran
+    npm install fails with ERR_MODULE_NOT_FOUND (issue #297).
+    """
+    manifest_path = _ADVANCED / "package.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return f"The subtitle preset codec is not present at {_ADVANCED}"
+    missing = []
+    for dep in (manifest.get("dependencies") or {}):
+        if not (_ADVANCED / "node_modules" / dep).is_dir() and not (ROOT / "node_modules" / dep).is_dir():
+            missing.append(dep)
+    if not missing:
+        return None
+    shown = ", ".join(missing[:8])
+    extra = f" (+{len(missing) - 8} more)" if len(missing) > 8 else ""
+    return (
+        f"Subtitle preset editing needs Node packages that are not installed ({shown}{extra}). "
+        f"From {_ADVANCED} run: npm install --omit=dev --omit=optional"
+    )
 
 
 def _capture_installed_preset(resolve, project, preset, output):
@@ -67,6 +95,9 @@ def set_subtitle_preset(resolve, project, timeline, params, safe_dir):
     node = shutil.which("node")
     if not node:
         return {"success": False, "error": "Node.js is required for the subtitle preset codec"}
+    gap = subtitle_codec_gap()
+    if gap:
+        return {"success": False, "error": gap}
     # The dispatcher coerces strings before the safety-gated helper is entered.
     dry_run = params.get("dry_run", False)
     if not isinstance(dry_run, bool):
@@ -116,7 +147,12 @@ def set_subtitle_preset(resolve, project, timeline, params, safe_dir):
                                    capture_output=True, text=True, encoding="utf-8", errors="replace",
                                    timeout=60, check=False)
         if completed.returncode:
-            raise RuntimeError(completed.stderr.strip() or "Subtitle codec failed")
+            err = completed.stderr.strip() or "Subtitle codec failed"
+            if "ERR_MODULE_NOT_FOUND" in err or "Cannot find package" in err:
+                err = subtitle_codec_gap() or (
+                    f"{err} From {_ADVANCED} run: npm install --omit=dev --omit=optional"
+                )
+            raise RuntimeError(err)
         patch = json.loads(completed.stdout)
         # The codec's output file is private staging, removed after success.
         patch.pop("output", None)

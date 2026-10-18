@@ -15025,7 +15025,15 @@ def _mcp_install_payload(client_id: str) -> Dict[str, Any]:
         )
     except Exception as exc:
         return {"success": False, "error": str(exc)}
-    return {"success": bool(ok), "message": message, "client_id": client_id}
+    # Same gap as install.py: writing the client entry does not install the
+    # Node packages the live subtitle preset path imports (issue #297).
+    node_deps = "not provisioned"
+    try:
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(paths["server_path"])))
+        node_deps = installer.provision_advanced_node_deps(project_dir)
+    except Exception as exc:
+        node_deps = f"npm install failed: {exc}"
+    return {"success": bool(ok), "message": message, "client_id": client_id, "node_deps": node_deps}
 
 
 def _mcp_uninstall_payload(client_id: str) -> Dict[str, Any]:
