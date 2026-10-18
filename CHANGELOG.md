@@ -2,6 +2,28 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.14.1 — Setup finds the Mac App Store Studio bundle
+
+Fixes #299.
+
+### Fixed
+
+- **macOS path detection (`install.py`, `src/utils/resolve_runtime.py`, `src/utils/platform.py`, `scripts/doctor.py`)**:
+  the Mac App Store Studio build installs as `/Applications/DaVinci Resolve Studio.app`
+  and keeps `Developer/Scripting` inside the bundle. Setup only knew the installer
+  layout and the free App Store app, and the process check required a path ending
+  in `DaVinci Resolve.app`, so a running Studio app was reported as not running.
+  The installer bundle is still preferred when it is present. App Store Studio is
+  next, then the free App Store app. Auto-launch and restart use that same order.
+
+### Validation
+
+- Path-detection unit tests pass, including the Studio process name, the in-bundle
+  scripting directory, and setup's candidate table.
+- Release static checks pass.
+- The Mac App Store Studio bundle was not connected live. It is not installed on
+  the release machine. The installer app and the free App Store app are.
+
 ## What's New in v4.14.0 — Subtitle presets install, and frame capture puts the render page back
 
 Lands #298. Closes #297 and #296. #295 is only the controls the Word Highlight
