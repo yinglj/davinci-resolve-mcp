@@ -225,14 +225,25 @@ def require_current_python(label="Python"):
 
 RESOLVE_PATHS = {
     "Darwin": {
+        # The Library scripting dir is what the installer writes. The Mac App
+        # Store builds never create it; their API lives inside the bundle.
+        # Installer first, then App Store Studio, then the free App Store app,
+        # so a machine with more than one keeps the installer.
         "api": [
             "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting",
+            "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Resources/Developer/Scripting",
+            "/Applications/DaVinci Resolve Studio.app/Contents/Resources/Developer/Scripting",
+            "/Applications/DaVinci Resolve.app/Contents/Resources/Developer/Scripting",
         ],
         "lib": [
             "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",
+            "/Applications/DaVinci Resolve Studio.app/Contents/Libraries/Fusion/fusionscript.so",
+            "/Applications/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",
         ],
         "app": [
             "/Applications/DaVinci Resolve/DaVinci Resolve.app",
+            "/Applications/DaVinci Resolve Studio.app",
+            "/Applications/DaVinci Resolve.app",
         ],
     },
     "Windows": {

@@ -34,13 +34,16 @@ import subprocess
 from typing import Any, Dict, List, Optional
 
 #: Process paths that mean a DaVinci Resolve application is running. Not the
-#: full path: the App Store build lives at `/Applications/DaVinci Resolve.app`
-#: and the installer build inside `/Applications/DaVinci Resolve/`, and either
-#: one counts.
+#: full path: the free App Store build lives at `/Applications/DaVinci
+#: Resolve.app`, App Store Studio at `/Applications/DaVinci Resolve Studio.app`,
+#: and the installer build inside `/Applications/DaVinci Resolve/`. The Studio
+#: name is its own pattern — `DaVinci Resolve Studio.app` does not end with
+#: `DaVinci Resolve.app`.
 RESOLVE_PROCESS_PATTERNS = (
-    "DaVinci Resolve.app/Contents/MacOS/Resolve",   # macOS, both editions
-    "Resolve.exe",                                  # Windows
-    "/opt/resolve/bin/resolve",                     # Linux
+    "DaVinci Resolve Studio.app/Contents/MacOS/Resolve",  # macOS, App Store Studio
+    "DaVinci Resolve.app/Contents/MacOS/Resolve",         # macOS, installer and free App Store
+    "Resolve.exe",                                        # Windows
+    "/opt/resolve/bin/resolve",                           # Linux
 )
 
 #: The documented headless switch. Blackmagic spells it exactly this way on all
@@ -50,10 +53,12 @@ HEADLESS_FLAG = "-nogui"
 #: Set to 1 to make this server's auto-launch start Resolve without a UI.
 ENV_PREFER_HEADLESS = "DAVINCI_RESOLVE_HEADLESS"
 
-#: macOS puts the two editions in different places. Installer/Studio first, to
-#: preserve the behaviour that a machine with both starts Studio.
+#: macOS puts the editions in different places. Installer first, then App Store
+#: Studio, then the free App Store app: a machine with the installer still
+#: starts that one, and a machine with both App Store editions starts Studio.
 MACOS_RESOLVE_APPS = (
     "/Applications/DaVinci Resolve/DaVinci Resolve.app",
+    "/Applications/DaVinci Resolve Studio.app",
     "/Applications/DaVinci Resolve.app",
 )
 

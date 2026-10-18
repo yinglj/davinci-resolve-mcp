@@ -236,7 +236,10 @@ def restart_resolve_app(resolve_obj, wait_seconds: int = 5) -> bool:
     try:
         # Get Resolve executable path for restart
         if platform.system().lower() == 'darwin':
-            resolve_path = '/Applications/DaVinci Resolve/DaVinci Resolve.app'
+            from src.utils.resolve_runtime import MACOS_RESOLVE_APPS
+            resolve_path = next((p for p in MACOS_RESOLVE_APPS if os.path.exists(p)), None)
+            if resolve_path is None:
+                return False
         elif platform.system().lower() == 'windows':
             # Default path, may need to be customized
             resolve_path = r'C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe'

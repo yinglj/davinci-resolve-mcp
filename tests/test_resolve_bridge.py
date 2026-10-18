@@ -2449,10 +2449,12 @@ class ServerReachesTheBridgeTests(unittest.TestCase):
         — and a machine with both always got Studio."""
         from src.utils import resolve_runtime
 
-        self.assertIn("/Applications/DaVinci Resolve.app", resolve_runtime.MACOS_RESOLVE_APPS)
-        self.assertIn(
-            "/Applications/DaVinci Resolve/DaVinci Resolve.app", resolve_runtime.MACOS_RESOLVE_APPS
-        )
+        apps = resolve_runtime.MACOS_RESOLVE_APPS
+        installer = "/Applications/DaVinci Resolve/DaVinci Resolve.app"
+        studio = "/Applications/DaVinci Resolve Studio.app"
+        free = "/Applications/DaVinci Resolve.app"
+        self.assertLess(apps.index(installer), apps.index(studio))
+        self.assertLess(apps.index(studio), apps.index(free))
 
     def test_bridge_requested_reads_the_environment_at_call_time(self) -> None:
         from unittest import mock
@@ -2612,11 +2614,13 @@ class NeverLaunchARunningResolveTests(unittest.TestCase):
         from src.utils import resolve_runtime
 
         patterns = resolve_runtime.RESOLVE_PROCESS_PATTERNS
-        # The App Store build is `/Applications/DaVinci Resolve.app/...` and the
-        # installer build `/Applications/DaVinci Resolve/DaVinci Resolve.app/...`;
-        # one pattern has to match both, or the edition that is running is missed.
+        # The free App Store build is `/Applications/DaVinci Resolve.app/...`,
+        # App Store Studio is `/Applications/DaVinci Resolve Studio.app/...`,
+        # and the installer build is `/Applications/DaVinci Resolve/DaVinci
+        # Resolve.app/...`. Studio does not contain the free-app suffix.
         for command in (
             "/Applications/DaVinci Resolve.app/Contents/MacOS/Resolve",
+            "/Applications/DaVinci Resolve Studio.app/Contents/MacOS/Resolve",
             "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/MacOS/Resolve",
         ):
             with self.subTest(command=command):

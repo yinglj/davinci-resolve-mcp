@@ -59,9 +59,22 @@ CODEX_CONFIG = CODEX_HOME / "config.toml"
 #: what made it so confusing to diagnose (issue #106). Linux had the same bug.
 _RESOLVE_PATH_CANDIDATES: dict[str, dict[str, tuple[str, ...]]] = {
     "darwin": {
-        "app": ("/Applications/DaVinci Resolve/DaVinci Resolve.app",),
-        "api": ("/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting",),
-        "lib": ("/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",),
+        "app": (
+            "/Applications/DaVinci Resolve/DaVinci Resolve.app",
+            "/Applications/DaVinci Resolve Studio.app",
+            "/Applications/DaVinci Resolve.app",
+        ),
+        "api": (
+            "/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting",
+            "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Resources/Developer/Scripting",
+            "/Applications/DaVinci Resolve Studio.app/Contents/Resources/Developer/Scripting",
+            "/Applications/DaVinci Resolve.app/Contents/Resources/Developer/Scripting",
+        ),
+        "lib": (
+            "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",
+            "/Applications/DaVinci Resolve Studio.app/Contents/Libraries/Fusion/fusionscript.so",
+            "/Applications/DaVinci Resolve.app/Contents/Libraries/Fusion/fusionscript.so",
+        ),
     },
     "win32": {
         "app": (r"C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe",),

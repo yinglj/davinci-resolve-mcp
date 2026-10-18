@@ -178,6 +178,15 @@ class RuntimeModeTests(unittest.TestCase):
         with mock.patch.object(rr.subprocess, "run", return_value=_ps(appstore)):
             self.assertTrue(rr.is_headless())
 
+    def test_mac_app_store_studio_counts_as_running(self) -> None:
+        """Issue #299: the Studio bundle name is not a suffix of the free one."""
+        studio = "/Applications/DaVinci Resolve Studio.app/Contents/MacOS/Resolve"
+        with mock.patch.object(rr.subprocess, "run", return_value=_ps(studio)):
+            mode = rr.runtime_mode()
+        self.assertTrue(mode["running"])
+        self.assertFalse(mode["headless"])
+        self.assertEqual(mode["instances"], 1)
+
     def test_a_mere_mention_of_the_path_is_not_an_instance(self) -> None:
         """A shell running a script that *names* Resolve is not Resolve.
 
