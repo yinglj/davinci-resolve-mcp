@@ -53,8 +53,16 @@ Full IDs disambiguate names such as the ordinary and animated `Statement`.
 All subtitle templates with the inspected `Template = TextPlus` layout accept
 the common literal `font`, `fontStyle`, `size`, `position`, `textRed`, `textGreen`,
 `textBlue`, and `textAlpha` controls. Highlight and outline mappings remain
-specific to Word Highlight. Connected/animated controls, different layouts and
-unmapped effect controls are refused. Do not guess their meanings. The live
+specific to Word Highlight. Word Highlight also accepts its shading element 8
+as a drop shadow (`shadowEnabled`, `shadowRed`, `shadowGreen`, `shadowBlue`,
+`shadowOffset`, `shadowSoftness`, `shadowSoftnessX`, `shadowSoftnessY`) and
+`horizontalAlign` / `verticalAlign`, which write the template's justification
+integers. The centred bundled reference stores `3`. That shadow is not a stroke
+on the unhighlighted words; `outlineEnabled` and `thickness` remain the
+spoken-word outline. Per-word scale and cue in/out transitions are not literal
+inputs on this macro and are refused. A dry run's `editableInputs` lists the
+controls the holder actually accepts. Connected/animated controls, different
+layouts and unmapped effect controls are refused. Do not guess their meanings. The live
 matrix is documented in [title library automation](title-library-automation.md).
 An alternate `preset_reference` can copy another decodable native holder.
 For an unbundled installed preset, a mutation-free dry run needs an existing
@@ -238,11 +246,14 @@ UUIDs. An occupied destination requires `replace:true`; the source is unchanged.
 Omit `inputs` to copy the preset bytes unchanged. To adjust an existing preset,
 use `set_subtitle_preset` with target selectors and `inputs`.
 
-Colour channels are 0–1, `outlineEnabled` is 0 or 1, `size` is Fusion's
-normalised text size (not points), `position` is Fusion Center `[x,y]`, and
-`thickness` is the template's HOutlineThickness value. Parameter editing is
-based on common literal Template TextPlus inputs for subtitle templates;
-highlight and outline controls are specific to Word Highlight.
+Colour channels are 0–1, `outlineEnabled` and `shadowEnabled` are 0 or 1,
+`size` is Fusion's normalised text size (not points), `position` is Fusion
+Center `[x,y]`, `shadowOffset` is an `[x,y]` pair in that same space,
+`thickness` is the template's HOutlineThickness value, and `horizontalAlign`
+/ `verticalAlign` are the template's justification integers (the centred
+reference stores 3). Parameter editing is based on common literal Template
+TextPlus inputs for subtitle templates; highlight, outline, shadow and
+alignment controls are specific to Word Highlight.
 Connected/animated inputs and unsupported layouts are refused.
 Missing input values in the listing mean Resolve/template defaults, not zero.
 Other supported composition envelopes can be cloned unchanged, but cannot have

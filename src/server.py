@@ -15299,6 +15299,18 @@ def _render_target_dir(proj, teardown: List[str]) -> Optional[str]:
     return target if isinstance(target, str) and target else None
 
 
+def _timeline_subtitle_count(tl) -> int:
+    """Subtitle tracks on `tl`, or 0 when the count cannot be read."""
+    try:
+        count = tl.GetTrackCount("subtitle")
+    except Exception:
+        return 0
+    try:
+        return int(count or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _playhead_frame_render(proj, tl, p: Dict[str, Any],
                            teardown: Optional[List[str]] = None):
     """Render exactly one frame — the only frame-accurate capture route.
@@ -15323,7 +15335,9 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
       - TargetDir is read off a throwaway render job before the capture changes
         it (_render_target_dir) and written back afterwards. A project that
         has never had a render target has nothing to read, and Resolve cannot
-        clear one once set, so there it is left on the capture's folder.
+        clear one once set, so the capture's folder is left in place. It is
+        not deleted: Deliver pointing at a removed path raises the modal
+        "Render Path Inaccessible".
       - CustomName is never written. It can be neither read nor cleared (an
         empty one is refused on 19.1.3.7), so the capture renders under
         whatever name the project already produces, into a folder of its own,
@@ -15476,13 +15490,10 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
         # to read it from.
         original_target = _render_target_dir(proj, teardown)
         codecs = proj.GetRenderCodecs("JPEG" if fmt == "jpg" else fmt.upper()) or {}
-        codec = list(codecs.values())[0] if codecs else fmt
-        if not proj.SetCurrentRenderFormatAndCodec(fmt, codec):
-            return _err(
-                f"Resolve refused render format {fmt!r} with codec {codec!r}",
-                code="RENDER_FORMAT_REFUSED", category="api_error",
-                state={"format": fmt, "codec": codec},
-            )
+        codec = list(codecs.values())[0] if isinstance(codecs, dict) and codecs else fmt
+        # The output folder goes in BEFORE the format change. Switching format
+        # while TargetDir is missing raises Resolve's modal "Render Path
+        # Inaccessible — Please select a valid render path." (issue #296).
         applied = proj.SetRenderSettings({
             "TargetDir": folder,
             "MarkIn": frame,
@@ -15498,6 +15509,13 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
                 state={"frame": frame},
             )
         range_pinned = True
+        fmt_id, codec_id = _canonical_render_format_codec(proj, fmt, codec)
+        if not proj.SetCurrentRenderFormatAndCodec(fmt_id, codec_id):
+            return _err(
+                f"Resolve refused render format {fmt_id!r} with codec {codec_id!r}",
+                code="RENDER_FORMAT_REFUSED", category="api_error",
+                state={"format": fmt_id, "codec": codec_id},
+            )
         job = proj.AddRenderJob()
         if not job:
             return _err("AddRenderJob returned nothing", code="RENDER_JOB_FAILED", category="api_error")
@@ -15550,6 +15568,14 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
         else:
             with open(src_path, "rb") as handle:
                 data = handle.read()
+        if _timeline_subtitle_count(tl):
+            teardown.append(
+                "This still does not include the subtitle track. A capture "
+                "cannot turn subtitle burn-in on for one frame and put the "
+                "previous ExportSubtitle setting back: there is no "
+                "GetRenderSettings, and on Resolve 19 those keys are accepted "
+                "and then ignored."
+            )
         return Image(data=data, format=out_format)
     finally:
         if job:
@@ -15578,9 +15604,12 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
             # A failed restore leaves the Deliver page on the capture's format
             # and codec, which the user's next render would silently inherit.
             # This runs in a teardown path, so it is logged rather than raised.
+            # The getter reports descriptions ('H.264'); the setter wants ids
+            # ('H264') and refuses the description (issue #296).
+            restore_fmt, restore_codec = _canonical_render_format_codec(
+                proj, original_fc.get("format"), original_fc.get("codec"))
             try:
-                restored_fc = proj.SetCurrentRenderFormatAndCodec(
-                    original_fc.get("format"), original_fc.get("codec"))
+                restored_fc = proj.SetCurrentRenderFormatAndCodec(restore_fmt, restore_codec)
             except Exception as exc:
                 restored_fc, restore_exc = False, exc
             else:
@@ -15588,12 +15617,12 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
             if not restored_fc:
                 logger.warning(
                     "frame capture could not restore the render format/codec to %s/%s: %s",
-                    original_fc.get("format"), original_fc.get("codec"),
+                    restore_fmt, restore_codec,
                     restore_exc or "SetCurrentRenderFormatAndCodec returned False",
                 )
                 teardown.append(
                     "The render format/codec was left on the capture's "
-                    f"({fmt}); restoring {original_fc.get('format')}/{original_fc.get('codec')} "
+                    f"({fmt}); restoring {restore_fmt}/{restore_codec} "
                     "failed, so the next render job would inherit it."
                 )
         # The mark range: put the user's own range back when they had one, and
@@ -15640,23 +15669,43 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
         # The output folder, when there was one to read. Without this the
         # user's next render job inherits a temporary folder that the cleanup
         # just below removes.
+        # Deleting the folder Deliver is still pointed at raises the modal
+        # "Render Path Inaccessible". Remove it only after the user's own path
+        # is back. A project that never had one cannot have it cleared, so the
+        # folder stays (issue #296).
+        target_moved = False
         if range_pinned and original_target:
             try:
                 target_restored = bool(proj.SetRenderSettings({"TargetDir": original_target}))
                 target_exc = None
             except Exception as exc:
                 target_restored, target_exc = False, exc
-            if not target_restored:
+            if target_restored:
+                target_moved = True
+            else:
                 logger.warning(
                     "frame capture could not restore the render output folder to %s: %s",
                     original_target, target_exc or "SetRenderSettings returned False",
                 )
                 teardown.append(
                     "The render output folder was left on the capture's temporary "
-                    f"folder; restoring {original_target!r} failed. Set it again with "
-                    "render(action='set_settings', params={'settings': {'TargetDir': ...}})."
+                    f"folder ({folder}); restoring {original_target!r} failed. "
+                    "The folder was kept so Deliver is not left pointing at a "
+                    "missing path, which raises Resolve's 'Render Path Inaccessible' "
+                    "dialog. Set it again with render(action='set_settings', "
+                    "params={'settings': {'TargetDir': ...}})."
                 )
-        _discard_still_staging(folder)
+        elif range_pinned:
+            teardown.append(
+                "The render output folder was left on the capture's temporary "
+                f"folder ({folder}). This project had no render path to put back, "
+                "and removing the folder would leave Deliver pointing at a missing "
+                "path, which raises Resolve's 'Render Path Inaccessible' dialog. "
+                "Set a render path with render(action='set_settings', "
+                "params={'settings': {'TargetDir': ...}})."
+            )
+        if target_moved or not range_pinned:
+            _discard_still_staging(folder)
         try:
             os.rmdir(base)  # only ever succeeds when nothing else is using it
         except OSError:
@@ -20508,6 +20557,25 @@ def _render_codec_id(proj, fmt: str, codec: str, formats: Optional[Dict[str, Any
     except Exception:
         return codec
     return _render_codec_id_from_codecs(codecs, codec)
+
+
+def _canonical_render_format_codec(proj, fmt, codec):
+    """Ids `SetCurrentRenderFormatAndCodec` accepts.
+
+    GetCurrentRenderFormatAndCodec and the Deliver page labels are descriptions.
+    On 19.1 and 21.0.4, ('mp4', 'H.264') is refused and ('mp4', 'H264') is
+    accepted. An unrecognized value passes through for Resolve to reject.
+    """
+    if not isinstance(fmt, str) or not isinstance(codec, str) or not fmt or not codec:
+        return fmt, codec
+    try:
+        formats = _render_formats(proj)
+    except Exception:
+        formats = {}
+    if not isinstance(formats, dict):
+        formats = {}
+    format_id = _render_format_id_from_formats(formats, fmt)
+    return format_id, _render_codec_id(proj, format_id, codec, formats)
 
 
 def _render_codecs(proj, fmt: str, formats: Optional[Dict[str, Any]] = None):
@@ -27184,7 +27252,9 @@ def timeline_frame(action: str, params: Optional[Dict[str, Any]] = None) -> Any:
     route switches back and reads the page to confirm it. If any restore does
     not take, the image is followed by {"warnings": [...]} naming what was left
     changed and the call that puts it back (an error result carries the same
-    "warnings" key). No warnings block means every restore was confirmed.
+    "warnings" key). No warnings block means every restore was confirmed. A
+    timeline with a subtitle track also gets a warning: the still does not
+    include that track.
     """
     p = _params(params)
     if action == "capture":
@@ -27215,9 +27285,11 @@ def timeline_frame(action: str, params: Optional[Dict[str, Any]] = None) -> Any:
                 "CustomName": True,
             },
             "render_settings_caveat": (
-                "A project that has never had a render TargetDir is left with the "
-                "capture's temporary folder as its TargetDir."
+                "A project that has never had a render TargetDir keeps the capture's "
+                "temporary folder. Removing it would leave Deliver pointing at a "
+                "missing path, which raises Resolve's 'Render Path Inaccessible' dialog."
             ),
+            "subtitles_included": False,
         }
         _, tl, err = _get_tl()
         if err:
@@ -27252,7 +27324,11 @@ def timeline_ai(action: str, params: Optional[Dict[str, Any]] = None) -> Dict[st
       set_subtitle_preset(track?, inputs?, preset?, preset_reference?, reference_track?, revision_name?, dry_run?, templates_archive?)
         Apply an installed subtitle preset and common literal font/style, size,
         position and text RGBA controls with Resolve kept open. Word Highlight
-        also supports mapped highlight/outline colours and thickness. Native
+        also supports mapped highlight/outline colours and thickness, its drop
+        shadow (shadowEnabled, shadowRed/Green/Blue, shadowOffset, shadowSoftness
+        and the X/Y pair) and horizontalAlign/verticalAlign justification
+        integers (the centred reference stores 3). Per-word scale and cue
+        in/out transitions are not literal inputs and are refused. Native
         export -> codec -> native import as a selected revision; original retained.
         Word Highlight and Lollipop have bundled references; other installed
         presets are captured natively in a temporary title timeline. Full IDs

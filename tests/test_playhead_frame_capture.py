@@ -296,7 +296,8 @@ class _RenderCapture:
                  write=True, ffmpeg="/usr/bin/ffmpeg", marks=None, mode=1, mode_switch=True,
                  resolve=None, range_restore_ok=True, user_target=USER_TARGET,
                  user_name="userA", target_restore_ok=True, job_delete_ok=True,
-                 existing=None):
+                 existing=None, render_formats=None, codecs_for=None,
+                 subtitle_tracks=0):
         """Returns (result, project mock, list of SetRenderSettings payloads)."""
         resolve = resolve or _FakeResolve(page="color")
         tl = _fake_timeline(resolve)
@@ -316,7 +317,14 @@ class _RenderCapture:
         proj.GetCurrentRenderMode.side_effect = _mode
         proj.SetCurrentRenderMode.return_value = mode_switch
         proj.GetCurrentRenderFormatAndCodec.return_value = {"format": "mov", "codec": "H.264"}
-        proj.GetRenderCodecs.return_value = {"JPEG": "YUV420_8"}
+        if render_formats is not None:
+            proj.GetRenderFormats.return_value = render_formats
+        if codecs_for is not None:
+            proj.GetRenderCodecs.side_effect = codecs_for
+        else:
+            proj.GetRenderCodecs.return_value = {"JPEG": "YUV420_8"}
+        if subtitle_tracks:
+            tl.GetTrackCount.side_effect = lambda kind: subtitle_tracks if kind == "subtitle" else 0
         proj.SetCurrentRenderFormatAndCodec.return_value = True
         proj.GetRenderJobStatus.return_value = (
             status if isinstance(status, dict) else {"JobStatus": status}
@@ -423,6 +431,30 @@ class CaptureRenderTest(_RenderCapture, unittest.TestCase):
         self.assertEqual(
             proj.SetCurrentRenderFormatAndCodec.call_args_list[-1].args,
             ("mov", "H.264"),
+        )
+
+    def test_render_format_restore_uses_codec_ids_not_descriptions(self):
+        # GetCurrentRenderFormatAndCodec reports the Deliver label. The setter
+        # refuses it: ('mp4', 'H.264') is False, ('mp4', 'H264') is True
+        # (api_truth, reconfirmed on 21.0.4). Issue #296 left the project on jpg.
+        def codecs(fmt):
+            if str(fmt).lower() in ("jpg", "jpeg"):
+                return {"JPEG": "YUV420_8"}
+            return {"H.264": "H264"}
+
+        out, proj, _ = self._capture(
+            {},
+            render_formats={"QuickTime": "mov", "JPEG": "jpg"},
+            codecs_for=codecs,
+        )
+        self.assertIsInstance(out, Image)
+        self.assertEqual(
+            proj.SetCurrentRenderFormatAndCodec.call_args_list[0].args,
+            ("jpg", "YUV420_8"),
+        )
+        self.assertEqual(
+            proj.SetCurrentRenderFormatAndCodec.call_args_list[-1].args,
+            ("mov", "H264"),
         )
 
     def test_individual_clips_mode_is_forced_to_single_clip_and_restored(self):
@@ -707,20 +739,28 @@ class CaptureOutputSettingsTest(_RenderCapture, unittest.TestCase):
 
     def test_a_project_with_no_output_folder_still_captures(self):
         # AddRenderJob returns '' there, so there is nothing to read and
-        # nothing to put back. That is not a failed restore.
+        # nothing to put back. The capture folder stays: deleting the path
+        # Deliver is pointed at raises "Render Path Inaccessible".
         out, proj, calls = self._capture({"frame": 86424}, user_target=None)
-        self.assertIsInstance(out, Image)
+        self.assertIsInstance(out, list)
+        self.assertIsInstance(out[0], Image)
+        self.assertIn("Render Path Inaccessible", out[1]["warnings"][0])
+        staging = calls[0]["TargetDir"]
+        self.assertTrue(os.path.isdir(staging))
         self.assertEqual([c for c in calls if set(c) == {"TargetDir"}], [])
         self.assertEqual(proj.render_state["jobs"], {})
 
     def test_an_output_folder_that_is_not_put_back_is_reported(self):
         with mock.patch.object(s.logger, "warning"):
-            out, proj, _ = self._capture({"frame": 86424}, target_restore_ok=False)
+            out, proj, calls = self._capture({"frame": 86424}, target_restore_ok=False)
         self.assertIsInstance(out, list)
         self.assertIsInstance(out[0], Image)
         self.assertEqual(len(out[1]["warnings"]), 1)
         self.assertIn("output folder", out[1]["warnings"][0])
         self.assertIn(USER_TARGET, out[1]["warnings"][0])
+        self.assertIn("Render Path Inaccessible", out[1]["warnings"][0])
+        staging = [c["TargetDir"] for c in calls if "TargetDir" in c][0]
+        self.assertTrue(os.path.isdir(staging))
 
     def test_a_readback_job_that_cannot_be_removed_is_reported(self):
         with mock.patch.object(s.logger, "warning"):
@@ -797,6 +837,13 @@ class CaptureTeardownReportTest(_RenderCapture, unittest.TestCase):
     def test_teardown_is_empty_for_a_clean_capture(self):
         out, _, _ = self._capture({})
         self.assertIsInstance(out, Image)
+
+    def test_a_subtitle_track_is_named_as_not_in_the_still(self):
+        out, _, _ = self._capture({}, subtitle_tracks=1)
+        self.assertIsInstance(out, list)
+        self.assertIsInstance(out[0], Image)
+        self.assertIn("subtitle track", out[1]["warnings"][0])
+        self.assertIn("ExportSubtitle", out[1]["warnings"][0])
 
 
 class ToolSurfaceTest(unittest.TestCase):

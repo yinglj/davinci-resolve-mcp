@@ -90,3 +90,22 @@ test('capture an installed subtitle via native title DRT without changing captio
       template_id:'Templates/Edit/Titles/Statement'}),/subtitle template/);
   } finally { await fs.rm(dir,{recursive:true,force:true}); }
 });
+
+test('Word Highlight lists and sets its drop shadow; per-word scale is refused', async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'subtitle-shadow-'));
+  try {
+    const source = await fixture(dir, 'source.drt'), output = path.join(dir, 'out.drt');
+    const result = await editSubtitleTimeline({
+      source, output, inputs: { shadowEnabled: 1, shadowBlue: 0.25, verticalAlign: 3 },
+    });
+    assert.equal(result.after.shadowEnabled, 1);
+    assert.equal(result.after.shadowBlue, 0.25);
+    assert.equal(result.after.verticalAlign, 3);
+    assert.ok(result.editableInputs.includes('shadowOffset'));
+    assert.ok(!result.editableInputs.includes('highlightScale'));
+    await assert.rejects(
+      editSubtitleTimeline({ source, output: path.join(dir, 'scale.drt'), inputs: { highlightScale: 1.1 } }),
+      /highlightScale/,
+    );
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
+});
