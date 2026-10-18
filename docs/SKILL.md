@@ -422,7 +422,9 @@ Operating rules an agent must know:
   open. `timeline_ai.list_title_presets` discovers installed title/subtitle names
   and full IDs. `preset` accepts a bundled or installed subtitle preset; omit it
   to adjust the existing effect. `inputs` accepts common literal font/style,
-  size/position and text RGBA; highlight/outline controls are Word Highlight-specific.
+  size/position and text RGBA; highlight, outline, drop-shadow and justification
+  integers are Word Highlight-specific. The centred reference stores alignment
+  `3`. Per-word scale and cue transitions are not literal inputs and are refused.
   Native DRT export/edit/import creates and selects a recoverable revision,
   preserving the original. Do not ask the user to quit or relaunch for effects.
   Render frames to verify appearance; inventory/readback alone is insufficient.
