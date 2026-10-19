@@ -443,6 +443,12 @@ Operating rules an agent must know:
   SQLite DB and verify transactionally. See
   [subtitle-track editing](guides/subtitle-track-editing.md) for selectors,
   Word Highlight controls, dry-run examples and live-validation limits.
+- **Offline conform footage indexing**: `conform.relink_scalefix` accepts existing
+  directories in `footageDir` / `footageDirs` (absolute or relative). Empty,
+  missing, non-directory, and `-`-prefixed roots are refused. Indexing uses Node
+  filesystem traversal, preserves MOV/MP4 filtering and proxy exclusions, and
+  does not follow nested directory symlinks. Explicit `media` lists bypass
+  directory indexing.
 - **Guards are load-bearing.** Advanced tools refuse rather than fabricate
   (silent-lie guards): a thrown "refused" error usually means wrong input space,
   log-encoded frames, or missing media — read the message before retrying.

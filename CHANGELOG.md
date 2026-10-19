@@ -2,6 +2,28 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.14.3 — Secure footage indexing
+
+### Security
+
+- Fix argument injection in `conform.relink_scalefix` (GHSA-x29h-6rgf-w233).
+  Replace the `find` subprocess with Node filesystem traversal so caller-supplied
+  footage roots cannot execute commands or inject filesystem operations.
+- Validate all footage roots before indexing. Preserve recursive MOV/MP4 indexing,
+  proxy exclusions, relative paths, file symlinks, and duplicate filtering;
+  skip nested directory symlinks and handle filenames containing newlines safely.
+- Thanks to HexMystic for reporting the vulnerability.
+
+### Validation
+
+- Focused conform and vendor suite: 121 passed, 30 skipped, zero failed.
+- Full advanced-server Node suite: 1,141 passed, 60 skipped, zero failed using
+  the Node runtime matching the installed native dependencies.
+- Required release static checks pass. Control-panel documentation reviewed;
+  no panel behavior or navigation changed.
+- No Resolve scripting or project authoring behavior changed; live Resolve
+  validation is not required for this filesystem indexing fix.
+
 ## What's New in v4.14.2 — Refresh advanced-server dependencies
 
 Lands #302. Fixes #301.
