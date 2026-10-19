@@ -1,6 +1,21 @@
 version: 2
 updates:
   - package-ecosystem: npm
-    directory: /resolve-advanced
+    directories:
+      - /
+      - /resolve-advanced
     schedule:
       interval: weekly
+    groups:
+      compatible-updates:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # v5 changes empty-input and YAML merge-key semantics used by spec-compile.
+      # Revisit with an explicit loader migration; see PR #307.
+      - dependency-name: js-yaml
+        versions:
+          - "5.x"
