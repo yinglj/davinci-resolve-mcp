@@ -19,3 +19,8 @@ updates:
       - dependency-name: js-yaml
         versions:
           - "5.x"
+      # Native major upgrades need a runtime-floor and database compatibility review.
+      # v13 requires Node >=22; this project supports Node >=20.9 (PR #310).
+      - dependency-name: better-sqlite3
+        update-types:
+          - version-update:semver-major
