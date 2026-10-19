@@ -2,6 +2,30 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.14.4 — Compatible dependency updates
+
+Lands #303, #304, #305, #306, and #308. Resolves #307, #309, and #310.
+
+### Maintenance
+
+- Update fast-xml-parser to 5.11.2, JSZip to 3.10.2, Zod to 4.6.7,
+  PostgreSQL client pg to 8.23.1, and development formatter Prettier to 3.9.10.
+- Align the published root package with the advanced-server dependency ranges
+  and audited lockfile versions, including the MCP SDK and sharp security fixes.
+- Group weekly patch/minor Dependabot updates across both package manifests.
+- Defer js-yaml v5 because its default merge-key and empty-input behavior changes
+  existing YAML specs. Defer native better-sqlite3 major upgrades for an explicit
+  compatibility review; v13 requires Node 22 while this project supports Node 20.9.
+
+### Validation
+
+- Full advanced-server Node suite: 1,141 passed, 60 skipped, zero failed.
+- Root and advanced-server npm audits report zero vulnerabilities.
+- Required release static checks pass. Control-panel documentation reviewed;
+  no panel behavior or navigation changed.
+- No Resolve scripting or project authoring behavior changed; live Resolve
+  validation is not required for these dependency and maintenance updates.
+
 ## What's New in v4.14.3 — Secure footage indexing
 
 ### Security
