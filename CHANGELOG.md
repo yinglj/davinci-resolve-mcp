@@ -2,6 +2,31 @@
 
 Release history for the DaVinci Resolve MCP Server. The latest release is summarized in the root README; older entries live here to keep the README focused.
 
+## What's New in v4.14.2 — Refresh advanced-server dependencies
+
+Lands #302. Fixes #301.
+
+### Fixed
+
+- Refresh `resolve-advanced/package-lock.json` within the existing dependency
+  ranges to resolve five npm audit findings: MCP SDK 1.32.1, fast-uri 3.1.8,
+  hono 4.13.13, ip-address 10.7.4, and proxy-addr 2.0.8. The compatible sharp
+  platform packages also update. Dependency ranges are unchanged.
+- Refresh the root package lockfile for the release.
+
+### Maintenance
+
+- Add weekly Dependabot updates for `/resolve-advanced`.
+
+### Validation
+
+- Production-only and full advanced-server npm audits report zero vulnerabilities.
+- Advanced-server Node suite: 1,137 passed, 60 skipped, zero failed, with the
+  media-template cache directed to scratch space.
+- Required release static checks pass. Control-panel documentation reviewed;
+  no panel behavior or navigation changed.
+- No Resolve behavior changed; live Resolve validation is not required.
+
 ## What's New in v4.14.1 — Setup finds the Mac App Store Studio bundle
 
 Fixes #299.
