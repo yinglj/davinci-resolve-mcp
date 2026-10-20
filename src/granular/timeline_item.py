@@ -1,10 +1,237 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Timeline_Item Operations (Granular Tools)."""
+"""Timeline item property, keyframe, and clip-level tools."""
 
-from typing import Any, Dict, List, Optional, Union, Tuple
-from .common import mcp, get_resolve
+from src.granular.common import *  # noqa: F401,F403
+from src.utils.clip_colors import clip_color_refusal
 
-@mcp.tool()
+resolve = ResolveProxy()
+
+
+def _item_type(item, method="GetType"):
+    """Normalize type values without assuming an optional API is callable.
+
+    Resolve 21.1 documents lowercase types. Keep title-case compatibility,
+    and treat missing/non-string results as unknown rather than as a clip.
+    """
+    getter = getattr(item, method, None)
+    if not callable(getter):
+        return ""
+    value = getter()
+    return value.lower() if isinstance(value, str) else ""
+
+
+def _has_audio_type(item):
+    return (_item_type(item) == "audio"
+            or _item_type(item, "GetMediaType") == "audio")
+
+
+def _copy_grade_item_summary(item, index):
+    """Name a clip well enough that a caller can recognise it in a confirmation.
+
+    Every read is guarded: Resolve fabricates a callable for ANY attribute name on
+    its objects, so `getattr(item, "Whatever")` is never absent and a bad call
+    raises rather than returning None. Absent detail degrades the preview; it must
+    not break the gate that the preview exists to serve.
+    """
+    summary = {"index": index}
+    for key, method in (("name", "GetName"), ("id", "GetUniqueId"), ("start", "GetStart")):
+        getter = getattr(item, method, None)
+        if not callable(getter):
+            continue
+        try:
+            value = getter()
+        except Exception:
+            continue
+        if value is not None:
+            summary[key] = value
+    return summary
+
+
+@mcp.resource("resolve://timeline-item/{timeline_item_id}")
+def get_timeline_item_properties(timeline_item_id: str) -> Dict[str, Any]:
+    """Get properties of a specific timeline item by ID.
+    
+    Args:
+        timeline_item_id: The ID of the timeline item to get properties for
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return {"error": "No project currently open"}
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return {"error": "No timeline currently active"}
+    
+    try:
+        # Find the timeline item by ID
+        # We'll need to get all items from all tracks and check their IDs
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        timeline_item = None
+        
+        # Search video tracks
+        for track_index in range(1, video_track_count + 1):
+            items = current_timeline.GetItemListInTrack("video", track_index)
+            if items:
+                for item in items:
+                    if str(item.GetUniqueId()) == timeline_item_id:
+                        timeline_item = item
+                        break
+            if timeline_item:
+                break
+        
+        # If not found, search audio tracks
+        if not timeline_item:
+            for track_index in range(1, audio_track_count + 1):
+                items = current_timeline.GetItemListInTrack("audio", track_index)
+                if items:
+                    for item in items:
+                        if str(item.GetUniqueId()) == timeline_item_id:
+                            timeline_item = item
+                            break
+                if timeline_item:
+                    break
+        
+        if not timeline_item:
+            return {"error": f"Timeline item with ID '{timeline_item_id}' not found"}
+        
+        # Get basic properties
+        properties = {
+            "id": timeline_item_id,
+            "name": timeline_item.GetName(),
+            "type": timeline_item.GetType(),
+            "start_frame": timeline_item.GetStart(),
+            "end_frame": timeline_item.GetEnd(),
+            "duration": timeline_item.GetDuration()
+        }
+        
+        # Get additional properties if it's a video item
+        if _item_type(timeline_item) == "video":
+            # Transform properties
+            properties["transform"] = {
+                "position": {
+                    "x": timeline_item.GetProperty("Pan"),
+                    "y": timeline_item.GetProperty("Tilt")
+                },
+                "zoom": timeline_item.GetProperty("ZoomX"),  # ZoomX/ZoomY can be different for non-uniform scaling
+                "zoom_x": timeline_item.GetProperty("ZoomX"),
+                "zoom_y": timeline_item.GetProperty("ZoomY"),
+                "rotation": timeline_item.GetProperty("Rotation"),
+                "anchor_point": {
+                    "x": timeline_item.GetProperty("AnchorPointX"),
+                    "y": timeline_item.GetProperty("AnchorPointY")
+                },
+                "pitch": timeline_item.GetProperty("Pitch"),
+                "yaw": timeline_item.GetProperty("Yaw")
+            }
+            
+            # Crop properties
+            properties["crop"] = {
+                "left": timeline_item.GetProperty("CropLeft"),
+                "right": timeline_item.GetProperty("CropRight"),
+                "top": timeline_item.GetProperty("CropTop"),
+                "bottom": timeline_item.GetProperty("CropBottom")
+            }
+            
+            # Composite properties
+            properties["composite"] = {
+                "mode": timeline_item.GetProperty("CompositeMode"),
+                "opacity": timeline_item.GetProperty("Opacity")
+            }
+            
+            # Dynamic zoom properties
+            properties["dynamic_zoom"] = {
+                "enabled": timeline_item.GetProperty("DynamicZoomEnable"),
+                "mode": timeline_item.GetProperty("DynamicZoomMode")
+            }
+            
+            # Retime properties
+            properties["retime"] = {
+                "speed": timeline_item.GetProperty("Speed"),
+                "process": timeline_item.GetProperty("RetimeProcess")
+            }
+            
+            # Stabilization properties
+            properties["stabilization"] = {
+                "enabled": timeline_item.GetProperty("StabilizationEnable"),
+                "method": timeline_item.GetProperty("StabilizationMethod"),
+                "strength": timeline_item.GetProperty("StabilizationStrength")
+            }
+        
+        # Audio-specific properties
+        if _has_audio_type(timeline_item):
+            properties["audio"] = {
+                "volume": timeline_item.GetProperty("Volume"),
+                "pan": timeline_item.GetProperty("Pan"),
+                "eq_enabled": timeline_item.GetProperty("EQEnable"),
+                "normalize_enabled": timeline_item.GetProperty("NormalizeEnable"),
+                "normalize_level": timeline_item.GetProperty("NormalizeLevel")
+            }
+        
+        return properties
+        
+    except Exception as e:
+        return {"error": f"Error getting timeline item properties: {str(e)}"}
+
+
+@mcp.resource("resolve://timeline-items")
+def get_timeline_items() -> List[Dict[str, Any]]:
+    """Get all items in the current timeline with their IDs and basic properties."""
+    pm, current_project = get_current_project()
+    if not current_project:
+        return [{"error": "No project currently open"}]
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return [{"error": "No timeline currently active"}]
+    
+    try:
+        # Get all tracks in the timeline
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        items = []
+        
+        # Process video tracks
+        for track_index in range(1, video_track_count + 1):
+            track_items = current_timeline.GetItemListInTrack("video", track_index)
+            if track_items:
+                for item in track_items:
+                    items.append({
+                        "id": str(item.GetUniqueId()),
+                        "name": item.GetName(),
+                        "type": "video",
+                        "track": track_index,
+                        "start_frame": item.GetStart(),
+                        "end_frame": item.GetEnd(),
+                        "duration": item.GetDuration()
+                    })
+        
+        # Process audio tracks
+        for track_index in range(1, audio_track_count + 1):
+            track_items = current_timeline.GetItemListInTrack("audio", track_index)
+            if track_items:
+                for item in track_items:
+                    items.append({
+                        "id": str(item.GetUniqueId()),
+                        "name": item.GetName(),
+                        "type": "audio",
+                        "track": track_index,
+                        "start_frame": item.GetStart(),
+                        "end_frame": item.GetEnd(),
+                        "duration": item.GetDuration()
+                    })
+        
+        if not items:
+            return [{"info": "No items found in the current timeline"}]
+        
+        return items
+    except Exception as e:
+        return [{"error": f"Error listing timeline items: {str(e)}"}]
+
+
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@granular_destructive_op()
 def set_timeline_item_transform(timeline_item_id: str, 
                                property_name: str, 
                                property_value: float) -> str:
@@ -54,7 +281,7 @@ def set_timeline_item_transform(timeline_item_id: str,
         if not timeline_item:
             return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
         
-        if timeline_item.GetType() != "Video":
+        if _item_type(timeline_item) != "video":
             return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
         
         # Set the property
@@ -66,7 +293,9 @@ def set_timeline_item_transform(timeline_item_id: str,
     except Exception as e:
         return f"Error setting timeline item property: {str(e)}"
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_timeline_item_crop(timeline_item_id: str, 
                           crop_type: str, 
                           crop_value: float) -> str:
@@ -113,7 +342,7 @@ def set_timeline_item_crop(timeline_item_id: str,
         if not timeline_item:
             return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
         
-        if timeline_item.GetType() != "Video":
+        if _item_type(timeline_item) != "video":
             return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
         
         # Set the property
@@ -125,10 +354,12 @@ def set_timeline_item_crop(timeline_item_id: str,
     except Exception as e:
         return f"Error setting timeline item crop: {str(e)}"
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_timeline_item_composite(timeline_item_id: str, 
-                               composite_mode: str = None, 
-                               opacity: float = None) -> str:
+                               composite_mode: Optional[str] = None, 
+                               opacity: Optional[float] = None) -> str:
     """Set composite properties for a timeline item.
     
     Args:
@@ -181,7 +412,7 @@ def set_timeline_item_composite(timeline_item_id: str,
         if not timeline_item:
             return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
         
-        if timeline_item.GetType() != "Video":
+        if _item_type(timeline_item) != "video":
             return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
         
         success = True
@@ -211,10 +442,12 @@ def set_timeline_item_composite(timeline_item_id: str,
     except Exception as e:
         return f"Error setting timeline item composite properties: {str(e)}"
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_timeline_item_retime(timeline_item_id: str, 
-                            speed: float = None, 
-                            process: str = None) -> str:
+                            speed: Optional[float] = None, 
+                            process: Optional[str] = None) -> str:
     """Set retiming properties for a timeline item.
     
     Args:
@@ -288,11 +521,13 @@ def set_timeline_item_retime(timeline_item_id: str,
     except Exception as e:
         return f"Error setting timeline item retime properties: {str(e)}"
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_timeline_item_stabilization(timeline_item_id: str, 
-                                   enabled: bool = None, 
-                                   method: str = None,
-                                   strength: float = None) -> str:
+                                   enabled: Optional[bool] = None, 
+                                   method: Optional[str] = None,
+                                   strength: Optional[float] = None) -> str:
     """Set stabilization properties for a timeline item.
     
     Args:
@@ -340,7 +575,7 @@ def set_timeline_item_stabilization(timeline_item_id: str,
         if not timeline_item:
             return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
         
-        if timeline_item.GetType() != "Video":
+        if _item_type(timeline_item) != "video":
             return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
         
         success = True
@@ -378,11 +613,13 @@ def set_timeline_item_stabilization(timeline_item_id: str,
     except Exception as e:
         return f"Error setting timeline item stabilization properties: {str(e)}"
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_timeline_item_audio(timeline_item_id: str, 
-                           volume: float = None, 
-                           pan: float = None,
-                           eq_enabled: bool = None) -> str:
+                           volume: Optional[float] = None, 
+                           pan: Optional[float] = None,
+                           eq_enabled: Optional[bool] = None) -> str:
     """Set audio properties for a timeline item.
     
     Args:
@@ -445,7 +682,7 @@ def set_timeline_item_audio(timeline_item_id: str,
             return f"Error: Timeline item with ID '{timeline_item_id}' not found"
         
         # Check if the item has audio capabilities
-        if not is_audio and timeline_item.GetMediaType() != "Audio":
+        if not is_audio and not _has_audio_type(timeline_item):
             return f"Error: Timeline item with ID '{timeline_item_id}' does not have audio properties"
         
         success = True
@@ -479,13 +716,20 @@ def set_timeline_item_audio(timeline_item_id: str,
             
             return f"Successfully set {' and '.join(changes)} for timeline item '{timeline_item.GetName()}'"
         else:
-            return f"Failed to set some audio properties for timeline item '{timeline_item.GetName()}'"
+            return (
+                f"Failed to set audio properties for timeline item "
+                f"'{timeline_item.GetName()}'. Resolve's scripting API has no "
+                "write path for audio level, pan, or EQ — SetProperty covers "
+                "the video transform only, so 'Volume'/'Gain' return False and "
+                "'Pan' moves the video transform, not the audio pan. Work "
+                "around it by baking the gain into a rendered copy of the "
+                "source (ffmpeg volume=NdB) and importing that, or (Resolve "
+                "20.2.2+) by saving a Fairlight preset in the UI and applying "
+                "it with project_settings apply_fairlight_preset."
+            )
     except Exception as e:
         return f"Error setting timeline item audio properties: {str(e)}"
 
-# ------------------
-# Keyframe Control
-# ------------------
 
 @mcp.resource("resolve://timeline-item/{timeline_item_id}/keyframes/{property_name}")
 def get_timeline_item_keyframes(timeline_item_id: str, property_name: str) -> Dict[str, Any]:
@@ -550,7 +794,7 @@ def get_timeline_item_keyframes(timeline_item_id: str, property_name: str) -> Di
         audio_properties = ['Volume', 'Pan']
         
         # Check if it's a video item
-        if timeline_item.GetType() == "Video":
+        if _item_type(timeline_item) == "video":
             # Check each property to see if it has keyframes
             for prop in video_properties:
                 if timeline_item.GetKeyframeCount(prop) > 0:
@@ -571,7 +815,7 @@ def get_timeline_item_keyframes(timeline_item_id: str, property_name: str) -> Di
                         })
         
         # Check if it has audio properties (could be video with audio or audio-only)
-        if timeline_item.GetType() == "Audio" or timeline_item.GetMediaType() == "Audio":
+        if _has_audio_type(timeline_item):
             # Check each audio property for keyframes
             for prop in audio_properties:
                 if timeline_item.GetKeyframeCount(prop) > 0:
@@ -619,6 +863,464 @@ def get_timeline_item_keyframes(timeline_item_id: str, property_name: str) -> Di
     except Exception as e:
         return {"error": f"Error getting timeline item keyframes: {str(e)}"}
 
+
+@mcp.tool()
+def add_keyframe(timeline_item_id: str, property_name: str, frame: int, value: float) -> str:
+    """Add a keyframe at the specified frame for a timeline item property.
+    
+    Args:
+        timeline_item_id: The ID of the timeline item to add keyframe to
+        property_name: The name of the property to keyframe (e.g., 'Pan', 'ZoomX')
+        frame: Frame position for the keyframe
+        value: Value to set at the keyframe
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return "Error: No timeline currently active"
+    
+    # Valid keyframeable properties
+    video_properties = [
+        'Pan', 'Tilt', 'ZoomX', 'ZoomY', 'Rotation', 'AnchorPointX', 'AnchorPointY',
+        'Pitch', 'Yaw', 'Opacity', 'CropLeft', 'CropRight', 'CropTop', 'CropBottom'
+    ]
+    
+    audio_properties = ['Volume', 'Pan']
+    
+    valid_properties = video_properties + audio_properties
+    
+    if property_name not in valid_properties:
+        return f"Error: Invalid property name. Must be one of: {', '.join(valid_properties)}"
+    
+    try:
+        # Find the timeline item by ID
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        timeline_item = None
+        is_audio = False
+        
+        # Search video tracks
+        for track_index in range(1, video_track_count + 1):
+            items = current_timeline.GetItemListInTrack("video", track_index)
+            if items:
+                for item in items:
+                    if str(item.GetUniqueId()) == timeline_item_id:
+                        timeline_item = item
+                        break
+            if timeline_item:
+                break
+        
+        # If not found, search audio tracks
+        if not timeline_item:
+            for track_index in range(1, audio_track_count + 1):
+                items = current_timeline.GetItemListInTrack("audio", track_index)
+                if items:
+                    for item in items:
+                        if str(item.GetUniqueId()) == timeline_item_id:
+                            timeline_item = item
+                            is_audio = True
+                            break
+                if timeline_item:
+                    break
+        
+        if not timeline_item:
+            return f"Error: Timeline item with ID '{timeline_item_id}' not found"
+        
+        # Check if the specified property is valid for this item type
+        if is_audio and property_name not in audio_properties:
+            return f"Error: Property '{property_name}' is not available for audio items"
+        
+        if not is_audio and property_name not in video_properties and _item_type(timeline_item) != "video":
+            return f"Error: Property '{property_name}' is not available for this item type"
+            
+        # Validate frame is within the item's range
+        start_frame = timeline_item.GetStart()
+        end_frame = timeline_item.GetEnd()
+        
+        if frame < start_frame or frame > end_frame:
+            return f"Error: Frame {frame} is outside the item's range ({start_frame} to {end_frame})"
+        
+        # Add the keyframe
+        result = timeline_item.AddKeyframe(property_name, frame, value)
+        
+        if result:
+            return f"Successfully added keyframe for {property_name} at frame {frame} with value {value}"
+        else:
+            return f"Failed to add keyframe for {property_name} at frame {frame}"
+        
+    except Exception as e:
+        return f"Error adding keyframe: {str(e)}"
+
+
+@mcp.tool()
+def modify_keyframe(timeline_item_id: str, property_name: str, frame: int, new_value: Optional[float] = None, new_frame: Optional[int] = None) -> str:
+    """Modify an existing keyframe by changing its value or frame position.
+    
+    Args:
+        timeline_item_id: The ID of the timeline item
+        property_name: The name of the property with keyframe
+        frame: Current frame position of the keyframe to modify
+        new_value: Optional new value for the keyframe
+        new_frame: Optional new frame position for the keyframe
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return "Error: No timeline currently active"
+    
+    if new_value is None and new_frame is None:
+        return "Error: Must specify at least one of new_value or new_frame"
+    
+    try:
+        # Find the timeline item by ID
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        timeline_item = None
+        
+        # Search video tracks
+        for track_index in range(1, video_track_count + 1):
+            items = current_timeline.GetItemListInTrack("video", track_index)
+            if items:
+                for item in items:
+                    if str(item.GetUniqueId()) == timeline_item_id:
+                        timeline_item = item
+                        break
+            if timeline_item:
+                break
+        
+        # If not found, search audio tracks
+        if not timeline_item:
+            for track_index in range(1, audio_track_count + 1):
+                items = current_timeline.GetItemListInTrack("audio", track_index)
+                if items:
+                    for item in items:
+                        if str(item.GetUniqueId()) == timeline_item_id:
+                            timeline_item = item
+                            break
+                if timeline_item:
+                    break
+        
+        if not timeline_item:
+            return f"Error: Timeline item with ID '{timeline_item_id}' not found"
+        
+        # Check if the property has keyframes
+        keyframe_count = timeline_item.GetKeyframeCount(property_name)
+        if keyframe_count == 0:
+            return f"Error: No keyframes found for property '{property_name}'"
+        
+        # Find the keyframe at the specified frame
+        keyframe_index = -1
+        for i in range(keyframe_count):
+            kf = timeline_item.GetKeyframeAtIndex(property_name, i)
+            if kf["frame"] == frame:
+                keyframe_index = i
+                break
+        
+        if keyframe_index == -1:
+            return f"Error: No keyframe found at frame {frame} for property '{property_name}'"
+        
+        if new_frame is not None:
+            # Check if new frame is within the item's range
+            start_frame = timeline_item.GetStart()
+            end_frame = timeline_item.GetEnd()
+            
+            if new_frame < start_frame or new_frame > end_frame:
+                return f"Error: New frame {new_frame} is outside the item's range ({start_frame} to {end_frame})"
+                
+            # Delete the keyframe at the current frame. A discarded False here
+            # leaves the ORIGINAL keyframe in place; the AddKeyframe below then
+            # succeeds at the new frame and the tool reports "moved" for what is
+            # actually a copy.
+            current_value = timeline_item.GetPropertyAtKeyframeIndex(property_name, keyframe_index)
+            if not timeline_item.DeleteKeyframe(property_name, frame):
+                return (f"Failed to move keyframe for {property_name}: DeleteKeyframe "
+                        f"refused frame {frame}, so the original is still there and "
+                        f"nothing was moved")
+            
+            # Add a new keyframe at the new frame position with the current value (or new value if specified)
+            value = new_value if new_value is not None else current_value
+            result = timeline_item.AddKeyframe(property_name, new_frame, value)
+            
+            if result:
+                return f"Successfully moved keyframe for {property_name} from frame {frame} to frame {new_frame}"
+            else:
+                return f"Failed to move keyframe for {property_name}"
+        else:
+            # Only changing the value, not the frame position: delete and
+            # re-add. A discarded False leaves the OLD value in place and
+            # AddKeyframe on an occupied frame is not a value update.
+            if not timeline_item.DeleteKeyframe(property_name, frame):
+                return (f"Failed to update keyframe value for {property_name} at frame "
+                        f"{frame}: DeleteKeyframe refused, so the old value is still "
+                        f"there and nothing was changed")
+            result = timeline_item.AddKeyframe(property_name, frame, new_value)
+            
+            if result:
+                return f"Successfully updated keyframe value for {property_name} at frame {frame} to {new_value}"
+            else:
+                return f"Failed to update keyframe value for {property_name} at frame {frame}"
+        
+    except Exception as e:
+        return f"Error modifying keyframe: {str(e)}"
+
+
+@mcp.tool()
+@granular_destructive_op()
+def delete_keyframe(timeline_item_id: str, property_name: str, frame: int) -> str:
+    """Delete a keyframe at the specified frame for a timeline item property.
+    
+    Args:
+        timeline_item_id: The ID of the timeline item
+        property_name: The name of the property with keyframe to delete
+        frame: Frame position of the keyframe to delete
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return "Error: No timeline currently active"
+    
+    try:
+        # Find the timeline item by ID
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        timeline_item = None
+        
+        # Search video tracks
+        for track_index in range(1, video_track_count + 1):
+            items = current_timeline.GetItemListInTrack("video", track_index)
+            if items:
+                for item in items:
+                    if str(item.GetUniqueId()) == timeline_item_id:
+                        timeline_item = item
+                        break
+            if timeline_item:
+                break
+        
+        # If not found, search audio tracks
+        if not timeline_item:
+            for track_index in range(1, audio_track_count + 1):
+                items = current_timeline.GetItemListInTrack("audio", track_index)
+                if items:
+                    for item in items:
+                        if str(item.GetUniqueId()) == timeline_item_id:
+                            timeline_item = item
+                            break
+                if timeline_item:
+                    break
+        
+        if not timeline_item:
+            return f"Error: Timeline item with ID '{timeline_item_id}' not found"
+        
+        # Check if the property has keyframes
+        keyframe_count = timeline_item.GetKeyframeCount(property_name)
+        if keyframe_count == 0:
+            return f"Error: No keyframes found for property '{property_name}'"
+        
+        # Check if there's a keyframe at the specified frame
+        keyframe_exists = False
+        for i in range(keyframe_count):
+            kf = timeline_item.GetKeyframeAtIndex(property_name, i)
+            if kf["frame"] == frame:
+                keyframe_exists = True
+                break
+        
+        if not keyframe_exists:
+            return f"Error: No keyframe found at frame {frame} for property '{property_name}'"
+        
+        # Delete the keyframe
+        result = timeline_item.DeleteKeyframe(property_name, frame)
+        
+        if result:
+            return f"Successfully deleted keyframe for {property_name} at frame {frame}"
+        else:
+            return f"Failed to delete keyframe for {property_name} at frame {frame}"
+        
+    except Exception as e:
+        return f"Error deleting keyframe: {str(e)}"
+
+
+@mcp.tool()
+@granular_destructive_op()
+def set_keyframe_interpolation(timeline_item_id: str, property_name: str, frame: int, interpolation_type: str) -> str:
+    """Set the interpolation type for a keyframe.
+    
+    Args:
+        timeline_item_id: The ID of the timeline item
+        property_name: The name of the property with keyframe
+        frame: Frame position of the keyframe
+        interpolation_type: Type of interpolation. Options: 'Linear', 'Bezier', 'Ease-In', 'Ease-Out'
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return "Error: No timeline currently active"
+    
+    # Validate interpolation type
+    valid_interpolation_types = ['Linear', 'Bezier', 'Ease-In', 'Ease-Out']
+    if interpolation_type not in valid_interpolation_types:
+        return f"Error: Invalid interpolation type. Must be one of: {', '.join(valid_interpolation_types)}"
+    
+    try:
+        # Find the timeline item by ID
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        timeline_item = None
+        
+        # Search video tracks
+        for track_index in range(1, video_track_count + 1):
+            items = current_timeline.GetItemListInTrack("video", track_index)
+            if items:
+                for item in items:
+                    if str(item.GetUniqueId()) == timeline_item_id:
+                        timeline_item = item
+                        break
+            if timeline_item:
+                break
+        
+        # If not found, search audio tracks
+        if not timeline_item:
+            for track_index in range(1, audio_track_count + 1):
+                items = current_timeline.GetItemListInTrack("audio", track_index)
+                if items:
+                    for item in items:
+                        if str(item.GetUniqueId()) == timeline_item_id:
+                            timeline_item = item
+                            break
+                if timeline_item:
+                    break
+        
+        if not timeline_item:
+            return f"Error: Timeline item with ID '{timeline_item_id}' not found"
+        
+        # Check if the property has keyframes
+        keyframe_count = timeline_item.GetKeyframeCount(property_name)
+        if keyframe_count == 0:
+            return f"Error: No keyframes found for property '{property_name}'"
+        
+        # Check if there's a keyframe at the specified frame
+        keyframe_exists = False
+        for i in range(keyframe_count):
+            kf = timeline_item.GetKeyframeAtIndex(property_name, i)
+            if kf["frame"] == frame:
+                keyframe_exists = True
+                break
+        
+        if not keyframe_exists:
+            return f"Error: No keyframe found at frame {frame} for property '{property_name}'"
+        
+        # Set the interpolation type
+        interpolation_map = {
+            'Linear': 0,
+            'Bezier': 1,
+            'Ease-In': 2,
+            'Ease-Out': 3
+        }
+        
+        # Get current keyframe value
+        value = None
+        for i in range(keyframe_count):
+            kf = timeline_item.GetKeyframeAtIndex(property_name, i)
+            if kf["frame"] == frame:
+                value = timeline_item.GetPropertyAtKeyframeIndex(property_name, i)
+                break
+        
+        # Delete the old keyframe. A discarded False leaves the original
+        # interpolation in place and the tool still reports success.
+        if not timeline_item.DeleteKeyframe(property_name, frame):
+            return (f"Failed to set interpolation for {property_name} at frame {frame}: "
+                    f"DeleteKeyframe refused, so the original keyframe and its "
+                    f"interpolation are unchanged")
+        
+        # Add a new keyframe with the same value but different interpolation
+        result = timeline_item.AddKeyframe(property_name, frame, value, interpolation_map[interpolation_type])
+        
+        if result:
+            return f"Successfully set interpolation for {property_name} keyframe at frame {frame} to {interpolation_type}"
+        else:
+            return f"Failed to set interpolation for {property_name} keyframe at frame {frame}"
+        
+    except Exception as e:
+        return f"Error setting keyframe interpolation: {str(e)}"
+
+
+@mcp.tool()
+def enable_keyframes(timeline_item_id: str, keyframe_mode: str = "All") -> str:
+    """Enable keyframe mode for a timeline item.
+    
+    Args:
+        timeline_item_id: The ID of the timeline item
+        keyframe_mode: Keyframe mode to enable. Options: 'All', 'Color', 'Sizing'
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return "Error: No timeline currently active"
+    
+    # Validate keyframe mode
+    valid_keyframe_modes = ['All', 'Color', 'Sizing']
+    if keyframe_mode not in valid_keyframe_modes:
+        return f"Error: Invalid keyframe mode. Must be one of: {', '.join(valid_keyframe_modes)}"
+    
+    try:
+        # Find the timeline item by ID
+        video_track_count = current_timeline.GetTrackCount("video")
+        
+        timeline_item = None
+        
+        # Search video tracks
+        for track_index in range(1, video_track_count + 1):
+            items = current_timeline.GetItemListInTrack("video", track_index)
+            if items:
+                for item in items:
+                    if str(item.GetUniqueId()) == timeline_item_id:
+                        timeline_item = item
+                        break
+            if timeline_item:
+                break
+        
+        if not timeline_item:
+            return f"Error: Video timeline item with ID '{timeline_item_id}' not found"
+        
+        if _item_type(timeline_item) != "video":
+            return f"Error: Timeline item with ID '{timeline_item_id}' is not a video item"
+        
+        # Set the keyframe mode
+        keyframe_mode_map = {
+            'All': 0,
+            'Color': 1,
+            'Sizing': 2
+        }
+        
+        result = timeline_item.SetProperty("KeyframeMode", keyframe_mode_map[keyframe_mode])
+        
+        if result:
+            return f"Successfully enabled {keyframe_mode} keyframe mode for timeline item '{timeline_item.GetName()}'"
+        else:
+            return f"Failed to enable {keyframe_mode} keyframe mode for timeline item '{timeline_item.GetName()}'"
+        
+    except Exception as e:
+        return f"Error enabling keyframe mode: {str(e)}"
+
+
 @mcp.tool()
 def ti_get_info(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get comprehensive info about a timeline item.
@@ -639,6 +1341,28 @@ def ti_get_info(item_index: int = 0, track_type: str = "video", track_index: int
         "unique_id": item.GetUniqueId(), "clip_enabled": item.GetClipEnabled()
     }
 
+
+@mcp.tool()
+@granular_destructive_op()
+def ti_set_name(name: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
+    """Rename a timeline item.
+
+    Args:
+        name: New timeline item name.
+        item_index: 0-based item index. Default: 0.
+        track_type: 'video' or 'audio'. Default: 'video'.
+        track_index: 1-based track index. Default: 1.
+    """
+    item, err = _get_timeline_item(track_type, track_index, item_index)
+    if err:
+        return err
+    missing = _requires_method(item, "SetName", "20.2")
+    if missing:
+        return missing
+    result = item.SetName(name)
+    return {"success": bool(result), "name": name}
+
+
 @mcp.tool()
 def ti_get_source_start_time(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get source start time of a timeline item.
@@ -653,7 +1377,9 @@ def ti_get_source_start_time(item_index: int = 0, track_type: str = "video", tra
         return err
     return {"source_start_time": item.GetSourceStartTime(), "source_end_time": item.GetSourceEndTime()}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_set_property(property_name: str, property_value: Any, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Set a property on a timeline item.
 
@@ -664,11 +1390,16 @@ def ti_set_property(property_name: str, property_value: Any, item_index: int = 0
         track_type: 'video' or 'audio'. Default: 'video'.
         track_index: 1-based track index. Default: 1.
     """
+    if track_type == "subtitle":
+        return {"success": False, "error": "SetProperty is unsupported on subtitle items. "
+                "For effects use live timeline_ai set_subtitle_preset with Resolve open. "
+                "For caption text/timing use the live UI, or advanced project_db write_captions on a fully quit project."}
     item, err = _get_timeline_item(track_type, track_index, item_index)
     if err:
         return err
     result = item.SetProperty(property_name, property_value)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def ti_get_property(property_name: str = "", item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -688,6 +1419,7 @@ def ti_get_property(property_name: str = "", item_index: int = 0, track_type: st
     else:
         result = item.GetProperty()
     return {"property": result}
+
 
 @mcp.tool()
 def ti_add_marker(frame_id: int, color: str, name: str, note: str = "", duration: int = 1, custom_data: str = "", item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -710,6 +1442,7 @@ def ti_add_marker(frame_id: int, color: str, name: str, note: str = "", duration
     result = item.AddMarker(frame_id, color, name, note, duration, custom_data)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def ti_get_markers(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get all markers on a timeline item.
@@ -724,7 +1457,9 @@ def ti_get_markers(item_index: int = 0, track_type: str = "video", track_index: 
         return err
     return {"markers": item.GetMarkers() or {}}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_delete_markers_by_color(color: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete markers by color on a timeline item.
 
@@ -737,7 +1472,9 @@ def ti_delete_markers_by_color(color: str, item_index: int = 0, track_type: str 
         return err
     return {"success": bool(item.DeleteMarkersByColor(color))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_delete_marker_at_frame(frame_id: int, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete a marker at a frame on a timeline item.
 
@@ -750,7 +1487,9 @@ def ti_delete_marker_at_frame(frame_id: int, item_index: int = 0, track_type: st
         return err
     return {"success": bool(item.DeleteMarkerAtFrame(frame_id))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_delete_marker_by_custom_data(custom_data: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete a marker by custom data on a timeline item.
 
@@ -762,6 +1501,7 @@ def ti_delete_marker_by_custom_data(custom_data: str, item_index: int = 0, track
     if err:
         return err
     return {"success": bool(item.DeleteMarkerByCustomData(custom_data))}
+
 
 @mcp.tool()
 def ti_get_marker_by_custom_data(custom_data: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -775,6 +1515,7 @@ def ti_get_marker_by_custom_data(custom_data: str, item_index: int = 0, track_ty
     if err:
         return err
     return {"marker": item.GetMarkerByCustomData(custom_data) or {}}
+
 
 @mcp.tool()
 def ti_update_marker_custom_data(frame_id: int, custom_data: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -790,6 +1531,7 @@ def ti_update_marker_custom_data(frame_id: int, custom_data: str, item_index: in
         return err
     return {"success": bool(item.UpdateMarkerCustomData(frame_id, custom_data))}
 
+
 @mcp.tool()
 def ti_get_marker_custom_data(frame_id: int, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get marker custom data.
@@ -802,6 +1544,7 @@ def ti_get_marker_custom_data(frame_id: int, item_index: int = 0, track_type: st
     if err:
         return err
     return {"custom_data": item.GetMarkerCustomData(frame_id) or ""}
+
 
 @mcp.tool()
 def ti_add_flag(color: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -816,6 +1559,7 @@ def ti_add_flag(color: str, item_index: int = 0, track_type: str = "video", trac
         return err
     return {"success": bool(item.AddFlag(color))}
 
+
 @mcp.tool()
 def ti_get_flag_list(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get flags on a timeline item.
@@ -828,7 +1572,9 @@ def ti_get_flag_list(item_index: int = 0, track_type: str = "video", track_index
         return err
     return {"flags": item.GetFlagList() or []}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_clear_flags(color: str = "", item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Clear flags from a timeline item.
 
@@ -840,6 +1586,7 @@ def ti_clear_flags(color: str = "", item_index: int = 0, track_type: str = "vide
     if err:
         return err
     return {"success": bool(item.ClearFlags(color))}
+
 
 @mcp.tool()
 def ti_get_clip_color(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -853,7 +1600,9 @@ def ti_get_clip_color(item_index: int = 0, track_type: str = "video", track_inde
         return err
     return {"clip_color": item.GetClipColor() or ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_set_clip_color(color: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Set clip color of a timeline item.
 
@@ -864,9 +1613,36 @@ def ti_set_clip_color(color: str, item_index: int = 0, track_type: str = "video"
     item, err = _get_timeline_item(track_type, track_index, item_index)
     if err:
         return err
-    return {"success": bool(item.SetClipColor(color))}
+    returned = bool(item.SetClipColor(color))
+    readback = item.GetClipColor() or ""
+    if not returned:
+        refusal = clip_color_refusal(color)
+        return {
+            "success": False,
+            "color": color,
+            "error": f"SetClipColor refused '{color}'",
+            "reason": refusal["reason"],
+            "remediation": refusal["remediation"],
+            "valid_colors": refusal["state"]["valid_colors"],
+        }
+    if readback != color:
+        # Generator and title items take the call, return True, and drop the
+        # colour (issue #124, Studio 19.1.3.7). Media-backed items persist.
+        return {
+            "success": False,
+            "color": color,
+            "readback": readback,
+            "error": "SetClipColor returned True but the colour did not persist",
+            "remediation": (
+                "Generator and title items accept and discard clip colours; colour "
+                "a media-backed item, or use a timeline marker instead."
+            ),
+        }
+    return {"success": True, "color": color, "readback": readback}
+
 
 @mcp.tool()
+@granular_destructive_op()
 def ti_clear_clip_color(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Clear clip color from a timeline item.
 
@@ -877,6 +1653,7 @@ def ti_clear_clip_color(item_index: int = 0, track_type: str = "video", track_in
     if err:
         return err
     return {"success": bool(item.ClearClipColor())}
+
 
 @mcp.tool()
 def ti_add_fusion_comp(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -890,6 +1667,7 @@ def ti_add_fusion_comp(item_index: int = 0, track_type: str = "video", track_ind
         return err
     return {"success": bool(item.AddFusionComp())}
 
+
 @mcp.tool()
 def ti_import_fusion_comp(file_path: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Import a Fusion composition from file.
@@ -902,6 +1680,7 @@ def ti_import_fusion_comp(file_path: str, item_index: int = 0, track_type: str =
     if err:
         return err
     return {"success": bool(item.ImportFusionComp(file_path))}
+
 
 @mcp.tool()
 def ti_export_fusion_comp(file_path: str, comp_index: int = 1, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -920,7 +1699,9 @@ def ti_export_fusion_comp(file_path: str, comp_index: int = 1, item_index: int =
         return {"error": f"No Fusion comp at index {comp_index}"}
     return {"success": bool(item.ExportFusionComp(file_path, comp_index))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_delete_fusion_comp(comp_name: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete a Fusion composition by name.
 
@@ -933,7 +1714,9 @@ def ti_delete_fusion_comp(comp_name: str, item_index: int = 0, track_type: str =
         return err
     return {"success": bool(item.DeleteFusionCompByName(comp_name))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_load_fusion_comp(comp_name: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Load a Fusion composition by name.
 
@@ -945,6 +1728,7 @@ def ti_load_fusion_comp(comp_name: str, item_index: int = 0, track_type: str = "
     if err:
         return err
     return {"success": bool(item.LoadFusionCompByName(comp_name))}
+
 
 @mcp.tool()
 def ti_rename_fusion_comp(old_name: str, new_name: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -959,6 +1743,7 @@ def ti_rename_fusion_comp(old_name: str, new_name: str, item_index: int = 0, tra
     if err:
         return err
     return {"success": bool(item.RenameFusionCompByName(old_name, new_name))}
+
 
 @mcp.tool()
 def ti_get_fusion_comp_info(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -975,6 +1760,7 @@ def ti_get_fusion_comp_info(item_index: int = 0, track_type: str = "video", trac
         "comp_names": item.GetFusionCompNameList() or {}
     }
 
+
 @mcp.tool()
 def ti_add_version(version_name: str, version_type: int = 0, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Add a new color version to a timeline item.
@@ -989,6 +1775,7 @@ def ti_add_version(version_name: str, version_type: int = 0, item_index: int = 0
         return err
     return {"success": bool(item.AddVersion(version_name, version_type))}
 
+
 @mcp.tool()
 def ti_get_current_version(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get the current color version of a timeline item.
@@ -1001,7 +1788,9 @@ def ti_get_current_version(item_index: int = 0, track_type: str = "video", track
         return err
     return {"version": item.GetCurrentVersion() or {}}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_delete_version(version_name: str, version_type: int = 0, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete a color version.
 
@@ -1015,7 +1804,9 @@ def ti_delete_version(version_name: str, version_type: int = 0, item_index: int 
         return err
     return {"success": bool(item.DeleteVersionByName(version_name, version_type))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_load_version(version_name: str, version_type: int = 0, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Load a color version.
 
@@ -1028,6 +1819,7 @@ def ti_load_version(version_name: str, version_type: int = 0, item_index: int = 
     if err:
         return err
     return {"success": bool(item.LoadVersionByName(version_name, version_type))}
+
 
 @mcp.tool()
 def ti_rename_version(old_name: str, new_name: str, version_type: int = 0, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1044,6 +1836,7 @@ def ti_rename_version(old_name: str, new_name: str, version_type: int = 0, item_
         return err
     return {"success": bool(item.RenameVersionByName(old_name, new_name, version_type))}
 
+
 @mcp.tool()
 def ti_get_version_name_list(version_type: int = 0, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get list of version names.
@@ -1057,7 +1850,9 @@ def ti_get_version_name_list(version_type: int = 0, item_index: int = 0, track_t
         return err
     return {"versions": item.GetVersionNameList(version_type) or []}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_set_cdl(cdl: Dict[str, Any], item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Set CDL (Color Decision List) values on a timeline item.
 
@@ -1068,7 +1863,8 @@ def ti_set_cdl(cdl: Dict[str, Any], item_index: int = 0, track_type: str = "vide
     item, err = _get_timeline_item(track_type, track_index, item_index)
     if err:
         return err
-    return {"success": bool(item.SetCDL(cdl))}
+    return {"success": bool(item.SetCDL(_normalize_cdl(cdl)))}
+
 
 @mcp.tool()
 def ti_add_take(media_pool_item_id: str, start_frame: int = 0, end_frame: int = 0, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1091,6 +1887,7 @@ def ti_add_take(media_pool_item_id: str, start_frame: int = 0, end_frame: int = 
         return {"error": f"MediaPoolItem {media_pool_item_id} not found"}
     return {"success": bool(item.AddTake(mpi, start_frame, end_frame))}
 
+
 @mcp.tool()
 def ti_get_takes_info(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get takes info for a timeline item.
@@ -1109,6 +1906,7 @@ def ti_get_takes_info(item_index: int = 0, track_type: str = "video", track_inde
         takes.append(take if take else {})
     return {"takes_count": count, "selected_take_index": selected, "takes": takes}
 
+
 @mcp.tool()
 def ti_select_take(take_index: int, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Select a take by index.
@@ -1122,7 +1920,9 @@ def ti_select_take(take_index: int, item_index: int = 0, track_type: str = "vide
         return err
     return {"success": bool(item.SelectTakeByIndex(take_index))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_delete_take(take_index: int, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete a take by index.
 
@@ -1134,6 +1934,7 @@ def ti_delete_take(take_index: int, item_index: int = 0, track_type: str = "vide
     if err:
         return err
     return {"success": bool(item.DeleteTakeByIndex(take_index))}
+
 
 @mcp.tool()
 def ti_finalize_take(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1147,32 +1948,112 @@ def ti_finalize_take(item_index: int = 0, track_type: str = "video", track_index
         return err
     return {"success": bool(item.FinalizeTake())}
 
-@mcp.tool()
-def ti_copy_grades(target_item_indices: List[int], track_type: str = "video", track_index: int = 1, source_item_index: int = 0) -> Dict[str, Any]:
-    """Copy grades from one timeline item to others.
+
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@granular_destructive_op()
+def ti_copy_grades(
+    target_item_indices: List[int],
+    track_type: str = "video",
+    track_index: int = 1,
+    source_item_index: int = 0,
+    acknowledge_trap: bool = False,
+    confirm_token: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Copy grades from one timeline item to others. DESTRUCTIVE — gated.
+
+    `TimelineItem.CopyGrades` replaces each target's ENTIRE node graph with the
+    source's and creates no version to go back to, so a target's hand grade is gone
+    with no way to recover it. Two acknowledgements are required, in order:
+    `acknowledge_trap=true` (you know what the API does), then `confirm_token` from
+    the preview this returns (you have seen which clips it resolved).
 
     Args:
         target_item_indices: List of 0-based indices of target items.
         track_type: 'video' or 'audio'. Default: 'video'.
         track_index: 1-based track index. Default: 1.
         source_item_index: 0-based source item index. Default: 0.
+        acknowledge_trap: Must be true — confirms you accept that target grades are
+            replaced unrecoverably.
+        confirm_token: Token from this tool's own confirmation_required response.
     """
     _, tl, err = _get_timeline()
     if err:
         return err
-    items = tl.GetItemListInTrack(track_type, track_index)
+    items = tl.GetItemListInTrack(track_type, track_index) or []
     if not items:
         return {"error": "No items in track"}
-    source = items[source_item_index] if source_item_index < len(items) else None
-    if not source:
-        return {"error": "Source item not found"}
-    targets = [items[i] for i in target_item_indices if i < len(items)]
-    if not targets:
-        return {"error": "No target items found"}
-    result = source.CopyGrades(targets)
-    return {"success": bool(result)}
+    if not isinstance(target_item_indices, list) or not target_item_indices:
+        return {"error": "target_item_indices must be a non-empty list of 0-based indices"}
+
+    # A negative index is a real Python index: `items[-1]` silently grades the LAST
+    # clip in the track. The old bounds check (`i < len(items)`) let every negative
+    # through, so an off-by-one produced a confident success on the wrong clip.
+    out_of_range = sorted({i for i in target_item_indices
+                           if not isinstance(i, int) or isinstance(i, bool)
+                           or i < 0 or i >= len(items)})
+    if out_of_range:
+        return {"error": f"target_item_indices out of range for {len(items)} items in "
+                         f"{track_type} track {track_index}: {out_of_range}",
+                "track_item_count": len(items)}
+    if not isinstance(source_item_index, int) or isinstance(source_item_index, bool) \
+            or source_item_index < 0 or source_item_index >= len(items):
+        return {"error": f"source_item_index {source_item_index} out of range for "
+                         f"{len(items)} items in {track_type} track {track_index}",
+                "track_item_count": len(items)}
+
+    source = items[source_item_index]
+    # De-duplicate while keeping caller order: grading one clip twice is never what
+    # was meant, and it would double-count the preview the caller confirms against.
+    seen = set()
+    ordered = [i for i in target_item_indices if not (i in seen or seen.add(i))]
+    if source_item_index in seen:
+        return {"error": "source_item_index is also listed in target_item_indices; "
+                         "copying a grade onto its own source is a no-op that would "
+                         "still consume a confirmation"}
+    targets = [items[i] for i in ordered]
+
+    gate_params = {
+        "target_item_indices": ordered,
+        "track_type": track_type,
+        "track_index": track_index,
+        "source_item_index": source_item_index,
+    }
+    if not acknowledge_trap:
+        return {
+            "success": False,
+            "error": "'ti_copy_grades' is refused: TimelineItem.CopyGrades replaces "
+                     "each target's entire node graph and leaves no version to "
+                     "restore. Re-send with acknowledge_trap=true if that is "
+                     "genuinely what you want.",
+            "known_limitation": [
+                "TimelineItem.CopyGrades replaces the target grade wholesale and "
+                "creates no recovery version (measured on Studio 19.1.3.7; "
+                "reconfirmed on Studio 21.1.0.14, issue #207)."
+            ],
+            "retry_with": {"acknowledge_trap": True},
+        }
+    if confirm_token is None and CONFIRM_TOKENS.required():
+        return CONFIRM_TOKENS.issue(
+            action="ti_copy_grades",
+            params=gate_params,
+            preview={
+                "operation": "ti_copy_grades",
+                "warning": "Replaces the entire node graph on every target item.",
+                "source": _copy_grade_item_summary(items[source_item_index], source_item_index),
+                "target_count": len(targets),
+                "targets": [_copy_grade_item_summary(items[i], i) for i in ordered],
+            },
+        )
+    blocked = CONFIRM_TOKENS.consume(action="ti_copy_grades", params={
+        **gate_params, "confirm_token": confirm_token})
+    if blocked:
+        return blocked
+    return {"success": bool(source.CopyGrades(targets)),
+            "target_count": len(targets)}
+
 
 @mcp.tool()
+@granular_destructive_op()
 def ti_set_clip_enabled(enabled: bool, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Enable or disable a timeline item.
 
@@ -1184,6 +2065,7 @@ def ti_set_clip_enabled(enabled: bool, item_index: int = 0, track_type: str = "v
     if err:
         return err
     return {"success": bool(item.SetClipEnabled(enabled))}
+
 
 @mcp.tool()
 def ti_update_sidecar(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1197,7 +2079,9 @@ def ti_update_sidecar(item_index: int = 0, track_type: str = "video", track_inde
         return err
     return {"success": bool(item.UpdateSidecar())}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_load_burn_in_preset(preset_name: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Load a burn-in preset for a timeline item.
 
@@ -1210,18 +2094,37 @@ def ti_load_burn_in_preset(preset_name: str, item_index: int = 0, track_type: st
         return err
     return {"success": bool(item.LoadBurnInPreset(preset_name))}
 
+
 @mcp.tool()
-def ti_create_magic_mask(mode: str = "Forward", item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
+def ti_create_magic_mask(mode: str = "F", item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Create a Magic Mask on a timeline item.
 
+    Magic Mask v2 needs operator CLICKS on the subject (Color page > Magic Mask
+    palette > click subject > Track Forward); the API cannot place them, so with
+    no clicks present Resolve returns False and no isolation exists.
+
     Args:
-        mode: 'Forward' or 'Backward'. Default: 'Forward'.
+        mode: 'F' (forward), 'B' (backward), or 'BI' (bidirection) per the
+            scripting README ('Forward'/'Backward' are accepted as aliases).
         item_index: 0-based item index. Default: 0.
     """
+    aliases = {"F": "F", "FORWARD": "F", "B": "B", "BACKWARD": "B",
+               "BI": "BI", "BIDIRECTION": "BI", "BIDIRECTIONAL": "BI"}
+    normalized = aliases.get(str(mode).strip().upper())
+    if not normalized:
+        return {"error": "mode must be 'F', 'B', or 'BI'"}
     item, err = _get_timeline_item(track_type, track_index, item_index)
     if err:
         return err
-    return {"success": bool(item.CreateMagicMask(mode))}
+    if bool(item.CreateMagicMask(normalized)):
+        return {"success": True, "mode": normalized}
+    return {
+        "success": False,
+        "needs_hitl": True,
+        "hitl": "No Magic Mask clicks on this item — a human must click the subject "
+                "on the Color page Magic Mask palette, then press Track Forward.",
+    }
+
 
 @mcp.tool()
 def ti_regenerate_magic_mask(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1235,6 +2138,7 @@ def ti_regenerate_magic_mask(item_index: int = 0, track_type: str = "video", tra
         return err
     return {"success": bool(item.RegenerateMagicMask())}
 
+
 @mcp.tool()
 def ti_stabilize(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Stabilize a timeline item.
@@ -1247,6 +2151,7 @@ def ti_stabilize(item_index: int = 0, track_type: str = "video", track_index: in
         return err
     return {"success": bool(item.Stabilize())}
 
+
 @mcp.tool()
 def ti_smart_reframe(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Apply Smart Reframe to a timeline item.
@@ -1258,6 +2163,67 @@ def ti_smart_reframe(item_index: int = 0, track_type: str = "video", track_index
     if err:
         return err
     return {"success": bool(item.SmartReframe())}
+
+
+@mcp.tool()
+def ti_get_voice_isolation_state(item_index: int = 0, track_type: str = "audio", track_index: int = 1) -> Dict[str, Any]:
+    """Get voice isolation state for a timeline item.
+
+    Args:
+        item_index: 0-based item index. Default: 0.
+        track_type: 'audio' or 'video'. Default: 'audio'.
+        track_index: 1-based track index. Default: 1.
+    """
+    item, err = _get_timeline_item(track_type, track_index, item_index)
+    if err:
+        return err
+    missing = _requires_method(item, "GetVoiceIsolationState", "20.1")
+    if missing:
+        return missing
+    state = item.GetVoiceIsolationState()
+    return {"state": state if state else {"isEnabled": False, "amount": 0}}
+
+
+@mcp.tool()
+@granular_destructive_op()
+def ti_set_voice_isolation_state(state: Dict[str, Any], item_index: int = 0, track_type: str = "audio", track_index: int = 1) -> Dict[str, Any]:
+    """Set voice isolation state for a timeline item.
+
+    Args:
+        state: Dict with isEnabled (bool) and amount (0-100).
+        item_index: 0-based item index. Default: 0.
+        track_type: 'audio' or 'video'. Default: 'audio'.
+        track_index: 1-based track index. Default: 1.
+    """
+    item, err = _get_timeline_item(track_type, track_index, item_index)
+    if err:
+        return err
+    missing = _requires_method(item, "SetVoiceIsolationState", "20.1")
+    if missing:
+        return missing
+    result = item.SetVoiceIsolationState(state)
+    return {"success": bool(result)}
+
+
+@mcp.tool()
+@granular_destructive_op()
+def ti_reset_all_node_colors(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
+    """Reset node colors for all nodes in the active clip version.
+
+    Args:
+        item_index: 0-based item index. Default: 0.
+        track_type: 'video' or 'audio'. Default: 'video'.
+        track_index: 1-based track index. Default: 1.
+    """
+    item, err = _get_timeline_item(track_type, track_index, item_index)
+    if err:
+        return err
+    missing = _requires_method(item, "ResetAllNodeColors", "20.2")
+    if missing:
+        return missing
+    result = item.ResetAllNodeColors()
+    return {"success": bool(result)}
+
 
 @mcp.tool()
 def ti_get_node_graph(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1274,6 +2240,7 @@ def ti_get_node_graph(item_index: int = 0, track_type: str = "video", track_inde
         return {"has_graph": True, "num_nodes": graph.GetNumNodes()}
     return {"has_graph": False}
 
+
 @mcp.tool()
 def ti_get_color_group(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get the color group for a timeline item.
@@ -1288,6 +2255,7 @@ def ti_get_color_group(item_index: int = 0, track_type: str = "video", track_ind
     if group:
         return {"group_name": group.GetName()}
     return {"group_name": None}
+
 
 @mcp.tool()
 def ti_assign_to_color_group(group_name: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1312,7 +2280,9 @@ def ti_assign_to_color_group(group_name: str, item_index: int = 0, track_type: s
         return {"error": f"Color group '{group_name}' not found"}
     return {"success": bool(item.AssignToColorGroup(target))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_remove_from_color_group(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Remove a timeline item from its color group.
 
@@ -1323,6 +2293,7 @@ def ti_remove_from_color_group(item_index: int = 0, track_type: str = "video", t
     if err:
         return err
     return {"success": bool(item.RemoveFromColorGroup())}
+
 
 @mcp.tool()
 def ti_export_lut(export_type: str, path: str, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1337,10 +2308,11 @@ def ti_export_lut(export_type: str, path: str, item_index: int = 0, track_type: 
     if err:
         return err
     try:
-        etype = getattr(resolve, export_type) if hasattr(resolve, export_type) else export_type
+        etype = _api_constant(resolve, export_type, export_type)
     except Exception:
         etype = export_type
     return {"success": bool(item.ExportLUT(etype, path))}
+
 
 @mcp.tool()
 def ti_get_linked_items(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1357,6 +2329,7 @@ def ti_get_linked_items(item_index: int = 0, track_type: str = "video", track_in
         return {"linked_items": [{"name": li.GetName(), "unique_id": li.GetUniqueId()} for li in linked]}
     return {"linked_items": []}
 
+
 @mcp.tool()
 def ti_get_track_type_and_index(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get the track type and index for a timeline item.
@@ -1369,6 +2342,7 @@ def ti_get_track_type_and_index(item_index: int = 0, track_type: str = "video", 
         return err
     result = item.GetTrackTypeAndIndex()
     return {"track_type": result[0] if result else "", "track_index": result[1] if result and len(result) > 1 else 0}
+
 
 @mcp.tool()
 def ti_get_source_audio_channel_mapping(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1383,6 +2357,7 @@ def ti_get_source_audio_channel_mapping(item_index: int = 0, track_type: str = "
     mapping = item.GetSourceAudioChannelMapping()
     return {"audio_channel_mapping": mapping if mapping else ""}
 
+
 @mcp.tool()
 def ti_get_stereo_convergence_values(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get stereo convergence values for a timeline item.
@@ -1394,6 +2369,7 @@ def ti_get_stereo_convergence_values(item_index: int = 0, track_type: str = "vid
     if err:
         return err
     return {"convergence": item.GetStereoConvergenceValues() or {}}
+
 
 @mcp.tool()
 def ti_get_stereo_floating_window_params(eye: str = "left", item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1411,6 +2387,7 @@ def ti_get_stereo_floating_window_params(eye: str = "left", item_index: int = 0,
     else:
         return {"params": item.GetStereoRightFloatingWindowParams() or {}}
 
+
 @mcp.tool()
 def ti_get_media_pool_item(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Get the MediaPoolItem associated with a timeline item.
@@ -1425,6 +2402,7 @@ def ti_get_media_pool_item(item_index: int = 0, track_type: str = "video", track
     if mpi:
         return {"name": mpi.GetName(), "unique_id": mpi.GetUniqueId()}
     return {"media_pool_item": None}
+
 
 @mcp.tool()
 def ti_get_cache_status(item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -1441,7 +2419,9 @@ def ti_get_cache_status(item_index: int = 0, track_type: str = "video", track_in
         "fusion_output_cache_enabled": bool(item.GetIsFusionOutputCacheEnabled())
     }
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_set_color_output_cache(enabled: bool, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Enable/disable color output cache for a timeline item.
 
@@ -1454,7 +2434,9 @@ def ti_set_color_output_cache(enabled: bool, item_index: int = 0, track_type: st
         return err
     return {"success": bool(item.SetColorOutputCache(enabled))}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def ti_set_fusion_output_cache(enabled: bool, item_index: int = 0, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Enable/disable Fusion output cache for a timeline item.
 
@@ -1467,10 +2449,6 @@ def ti_set_fusion_output_cache(enabled: bool, item_index: int = 0, track_type: s
         return err
     return {"success": bool(item.SetFusionOutputCache(enabled))}
 
-
-# ------------------
-# Final API Gap Coverage (Experiment 4)
-# ------------------
 
 @mcp.tool()
 def get_fusion_comp_by_name(comp_name: str, track_type: str = "video", track_index: int = 1, item_index: int = 0) -> Dict[str, Any]:
@@ -1489,22 +2467,3 @@ def get_fusion_comp_by_name(comp_name: str, track_type: str = "video", track_ind
     if comp:
         return {"success": True, "comp_name": comp_name, "comp_available": True}
     return {"success": False, "error": f"Fusion composition '{comp_name}' not found on this timeline item"}
-
-
-# Start the server
-if __name__ == "__main__":
-    try:
-        if resolve is None:
-            logger.error("Cannot start server without connection to DaVinci Resolve")
-            sys.exit(1)
-        
-        logger.info("Starting DaVinci Resolve MCP Server")
-        # Start the MCP server with the simple run method
-        # Note: The MCP CLI tool handles port configuration, not FastMCP directly
-        mcp.run()
-    except KeyboardInterrupt:
-        logger.info("Server shutdown requested")
-    except Exception as e:
-        logger.error(f"Server error: {str(e)}")
-        sys.exit(1)
-

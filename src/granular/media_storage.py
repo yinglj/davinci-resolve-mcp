@@ -1,8 +1,8 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Media_Storage Operations (Granular Tools)."""
+"""MediaStorage tools."""
 
-from typing import Any, Dict, List, Optional, Union, Tuple
-from .common import mcp, get_resolve
+from src.granular.common import *  # noqa: F401,F403
+
+resolve = ResolveProxy()
 
 @mcp.tool()
 def get_mounted_volumes() -> Dict[str, Any]:
@@ -15,6 +15,7 @@ def get_mounted_volumes() -> Dict[str, Any]:
         return {"error": "Failed to get MediaStorage"}
     volumes = ms.GetMountedVolumeList()
     return {"volumes": volumes if volumes else []}
+
 
 @mcp.tool()
 def get_media_storage_subfolders(folder_path: str) -> Dict[str, Any]:
@@ -32,6 +33,7 @@ def get_media_storage_subfolders(folder_path: str) -> Dict[str, Any]:
     subfolders = ms.GetSubFolderList(folder_path)
     return {"folder_path": folder_path, "subfolders": subfolders if subfolders else []}
 
+
 @mcp.tool()
 def get_media_storage_files(folder_path: str) -> Dict[str, Any]:
     """Get media and file listings in a given absolute folder path from Media Storage.
@@ -47,6 +49,7 @@ def get_media_storage_files(folder_path: str) -> Dict[str, Any]:
         return {"error": "Failed to get MediaStorage"}
     files = ms.GetFileList(folder_path)
     return {"folder_path": folder_path, "files": files if files else []}
+
 
 @mcp.tool()
 def reveal_in_media_storage(file_path: str) -> Dict[str, Any]:
@@ -64,12 +67,19 @@ def reveal_in_media_storage(file_path: str) -> Dict[str, Any]:
     result = ms.RevealInStorage(file_path)
     return {"success": bool(result), "file_path": file_path}
 
+
 @mcp.tool()
-def add_items_to_media_pool_from_storage(file_paths: List[str]) -> Dict[str, Any]:
+def add_items_to_media_pool_from_storage(
+    file_paths: Optional[List[str]] = None,
+    item_infos: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """Add specified file/folder paths from Media Storage into current Media Pool folder.
 
     Args:
-        file_paths: List of absolute file or folder paths to add to the Media Pool.
+        file_paths: Simple form — list of absolute file/folder paths.
+        item_infos: Positioned form — list of dicts with keys media (required),
+            startFrame, endFrame. Mirrors
+            MediaStorage.AddItemListToMediaPool([{itemInfo}, ...]) per docs line 210.
     """
     resolve = get_resolve()
     if resolve is None:
@@ -77,10 +87,23 @@ def add_items_to_media_pool_from_storage(file_paths: List[str]) -> Dict[str, Any
     ms = resolve.GetMediaStorage()
     if not ms:
         return {"error": "Failed to get MediaStorage"}
-    clips = ms.AddItemListToMediaPool(file_paths)
+    if item_infos is not None:
+        if not isinstance(item_infos, list) or not item_infos:
+            return {"error": "item_infos must be a non-empty list"}
+        for i, info in enumerate(item_infos):
+            if not isinstance(info, dict):
+                return {"error": f"item_infos[{i}] must be an object"}
+            if not info.get("media"):
+                return {"error": f"item_infos[{i}] requires media (file path)"}
+        clips = ms.AddItemListToMediaPool(item_infos)
+    else:
+        if not file_paths:
+            return {"error": "Provide file_paths (simple) or item_infos (positioned)"}
+        clips = ms.AddItemListToMediaPool(file_paths)
     if clips:
         return {"success": True, "clips_added": len(clips)}
     return {"success": False, "error": "Failed to add items to Media Pool"}
+
 
 @mcp.tool()
 def add_clip_mattes_to_media_pool(media_pool_item_id: str, matte_paths: List[str]) -> Dict[str, Any]:
@@ -122,6 +145,7 @@ def add_clip_mattes_to_media_pool(media_pool_item_id: str, matte_paths: List[str
     result = ms.AddClipMattesToMediaPool(clip, matte_paths, root)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def add_timeline_mattes_to_media_pool(timeline_item_index: int, matte_paths: List[str], track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Add timeline mattes from Media Storage to a timeline item.
@@ -147,15 +171,9 @@ def add_timeline_mattes_to_media_pool(timeline_item_index: int, matte_paths: Lis
         return {"error": "No current timeline"}
 
     items = timeline.GetItemListInTrack(track_type, track_index)
-    if not items or timeline_item_index >= len(items):
+    if not items or timeline_item_index < 0 or timeline_item_index >= len(items):  # reject negatives (EX5)
         return {"error": f"Timeline item at index {timeline_item_index} not found"}
 
     item = items[timeline_item_index]
     result = ms.AddTimelineMattesToMediaPool(item, matte_paths)
     return {"success": bool(result)}
-
-
-# ------------------
-# Resolve Object Tools (missing methods)
-# ------------------
-

@@ -1,99 +1,8 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Folder Operations (Granular Tools)."""
+"""Folder-oriented tools for media pool folders."""
 
-from typing import Any, Dict, List, Optional, Union, Tuple
-from .common import mcp, get_resolve
+from src.granular.common import *  # noqa: F401,F403
 
-@mcp.tool()
-def transcribe_audio(clip_name: str, language: str = "en-US") -> str:
-    """Transcribe audio for a clip.
-    
-    Args:
-        clip_name: Name of the clip to transcribe
-        language: Language code for transcription (default: en-US)
-    """
-    pm, current_project = get_current_project()
-    if not current_project:
-        return "Error: No project currently open"
-    
-    media_pool = current_project.GetMediaPool()
-    if not media_pool:
-        return "Error: Failed to get Media Pool"
-    
-    # Find the clip by name
-    clips = get_all_media_pool_clips(media_pool)
-    target_clip = None
-    
-    for clip in clips:
-        if clip.GetName() == clip_name:
-            target_clip = clip
-            break
-    
-    if not target_clip:
-        return f"Error: Clip '{clip_name}' not found in Media Pool"
-    
-    try:
-        result = target_clip.TranscribeAudio(language)
-        if result:
-            return f"Successfully started audio transcription for clip '{clip_name}' in language '{language}'"
-        else:
-            return f"Failed to start audio transcription for clip '{clip_name}'"
-    except Exception as e:
-        return f"Error during audio transcription: {str(e)}"
-
-@mcp.tool()
-def clear_transcription(clip_name: str) -> str:
-    """Clear audio transcription for a clip.
-    
-    Args:
-        clip_name: Name of the clip to clear transcription from
-    """
-    pm, current_project = get_current_project()
-    if not current_project:
-        return "Error: No project currently open"
-    
-    media_pool = current_project.GetMediaPool()
-    if not media_pool:
-        return "Error: Failed to get Media Pool"
-    
-    # Find the clip by name
-    clips = get_all_media_pool_clips(media_pool)
-    target_clip = None
-    
-    for clip in clips:
-        if clip.GetName() == clip_name:
-            target_clip = clip
-            break
-    
-    if not target_clip:
-        return f"Error: Clip '{clip_name}' not found in Media Pool"
-    
-    try:
-        result = target_clip.ClearTranscription()
-        if result:
-            return f"Successfully cleared audio transcription for clip '{clip_name}'"
-        else:
-            return f"Failed to clear audio transcription for clip '{clip_name}'"
-    except Exception as e:
-        return f"Error clearing audio transcription: {str(e)}"
-
-# Utility function to get all clips from the media pool (recursively)
-def get_all_media_pool_clips(media_pool):
-    """Get all clips from media pool recursively including subfolders."""
-    clips = []
-    root_folder = media_pool.GetRootFolder()
-    
-    def process_folder(folder):
-        folder_clips = folder.GetClipList()
-        if folder_clips:
-            clips.extend(folder_clips)
-        
-        sub_folders = folder.GetSubFolderList()
-        for sub_folder in sub_folders:
-            process_folder(sub_folder)
-    
-    process_folder(root_folder)
-    return clips
+resolve = ResolveProxy()
 
 @mcp.tool()
 def export_folder(folder_name: str, export_path: str, export_type: str = "DRB") -> str:
@@ -147,13 +56,18 @@ def export_folder(folder_name: str, export_path: str, export_type: str = "DRB") 
     except Exception as e:
         return f"Error exporting folder: {str(e)}"
 
+
 @mcp.tool()
-def transcribe_folder_audio(folder_name: str, language: str = "en-US") -> str:
+def transcribe_folder_audio(folder_name: str, use_speaker_detection: Optional[bool] = None) -> str:
     """Transcribe audio for all clips in a folder.
-    
+
+    The transcription language follows the project's Speech Recognition setting
+    (Project Settings > Subtitles), not a per-call argument.
+
     Args:
         folder_name: Name of the folder containing clips to transcribe
-        language: Language code for transcription (default: en-US)
+        use_speaker_detection: Optional (Resolve 21+). Enable speaker detection.
+            If omitted, the project's setting is used.
     """
     pm, current_project = get_current_project()
     if not current_project:
@@ -180,17 +94,24 @@ def transcribe_folder_audio(folder_name: str, language: str = "en-US") -> str:
     if not target_folder:
         return f"Error: Folder '{folder_name}' not found in Media Pool"
     
-    # Transcribe audio in the folder
+    # Transcribe audio in the folder.
+    # Resolve 21's signature is TranscribeAudio(useSpeakerDetection=None); pass the
+    # bool only when supplied so older Resolve builds (no arg) keep working.
     try:
-        result = target_folder.TranscribeAudio(language)
+        if use_speaker_detection is None:
+            result = target_folder.TranscribeAudio()
+        else:
+            result = target_folder.TranscribeAudio(use_speaker_detection)
         if result:
-            return f"Successfully started audio transcription for folder '{folder_name}' in language '{language}'"
+            return f"Successfully started audio transcription for folder '{folder_name}'"
         else:
             return f"Failed to start audio transcription for folder '{folder_name}'"
     except Exception as e:
         return f"Error during audio transcription: {str(e)}"
 
+
 @mcp.tool()
+@granular_destructive_op()
 def clear_folder_transcription(folder_name: str) -> str:
     """Clear audio transcription for all clips in a folder.
     
@@ -232,54 +153,6 @@ def clear_folder_transcription(folder_name: str) -> str:
     except Exception as e:
         return f"Error clearing audio transcription: {str(e)}"
 
-# Utility function to get all folders from the media pool (recursively)
-def get_all_media_pool_folders(media_pool):
-    """Get all folders from media pool recursively."""
-    folders = []
-    root_folder = media_pool.GetRootFolder()
-    
-    def process_folder(folder):
-        folders.append(folder)
-        
-        sub_folders = folder.GetSubFolderList()
-        for sub_folder in sub_folders:
-            process_folder(sub_folder)
-    
-    process_folder(root_folder)
-    return folders
-
-# ------------------
-# Cache Management
-# ------------------
-
-@mcp.resource("resolve://cache/settings")
-def get_cache_settings() -> Dict[str, Any]:
-    """Get current cache settings from the project."""
-    pm, current_project = get_current_project()
-    if not current_project:
-        return {"error": "No project currently open"}
-    
-    try:
-        # Get all cache-related settings
-        settings = {}
-        cache_keys = [
-            "CacheMode", 
-            "CacheClipMode",
-            "OptimizedMediaMode",
-            "ProxyMode", 
-            "ProxyQuality",
-            "TimelineCacheMode",
-            "LocalCachePath",
-            "NetworkCachePath"
-        ]
-        
-        for key in cache_keys:
-            value = current_project.GetSetting(key)
-            settings[key] = value
-            
-        return settings
-    except Exception as e:
-        return {"error": f"Failed to get cache settings: {str(e)}"}
 
 @mcp.tool()
 def get_folder_clip_list(folder_path: str = "") -> Dict[str, Any]:
@@ -302,6 +175,7 @@ def get_folder_clip_list(folder_path: str = "") -> Dict[str, Any]:
         return {"folder": folder.GetName(), "clips": [{"name": c.GetName(), "unique_id": c.GetUniqueId()} for c in clips]}
     return {"folder": folder.GetName(), "clips": []}
 
+
 @mcp.tool()
 def get_folder_subfolder_list(folder_path: str = "") -> Dict[str, Any]:
     """Get list of subfolders in a Media Pool folder.
@@ -323,6 +197,7 @@ def get_folder_subfolder_list(folder_path: str = "") -> Dict[str, Any]:
         return {"folder": folder.GetName(), "subfolders": [{"name": s.GetName(), "unique_id": s.GetUniqueId()} for s in subs]}
     return {"folder": folder.GetName(), "subfolders": []}
 
+
 @mcp.tool()
 def get_folder_is_stale(folder_path: str = "") -> Dict[str, Any]:
     """Check if a Media Pool folder is stale (needs refresh).
@@ -341,6 +216,7 @@ def get_folder_is_stale(folder_path: str = "") -> Dict[str, Any]:
         folder = mp.GetCurrentFolder()
     return {"folder": folder.GetName(), "is_stale": bool(folder.GetIsFolderStale())}
 
+
 @mcp.tool()
 def get_folder_unique_id(folder_path: str = "") -> Dict[str, Any]:
     """Get the unique ID of a Media Pool folder.
@@ -358,6 +234,7 @@ def get_folder_unique_id(folder_path: str = "") -> Dict[str, Any]:
     else:
         folder = mp.GetCurrentFolder()
     return {"folder": folder.GetName(), "unique_id": folder.GetUniqueId()}
+
 
 @mcp.tool()
 def folder_export(file_path: str, folder_path: str = "") -> Dict[str, Any]:
@@ -379,6 +256,7 @@ def folder_export(file_path: str, folder_path: str = "") -> Dict[str, Any]:
     result = folder.Export(file_path)
     return {"success": bool(result), "file_path": file_path}
 
+
 @mcp.tool()
 def folder_transcribe_audio(folder_path: str = "") -> Dict[str, Any]:
     """Transcribe audio for all clips in a Media Pool folder.
@@ -398,7 +276,9 @@ def folder_transcribe_audio(folder_path: str = "") -> Dict[str, Any]:
     result = folder.TranscribeAudio()
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def folder_clear_transcription(folder_path: str = "") -> Dict[str, Any]:
     """Clear transcription for all clips in a Media Pool folder.
 
@@ -418,7 +298,138 @@ def folder_clear_transcription(folder_path: str = "") -> Dict[str, Any]:
     return {"success": bool(result)}
 
 
-# ------------------
-# MediaPoolItem Tools (remaining)
-# ------------------
+def _resolve_folder(mp, folder_path):
+    """Return (folder, error). Empty path -> current folder."""
+    if folder_path:
+        folder = _navigate_to_folder(mp, folder_path)
+        if not folder:
+            return None, {"error": f"Folder '{folder_path}' not found"}
+        return folder, None
+    return mp.GetCurrentFolder(), None
 
+
+_MARKER_COLORS = [
+    "Blue", "Cyan", "Green", "Yellow", "Red", "Pink", "Purple", "Fuchsia",
+    "Rose", "Lavender", "Sky", "Mint", "Lemon", "Sand", "Cocoa", "Cream",
+]
+
+
+@mcp.tool()
+def folder_perform_audio_classification(folder_path: str = "") -> Dict[str, Any]:
+    """Classify audio of all clips in a Media Pool folder into categories (Resolve 21+).
+
+    Args:
+        folder_path: Path from root. Empty for current folder.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    folder, err = _resolve_folder(mp, folder_path)
+    if err:
+        return err
+    missing = _requires_method(folder, "PerformAudioClassification", "21.0")
+    if missing:
+        return missing
+    return _ai_result_payload(folder.PerformAudioClassification())
+
+
+@mcp.tool()
+@granular_destructive_op()
+def folder_clear_audio_classification(folder_path: str = "") -> Dict[str, Any]:
+    """Clear audio classification for all clips in a Media Pool folder (Resolve 21+).
+
+    Args:
+        folder_path: Path from root. Empty for current folder.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    folder, err = _resolve_folder(mp, folder_path)
+    if err:
+        return err
+    missing = _requires_method(folder, "ClearAudioClassification", "21.0")
+    if missing:
+        return missing
+    return _ai_result_payload(folder.ClearAudioClassification())
+
+
+@mcp.tool()
+def folder_analyze_for_intellisearch(folder_path: str = "", identify_faces: bool = False, is_better_mode: bool = False) -> Dict[str, Any]:
+    """Run IntelliSearch analysis on all clips in a folder (Resolve 21+, requires AI IntelliSearch Extra).
+
+    Args:
+        folder_path: Path from root. Empty for current folder.
+        identify_faces: Whether to identify faces.
+        is_better_mode: Use Better mode (vs Faster).
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    folder, err = _resolve_folder(mp, folder_path)
+    if err:
+        return err
+    missing = _requires_method(folder, "AnalyzeForIntellisearch", "21.0")
+    if missing:
+        return missing
+    return _ai_result_payload(folder.AnalyzeForIntellisearch(bool(identify_faces), bool(is_better_mode)))
+
+
+@mcp.tool()
+def folder_analyze_for_slate(folder_path: str = "", marker_color: str = "Blue") -> Dict[str, Any]:
+    """Run Slate analysis on all clips in a folder (Resolve 21+, requires AI Slate ID Extra).
+
+    Args:
+        folder_path: Path from root. Empty for current folder.
+        marker_color: Marker color for detected slates (Blue, Cyan, Green, Yellow, Red, Pink,
+            Purple, Fuchsia, Rose, Lavender, Sky, Mint, Lemon, Sand, Cocoa, Cream).
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    folder, err = _resolve_folder(mp, folder_path)
+    if err:
+        return err
+    missing = _requires_method(folder, "AnalyzeForSlate", "21.0")
+    if missing:
+        return missing
+    if marker_color not in _MARKER_COLORS:
+        return {"error": f"Invalid marker_color '{marker_color}'. Valid: {', '.join(_MARKER_COLORS)}"}
+    return _ai_result_payload(folder.AnalyzeForSlate(marker_color))
+
+
+@mcp.tool()
+@granular_destructive_op()
+def folder_remove_motion_blur(folder_path: str = "", deblur_option: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Render motion-deblurred copies of all clips in a folder (Resolve 21+).
+
+    Creates NEW media files; source media is not modified.
+
+    Args:
+        folder_path: Path from root. Empty for current folder.
+        deblur_option: Settings dict (FileName, Format, Codec, EncodingProfile,
+            UseExtremeMode, UseMarkInMarkOut, RenderAtSourceRes, UseMoreGpuMemory).
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    folder, err = _resolve_folder(mp, folder_path)
+    if err:
+        return err
+    missing = _requires_method(folder, "RemoveMotionBlur", "21.0")
+    if missing:
+        return missing
+    result = folder.RemoveMotionBlur(deblur_option or {})
+    # A missing Extras pack comes back as an error STRING, which is truthy and
+    # also iterable — the loop below would walk it character by character and
+    # report success. Normalize before either.
+    ok, message = _ai_result(result)
+    if not ok:
+        return {"success": False, "error": message} if message else {"success": False}
+    created = []
+    for pair in (result or []):
+        try:
+            orig, new = pair
+            created.append({"original": orig.GetName(), "new": new.GetName(), "new_id": new.GetUniqueId()})
+        except Exception:
+            continue
+    return {"success": True, "created": created}

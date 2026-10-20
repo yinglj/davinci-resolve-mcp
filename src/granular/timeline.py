@@ -1,8 +1,75 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Timeline Operations (Granular Tools)."""
+"""Timeline resources and operations."""
 
-from typing import Any, Dict, List, Optional, Union, Tuple
-from .common import mcp, get_resolve
+from src.granular.common import *  # noqa: F401,F403
+
+from src.utils.page_lock import color_page_for_thumbnails
+from src.utils.resolve_writes import set_current_timeline, describe_switch_failure
+
+resolve = ResolveProxy()
+
+@mcp.resource("resolve://timelines")
+def list_timelines() -> List[str]:
+    """List all timelines in the current project."""
+    logger.info("Received request to list timelines")
+    
+    if resolve is None:
+        logger.error("Not connected to DaVinci Resolve")
+        return ["Error: Not connected to DaVinci Resolve"]
+    
+    project_manager = resolve.GetProjectManager()
+    if not project_manager:
+        logger.error("Failed to get Project Manager")
+        return ["Error: Failed to get Project Manager"]
+    
+    current_project = project_manager.GetCurrentProject()
+    if not current_project:
+        logger.error("No project currently open")
+        return ["Error: No project currently open"]
+    
+    timeline_count = current_project.GetTimelineCount()
+    logger.info(f"Timeline count: {timeline_count}")
+    
+    timelines = []
+    
+    for i in range(1, timeline_count + 1):
+        timeline = current_project.GetTimelineByIndex(i)
+        if timeline:
+            timeline_name = timeline.GetName()
+            timelines.append(timeline_name)
+            logger.info(f"Found timeline {i}: {timeline_name}")
+    
+    if not timelines:
+        logger.info("No timelines found in the current project")
+        return ["No timelines found in the current project"]
+    
+    logger.info(f"Returning {len(timelines)} timelines: {', '.join(timelines)}")
+    return timelines
+
+
+@mcp.resource("resolve://current-timeline")
+def get_current_timeline() -> Dict[str, Any]:
+    """Get information about the current timeline."""
+    pm, current_project = get_current_project()
+    if not current_project:
+        return {"error": "No project currently open"}
+    
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return {"error": "No timeline currently active"}
+    
+    # Get basic timeline information
+    result = {
+        "name": current_timeline.GetName(),
+        "fps": current_timeline.GetSetting("timelineFrameRate"),
+        "resolution": {
+            "width": current_timeline.GetSetting("timelineResolutionWidth"),
+            "height": current_timeline.GetSetting("timelineResolutionHeight")
+        },
+        "duration": current_timeline.GetEndFrame() - current_timeline.GetStartFrame()
+    }
+    
+    return result
+
 
 @mcp.tool()
 def create_timeline(name: str) -> str:
@@ -36,41 +103,9 @@ def create_timeline(name: str) -> str:
     else:
         return f"Failed to create timeline '{name}'"
 
-@mcp.tool()
-def create_empty_timeline(name: str, 
-                       frame_rate: str = None, 
-                       resolution_width: int = None, 
-                       resolution_height: int = None,
-                       start_timecode: str = None,
-                       video_tracks: int = None,
-                       audio_tracks: int = None) -> str:
-    """Create a new timeline with the given name and custom settings.
-    
-    Args:
-        name: The name for the new timeline
-        frame_rate: Optional frame rate (e.g. "24", "29.97", "30", "60")
-        resolution_width: Optional width in pixels (e.g. 1920)
-        resolution_height: Optional height in pixels (e.g. 1080)
-        start_timecode: Optional start timecode (e.g. "01:00:00:00")
-        video_tracks: Optional number of video tracks (Default is project setting)
-        audio_tracks: Optional number of audio tracks (Default is project setting)
-    """
-    from api.timeline_operations import create_empty_timeline as create_empty_timeline_func
-    return create_empty_timeline_func(resolve, name, frame_rate, resolution_width, 
-                                    resolution_height, start_timecode, 
-                                    video_tracks, audio_tracks)
 
 @mcp.tool()
-def delete_timeline(name: str) -> str:
-    """Delete a timeline by name.
-    
-    Args:
-        name: The name of the timeline to delete
-    """
-    from api.timeline_operations import delete_timeline as delete_timeline_func
-    return delete_timeline_func(resolve, name)
-
-@mcp.tool()
+@granular_destructive_op()
 def set_current_timeline(name: str) -> str:
     """Switch to a timeline by name.
     
@@ -105,51 +140,61 @@ def set_current_timeline(name: str) -> str:
     
     return f"Error: Timeline '{name}' not found"
 
-@mcp.tool()
-def add_marker(frame: int = None, color: str = "Blue", note: str = "") -> str:
-    """Add a marker at the specified frame in the current timeline.
-    
-    Args:
-        frame: The frame number to add the marker at (defaults to current position if None)
-        color: The marker color (Blue, Cyan, Green, Yellow, Red, Pink, Purple, Fuchsia, Rose, Lavender, Sky, Mint, Lemon, Sand, Cocoa, Cream)
-        note: Text note to add to the marker
-    """
-    from api.timeline_operations import add_marker as add_marker_func
-    return add_marker_func(resolve, frame, color, note)
 
-# ------------------
-# Media Pool Operations
-# ------------------
-
-@mcp.resource("resolve://media-pool-clips")
-def list_media_pool_clips() -> List[Dict[str, Any]]:
-    """List all clips in the root folder of the media pool."""
+@mcp.resource("resolve://timeline-clips")
+def list_timeline_clips() -> List[Dict[str, Any]]:
+    """List all clips in the current timeline."""
     pm, current_project = get_current_project()
     if not current_project:
         return [{"error": "No project currently open"}]
     
-    media_pool = current_project.GetMediaPool()
-    if not media_pool:
-        return [{"error": "Failed to get Media Pool"}]
+    current_timeline = current_project.GetCurrentTimeline()
+    if not current_timeline:
+        return [{"error": "No timeline currently active"}]
     
-    root_folder = media_pool.GetRootFolder()
-    if not root_folder:
-        return [{"error": "Failed to get root folder"}]
-    
-    clips = root_folder.GetClipList()
-    if not clips:
-        return [{"info": "No clips found in the root folder"}]
-    
-    # Return a simplified list with basic clip info
-    result = []
-    for clip in clips:
-        result.append({
-            "name": clip.GetName(),
-            "duration": clip.GetDuration(),
-            "fps": clip.GetClipProperty("FPS")
-        })
-    
-    return result
+    try:
+        # Get all tracks in the timeline
+        # Video tracks are 1-based index (1 is first track)
+        video_track_count = current_timeline.GetTrackCount("video")
+        audio_track_count = current_timeline.GetTrackCount("audio")
+        
+        clips = []
+        
+        # Process video tracks
+        for track_index in range(1, video_track_count + 1):
+            track_items = current_timeline.GetItemListInTrack("video", track_index)
+            if track_items:
+                for item in track_items:
+                    clips.append({
+                        "name": item.GetName(),
+                        "type": "video",
+                        "track": track_index,
+                        "start_frame": item.GetStart(),
+                        "end_frame": item.GetEnd(),
+                        "duration": item.GetDuration()
+                    })
+        
+        # Process audio tracks
+        for track_index in range(1, audio_track_count + 1):
+            track_items = current_timeline.GetItemListInTrack("audio", track_index)
+            if track_items:
+                for item in track_items:
+                    clips.append({
+                        "name": item.GetName(),
+                        "type": "audio",
+                        "track": track_index,
+                        "start_frame": item.GetStart(),
+                        "end_frame": item.GetEnd(),
+                        "duration": item.GetDuration()
+                    })
+        
+        if not clips:
+            return [{"info": "No clips found in the current timeline"}]
+        
+        return clips
+    except Exception as e:
+        return [{"error": f"Error listing timeline clips: {str(e)}"}]
+
 
 @mcp.tool()
 def list_timelines_tool() -> List[str]:
@@ -157,25 +202,9 @@ def list_timelines_tool() -> List[str]:
     logger.info("Received request to list timelines via tool")
     return list_timelines()
 
-@mcp.tool()
-def get_timeline_by_index(index: int) -> Dict[str, Any]:
-    """Get a timeline by its 1-based index.
-
-    Args:
-        index: 1-based timeline index.
-    """
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project currently open"}
-    tl = project.GetTimelineByIndex(index)
-    if tl:
-        return {"name": tl.GetName(), "start_frame": tl.GetStartFrame(), "end_frame": tl.GetEndFrame(), "unique_id": tl.GetUniqueId()}
-    return {"error": f"No timeline at index {index}"}
 
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_name(name: str) -> Dict[str, Any]:
     """Rename the current timeline.
 
@@ -188,7 +217,9 @@ def timeline_set_name(name: str) -> Dict[str, Any]:
     result = tl.SetName(name)
     return {"success": bool(result), "name": name}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_start_timecode(timecode: str) -> Dict[str, Any]:
     """Set the start timecode of the current timeline.
 
@@ -201,6 +232,7 @@ def timeline_set_start_timecode(timecode: str) -> Dict[str, Any]:
     result = tl.SetStartTimecode(timecode)
     return {"success": bool(result), "timecode": timecode}
 
+
 @mcp.tool()
 def timeline_get_current_timecode() -> Dict[str, Any]:
     """Get the current playhead timecode."""
@@ -209,7 +241,9 @@ def timeline_get_current_timecode() -> Dict[str, Any]:
         return err
     return {"timecode": tl.GetCurrentTimecode()}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_current_timecode(timecode: str) -> Dict[str, Any]:
     """Set the playhead to a specific timecode.
 
@@ -222,24 +256,43 @@ def timeline_set_current_timecode(timecode: str) -> Dict[str, Any]:
     result = tl.SetCurrentTimecode(timecode)
     return {"success": bool(result), "timecode": timecode}
 
+
 @mcp.tool()
-def timeline_add_track(track_type: str, sub_track_type: str = "") -> Dict[str, Any]:
+def timeline_add_track(
+    track_type: str,
+    audio_type: Optional[str] = None,
+    index: Optional[int] = None,
+) -> Dict[str, Any]:
     """Add a new track to the timeline.
+
+    Mirrors Timeline.AddTrack(trackType, {newTrackOptions}) per docs line 327.
 
     Args:
         track_type: 'video', 'audio', or 'subtitle'.
-        sub_track_type: For audio: 'mono', 'stereo', '5.1', '7.1', 'adaptive'. Default: ''.
+        audio_type: For audio tracks: 'mono', 'stereo', 'lrc', 'lcr', 'lrcs', 'lcrs',
+            'quad', '5.0', '5.0film', '5.1', '5.1film', '7.0', '7.0film', '7.1',
+            '7.1film', 'adaptive1' through 'adaptive36'. Defaults to 'mono' for audio
+            tracks if omitted.
+        index: 1-based track index where 1 <= index <= GetTrackCount(track_type) + 1.
+            If omitted or out of bounds, the track is appended.
     """
     _, tl, err = _get_timeline()
     if err:
         return err
-    if sub_track_type:
-        result = tl.AddTrack(track_type, sub_track_type)
+    options: Dict[str, Any] = {}
+    if audio_type is not None:
+        options["audioType"] = audio_type
+    if index is not None:
+        options["index"] = index
+    if options:
+        result = tl.AddTrack(track_type, options)
     else:
         result = tl.AddTrack(track_type)
     return {"success": bool(result), "track_type": track_type}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_delete_track(track_type: str, track_index: int) -> Dict[str, Any]:
     """Delete a track from the timeline.
 
@@ -252,6 +305,7 @@ def timeline_delete_track(track_type: str, track_index: int) -> Dict[str, Any]:
         return err
     result = tl.DeleteTrack(track_type, track_index)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_get_track_sub_type(track_type: str, track_index: int) -> Dict[str, Any]:
@@ -267,7 +321,9 @@ def timeline_get_track_sub_type(track_type: str, track_index: int) -> Dict[str, 
     sub = tl.GetTrackSubType(track_type, track_index)
     return {"track_type": track_type, "track_index": track_index, "sub_type": sub if sub else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_track_enable(track_type: str, track_index: int, enabled: bool) -> Dict[str, Any]:
     """Enable or disable a track.
 
@@ -281,6 +337,7 @@ def timeline_set_track_enable(track_type: str, track_index: int, enabled: bool) 
         return err
     result = tl.SetTrackEnable(track_type, track_index, enabled)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_get_is_track_enabled(track_type: str, track_index: int) -> Dict[str, Any]:
@@ -296,7 +353,9 @@ def timeline_get_is_track_enabled(track_type: str, track_index: int) -> Dict[str
     enabled = tl.GetIsTrackEnabled(track_type, track_index)
     return {"enabled": bool(enabled)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_track_lock(track_type: str, track_index: int, locked: bool) -> Dict[str, Any]:
     """Lock or unlock a track.
 
@@ -310,6 +369,7 @@ def timeline_set_track_lock(track_type: str, track_index: int, locked: bool) -> 
         return err
     result = tl.SetTrackLock(track_type, track_index, locked)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_get_is_track_locked(track_type: str, track_index: int) -> Dict[str, Any]:
@@ -325,7 +385,45 @@ def timeline_get_is_track_locked(track_type: str, track_index: int) -> Dict[str,
     locked = tl.GetIsTrackLocked(track_type, track_index)
     return {"locked": bool(locked)}
 
+
 @mcp.tool()
+def timeline_get_voice_isolation_state(track_index: int) -> Dict[str, Any]:
+    """Get voice isolation state for an audio track.
+
+    Args:
+        track_index: 1-based audio track index.
+    """
+    _, tl, err = _get_timeline()
+    if err:
+        return err
+    missing = _requires_method(tl, "GetVoiceIsolationState", "20.1")
+    if missing:
+        return missing
+    state = tl.GetVoiceIsolationState(track_index)
+    return {"state": state if state else {"isEnabled": False, "amount": 0}}
+
+
+@mcp.tool()
+@granular_destructive_op()
+def timeline_set_voice_isolation_state(track_index: int, state: Dict[str, Any]) -> Dict[str, Any]:
+    """Set voice isolation state for an audio track.
+
+    Args:
+        track_index: 1-based audio track index.
+        state: Dict with isEnabled (bool) and amount (0-100).
+    """
+    _, tl, err = _get_timeline()
+    if err:
+        return err
+    missing = _requires_method(tl, "SetVoiceIsolationState", "20.1")
+    if missing:
+        return missing
+    result = tl.SetVoiceIsolationState(track_index, state)
+    return {"success": bool(result)}
+
+
+@mcp.tool()
+@granular_destructive_op()
 def timeline_delete_clips(clip_ids: List[str], track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Delete clips from the timeline.
 
@@ -346,7 +444,9 @@ def timeline_delete_clips(clip_ids: List[str], track_type: str = "video", track_
     result = tl.DeleteClips(to_delete)
     return {"success": bool(result), "deleted": len(to_delete)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_clips_linked(clip_ids: List[str], linked: bool, track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
     """Link or unlink clips in the timeline.
 
@@ -368,12 +468,14 @@ def timeline_set_clips_linked(clip_ids: List[str], linked: bool, track_type: str
     result = tl.SetClipsLinked(targets, linked)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def timeline_add_marker(frame_id: int, color: str, name: str, note: str = "", duration: int = 1, custom_data: str = "") -> Dict[str, Any]:
     """Add a marker to the current timeline.
 
     Args:
-        frame_id: Frame number for the marker.
+        frame_id: Frame number for the marker, relative to the timeline start
+            (frame 0 = first frame, even when the timeline starts at 01:00:00:00).
         color: Marker color (Blue, Cyan, Green, Yellow, Red, Pink, Purple, Fuchsia, Rose, Lavender, Sky, Mint, Lemon, Sand, Cocoa, Cream).
         name: Marker name.
         note: Marker note. Default: empty.
@@ -386,6 +488,7 @@ def timeline_add_marker(frame_id: int, color: str, name: str, note: str = "", du
     result = tl.AddMarker(frame_id, color, name, note, duration, custom_data)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def timeline_get_markers() -> Dict[str, Any]:
     """Get all markers on the current timeline."""
@@ -394,6 +497,7 @@ def timeline_get_markers() -> Dict[str, Any]:
         return err
     markers = tl.GetMarkers()
     return {"markers": markers if markers else {}}
+
 
 @mcp.tool()
 def timeline_get_marker_by_custom_data(custom_data: str) -> Dict[str, Any]:
@@ -407,6 +511,7 @@ def timeline_get_marker_by_custom_data(custom_data: str) -> Dict[str, Any]:
         return err
     marker = tl.GetMarkerByCustomData(custom_data)
     return {"marker": marker if marker else {}}
+
 
 @mcp.tool()
 def timeline_update_marker_custom_data(frame_id: int, custom_data: str) -> Dict[str, Any]:
@@ -422,6 +527,7 @@ def timeline_update_marker_custom_data(frame_id: int, custom_data: str) -> Dict[
     result = tl.UpdateMarkerCustomData(frame_id, custom_data)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def timeline_get_marker_custom_data(frame_id: int) -> Dict[str, Any]:
     """Get the custom data of a timeline marker.
@@ -435,7 +541,9 @@ def timeline_get_marker_custom_data(frame_id: int) -> Dict[str, Any]:
     data = tl.GetMarkerCustomData(frame_id)
     return {"frame_id": frame_id, "custom_data": data if data else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_delete_markers_by_color(color: str) -> Dict[str, Any]:
     """Delete all timeline markers of a specific color.
 
@@ -448,7 +556,9 @@ def timeline_delete_markers_by_color(color: str) -> Dict[str, Any]:
     result = tl.DeleteMarkersByColor(color)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_delete_marker_at_frame(frame_id: int) -> Dict[str, Any]:
     """Delete a timeline marker at a specific frame.
 
@@ -461,7 +571,9 @@ def timeline_delete_marker_at_frame(frame_id: int) -> Dict[str, Any]:
     result = tl.DeleteMarkerAtFrame(frame_id)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_delete_marker_by_custom_data(custom_data: str) -> Dict[str, Any]:
     """Delete a timeline marker by custom data.
 
@@ -473,6 +585,7 @@ def timeline_delete_marker_by_custom_data(custom_data: str) -> Dict[str, Any]:
         return err
     result = tl.DeleteMarkerByCustomData(custom_data)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_get_track_name(track_type: str, track_index: int) -> Dict[str, Any]:
@@ -488,7 +601,9 @@ def timeline_get_track_name(track_type: str, track_index: int) -> Dict[str, Any]
     name = tl.GetTrackName(track_type, track_index)
     return {"track_name": name if name else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_track_name(track_type: str, track_index: int, name: str) -> Dict[str, Any]:
     """Set the name of a track.
 
@@ -503,6 +618,7 @@ def timeline_set_track_name(track_type: str, track_index: int, name: str) -> Dic
     result = tl.SetTrackName(track_type, track_index, name)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def timeline_duplicate() -> Dict[str, Any]:
     """Duplicate the current timeline."""
@@ -514,14 +630,25 @@ def timeline_duplicate() -> Dict[str, Any]:
         return {"success": True, "name": new_tl.GetName(), "unique_id": new_tl.GetUniqueId()}
     return {"success": False, "error": "Failed to duplicate timeline"}
 
+
 @mcp.tool()
-def timeline_create_compound_clip(clip_ids: List[str], track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
+def timeline_create_compound_clip(
+    clip_ids: List[str],
+    track_type: str = "video",
+    track_index: int = 1,
+    name: Optional[str] = None,
+    start_timecode: Optional[str] = None,
+) -> Dict[str, Any]:
     """Create a compound clip from selected items.
+
+    Mirrors Timeline.CreateCompoundClip([timelineItems], {clipInfo}) per docs line 369.
 
     Args:
         clip_ids: List of timeline item unique IDs.
         track_type: 'video' or 'audio'. Default: 'video'.
         track_index: 1-based track index. Default: 1.
+        name: Optional name for the compound clip; maps to clipInfo.name.
+        start_timecode: Optional start timecode (e.g. "01:00:00:00"); maps to clipInfo.startTimecode.
     """
     _, tl, err = _get_timeline()
     if err:
@@ -530,10 +657,23 @@ def timeline_create_compound_clip(clip_ids: List[str], track_type: str = "video"
     targets = [i for i in (items or []) if i.GetUniqueId() in clip_ids]
     if not targets:
         return {"error": "No matching items found"}
-    result = tl.CreateCompoundClip(targets)
-    if result:
-        return {"success": True}
-    return {"success": False, "error": "Failed to create compound clip"}
+    clip_info: Dict[str, Any] = {}
+    if name is not None:
+        clip_info["name"] = name
+    if start_timecode is not None:
+        clip_info["startTimecode"] = start_timecode
+    if clip_info:
+        result = tl.CreateCompoundClip(targets, clip_info)
+    else:
+        result = tl.CreateCompoundClip(targets)
+    if not result:
+        return {"success": False, "error": "Failed to create compound clip"}
+    return {
+        "success": True,
+        "name": result.GetName() if _has_method(result, "GetName") else None,
+        "unique_id": result.GetUniqueId() if _has_method(result, "GetUniqueId") else None,
+    }
+
 
 @mcp.tool()
 def timeline_create_fusion_clip(clip_ids: List[str], track_type: str = "video", track_index: int = 1) -> Dict[str, Any]:
@@ -556,6 +696,7 @@ def timeline_create_fusion_clip(clip_ids: List[str], track_type: str = "video", 
         return {"success": True}
     return {"success": False, "error": "Failed to create Fusion clip"}
 
+
 @mcp.tool()
 def timeline_import_into(file_path: str, import_options: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Import content into the current timeline from a file.
@@ -573,6 +714,7 @@ def timeline_import_into(file_path: str, import_options: Optional[Dict[str, Any]
         result = tl.ImportIntoTimeline(file_path)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def timeline_export(file_path: str, export_type: str, export_subtype: str = "EXPORT_NONE") -> Dict[str, Any]:
     """Export the current timeline to a file.
@@ -587,13 +729,18 @@ def timeline_export(file_path: str, export_type: str, export_subtype: str = "EXP
         return err
     # Map string constants to resolve constants
     try:
-        etype = getattr(resolve, export_type) if hasattr(resolve, export_type) else export_type
-        esub = getattr(resolve, export_subtype) if hasattr(resolve, export_subtype) else export_subtype
+        # Fall back on the VALUE, not on hasattr: hasattr is a constant True
+        # here, so a build without the constant used to hand Export a None
+        # instead of the string name the fallback was written to pass through.
+        etype = _api_constant(resolve, export_type, export_type)
+        esub = _api_constant(resolve, export_subtype, export_subtype)
     except Exception:
+        logger.debug("Could not resolve timeline export constants", exc_info=True)
         etype = export_type
         esub = export_subtype
     result = tl.Export(file_path, etype, esub)
     return {"success": bool(result), "file_path": file_path}
+
 
 @mcp.tool()
 def timeline_insert_generator(generator_name: str, duration: Optional[int] = None) -> Dict[str, Any]:
@@ -612,6 +759,7 @@ def timeline_insert_generator(generator_name: str, duration: Optional[int] = Non
         result = tl.InsertGeneratorIntoTimeline(generator_name)
     return {"success": result is not None}
 
+
 @mcp.tool()
 def timeline_insert_fusion_generator(generator_name: str) -> Dict[str, Any]:
     """Insert a Fusion generator into the timeline.
@@ -625,6 +773,7 @@ def timeline_insert_fusion_generator(generator_name: str) -> Dict[str, Any]:
     result = tl.InsertFusionGeneratorIntoTimeline(generator_name)
     return {"success": result is not None}
 
+
 @mcp.tool()
 def timeline_insert_fusion_composition() -> Dict[str, Any]:
     """Insert a Fusion composition into the timeline."""
@@ -633,6 +782,7 @@ def timeline_insert_fusion_composition() -> Dict[str, Any]:
         return err
     result = tl.InsertFusionCompositionIntoTimeline()
     return {"success": result is not None}
+
 
 @mcp.tool()
 def timeline_insert_ofx_generator(generator_name: str) -> Dict[str, Any]:
@@ -647,6 +797,7 @@ def timeline_insert_ofx_generator(generator_name: str) -> Dict[str, Any]:
     result = tl.InsertOFXGeneratorIntoTimeline(generator_name)
     return {"success": result is not None}
 
+
 @mcp.tool()
 def timeline_insert_title(title_name: str) -> Dict[str, Any]:
     """Insert a title into the timeline.
@@ -659,6 +810,7 @@ def timeline_insert_title(title_name: str) -> Dict[str, Any]:
         return err
     result = tl.InsertTitleIntoTimeline(title_name)
     return {"success": result is not None}
+
 
 @mcp.tool()
 def timeline_insert_fusion_title(title_name: str) -> Dict[str, Any]:
@@ -673,6 +825,7 @@ def timeline_insert_fusion_title(title_name: str) -> Dict[str, Any]:
     result = tl.InsertFusionTitleIntoTimeline(title_name)
     return {"success": result is not None}
 
+
 @mcp.tool()
 def timeline_grab_still() -> Dict[str, Any]:
     """Grab a still from the current frame of the timeline."""
@@ -681,6 +834,7 @@ def timeline_grab_still() -> Dict[str, Any]:
         return err
     result = tl.GrabStill()
     return {"success": result is not None}
+
 
 @mcp.tool()
 def timeline_grab_all_stills() -> Dict[str, Any]:
@@ -691,6 +845,7 @@ def timeline_grab_all_stills() -> Dict[str, Any]:
     result = tl.GrabAllStills()
     return {"success": result is not None}
 
+
 @mcp.tool()
 def timeline_get_unique_id() -> Dict[str, Any]:
     """Get the unique ID of the current timeline."""
@@ -699,29 +854,57 @@ def timeline_get_unique_id() -> Dict[str, Any]:
         return err
     return {"unique_id": tl.GetUniqueId()}
 
+
 @mcp.tool()
-def timeline_create_subtitles_from_audio(language: str = "auto", preset: str = "default") -> Dict[str, Any]:
+def timeline_create_subtitles_from_audio(
+    language: str = "auto",
+    preset: str = "default",
+    chars_per_line: Optional[int] = None,
+    line_break: Optional[str] = None,
+    gap: Optional[int] = None,
+) -> Dict[str, Any]:
     """Create subtitles from audio in the current timeline.
 
+    Mirrors Timeline.CreateSubtitlesFromAudio({autoCaptionSettings}) per docs lines 718-761.
+
     Args:
-        language: Language for captioning ('auto', 'english', 'french', etc.). Default: 'auto'.
-        preset: Caption preset ('default', 'teletext', 'netflix'). Default: 'default'.
+        language: 'auto', 'danish', 'dutch', 'english', 'french', 'german', 'italian',
+            'japanese', 'korean', 'mandarin_simplified', 'mandarin_traditional',
+            'norwegian', 'portuguese', 'russian', 'spanish', 'swedish'. Default: 'auto'.
+        preset: 'default', 'teletext', 'netflix'. Default: 'default'.
+        chars_per_line: Integer 1-60. Resolve default is 42 (or 16 for Netflix preset).
+        line_break: 'single' or 'double'. Default: 'single' on Resolve side.
+        gap: Integer 0-10. Default: 0 on Resolve side.
     """
+    r = get_resolve()
+    if r is None:
+        return {"error": "Not connected to DaVinci Resolve"}
     _, tl, err = _get_timeline()
     if err:
         return err
-    settings = {}
+    settings, settings_err = _build_subtitle_settings(
+        r, language=language, preset=preset,
+        chars_per_line=chars_per_line, line_break=line_break, gap=gap,
+    )
+    if settings_err:
+        return settings_err
     result = tl.CreateSubtitlesFromAudio(settings)
     return {"success": bool(result)}
 
-@mcp.tool()
+
+# Explicit: the verb heuristic has no rule for "detect", and this one restructures
+# the timeline by adding cuts. The compound server rates timeline_ai.detect_scene_cuts
+# destructive; this is the same Resolve call, so it carries the same hint.
+@mcp.tool(annotations=DESTRUCTIVE_TOOL)
+@granular_destructive_op()
 def timeline_detect_scene_cuts() -> Dict[str, Any]:
-    """Detect scene cuts in the current timeline."""
+    """Detect scene cuts in the current timeline. DESTRUCTIVE — adds cuts to the timeline."""
     _, tl, err = _get_timeline()
     if err:
         return err
     result = tl.DetectSceneCuts()
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_convert_to_stereo() -> Dict[str, Any]:
@@ -731,6 +914,7 @@ def timeline_convert_to_stereo() -> Dict[str, Any]:
         return err
     result = tl.ConvertTimelineToStereo()
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_get_node_graph() -> Dict[str, Any]:
@@ -743,6 +927,7 @@ def timeline_get_node_graph() -> Dict[str, Any]:
         return {"has_graph": True, "num_nodes": graph.GetNumNodes()}
     return {"has_graph": False}
 
+
 @mcp.tool()
 def timeline_analyze_dolby_vision() -> Dict[str, Any]:
     """Analyze Dolby Vision for the current timeline."""
@@ -751,6 +936,7 @@ def timeline_analyze_dolby_vision() -> Dict[str, Any]:
         return err
     result = tl.AnalyzeDolbyVision()
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def timeline_get_current_video_item() -> Dict[str, Any]:
@@ -763,9 +949,13 @@ def timeline_get_current_video_item() -> Dict[str, Any]:
         return {"name": item.GetName(), "unique_id": item.GetUniqueId(), "start": item.GetStart(), "end": item.GetEnd()}
     return {"item": None}
 
+
 @mcp.tool()
 def timeline_get_current_clip_thumbnail(width: int = 320, height: int = 180) -> Dict[str, Any]:
     """Get thumbnail image data for the current clip.
+
+    Switches to the Color page for the read (GetCurrentClipThumbnailImage only
+    returns data there) and restores the previous page after.
 
     Args:
         width: Thumbnail width. Default: 320.
@@ -774,10 +964,20 @@ def timeline_get_current_clip_thumbnail(width: int = 320, height: int = 180) -> 
     _, tl, err = _get_timeline()
     if err:
         return err
-    result = tl.GetCurrentClipThumbnailImage()
+    with color_page_for_thumbnails(resolve) as on_color:
+        result = tl.GetCurrentClipThumbnailImage()
     if result:
-        return {"success": True, "has_data": bool(result)}
-    return {"success": False}
+        return {"success": True, "has_data": True}
+    return {
+        "success": False,
+        "error": (
+            "No thumbnail available for the current clip"
+            if on_color
+            else "No thumbnail: GetCurrentClipThumbnailImage requires the "
+            "Color page and automatic switching failed (headless or page locked)"
+        ),
+    }
+
 
 @mcp.tool()
 def timeline_get_media_pool_item() -> Dict[str, Any]:
@@ -790,6 +990,7 @@ def timeline_get_media_pool_item() -> Dict[str, Any]:
         return {"name": mpi.GetName(), "unique_id": mpi.GetUniqueId()}
     return {"media_pool_item": None}
 
+
 @mcp.tool()
 def timeline_get_mark_in_out() -> Dict[str, Any]:
     """Get mark in/out points for the current timeline."""
@@ -799,7 +1000,9 @@ def timeline_get_mark_in_out() -> Dict[str, Any]:
     result = tl.GetMarkInOut()
     return result if result else {}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_set_mark_in_out(mark_in: int, mark_out: int) -> Dict[str, Any]:
     """Set mark in/out points for the current timeline.
 
@@ -813,7 +1016,9 @@ def timeline_set_mark_in_out(mark_in: int, mark_out: int) -> Dict[str, Any]:
     result = tl.SetMarkInOut(mark_in, mark_out)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def timeline_clear_mark_in_out() -> Dict[str, Any]:
     """Clear mark in/out points for the current timeline."""
     _, tl, err = _get_timeline()
@@ -823,22 +1028,59 @@ def timeline_clear_mark_in_out() -> Dict[str, Any]:
     return {"success": bool(result)}
 
 
-# ------------------
-# TimelineItem Tools (remaining)
-# ------------------
-
 @mcp.tool()
-def create_timeline_from_clips(name: str, clip_ids: List[str] = None) -> Dict[str, Any]:
+def create_timeline_from_clips(
+    name: str,
+    clip_ids: Optional[List[str]] = None,
+    clip_infos: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """Create a new timeline from specified media pool clips.
 
     Args:
         name: Name for the new timeline.
-        clip_ids: List of MediaPoolItem unique IDs to include. If None, uses selected clips.
+        clip_ids: Simple form — list of MediaPoolItem unique IDs to append end-to-end.
+        clip_infos: Positioned form — list of dicts with keys clip_id (or
+            media_pool_item_id), start_frame, end_frame, record_frame.
+            record_frame is relative to the created timeline start frame by
+            default; pass record_frame_mode="absolute" for raw Resolve values.
+        If both are None, uses the currently selected media pool clips.
     """
-    _, mp, err = _get_mp()
+    project, mp, err = _get_mp()
     if err:
         return err
-    if clip_ids:
+    if clip_infos is not None:
+        if not isinstance(clip_infos, list) or not clip_infos:
+            return {"error": "clip_infos must be a non-empty list"}
+        root = mp.GetRootFolder()
+        for i, ci in enumerate(clip_infos):
+            _, row_err = _build_create_clip_info_dict(root, ci, i)
+            if row_err:
+                return row_err
+        tl = mp.CreateEmptyTimeline(name)
+        if not tl:
+            return {"success": False, "error": "Failed to create timeline"}
+        if project:
+            # The appends below go to the CURRENT timeline, so this is a
+            # precondition for the whole build, not a convenience.
+            switched, switch_detail = set_current_timeline(project, tl)
+            if not switched:
+                return {"success": False,
+                        "error": describe_switch_failure(switch_detail,
+                                                         "appending the clip_infos"),
+                        "switch": switch_detail}
+        timeline_start = _timeline_start_frame(tl)
+        built = []
+        for i, ci in enumerate(clip_infos):
+            append_ci = dict(ci)
+            append_ci.setdefault("track_index", append_ci.get("trackIndex", 1))
+            row, row_err = _build_append_clip_info_dict(root, append_ci, i, timeline_start)
+            if row_err:
+                return row_err
+            built.append(row)
+        appended = mp.AppendToTimeline(built)
+        if not appended:
+            return {"success": False, "error": "Failed to append clip_infos to created timeline"}
+    elif clip_ids:
         root = mp.GetRootFolder()
         clips = []
         for cid in clip_ids:
@@ -857,3 +1099,50 @@ def create_timeline_from_clips(name: str, clip_ids: List[str] = None) -> Dict[st
         return {"success": True, "timeline_name": tl.GetName(), "timeline_id": tl.GetUniqueId()}
     return {"success": False, "error": "Failed to create timeline from clips"}
 
+
+@mcp.tool()
+@granular_destructive_op()
+def set_timeline_setting(setting_name: str, setting_value: str) -> Dict[str, Any]:
+    """Set a timeline setting value.
+
+    Args:
+        setting_name: Name of the timeline setting to set (e.g. 'useCustomSettings', 'timelineFrameRate',
+                      'timelineResolutionWidth', 'timelineResolutionHeight', 'timelineOutputResolutionWidth',
+                      'timelineOutputResolutionHeight', 'colorSpaceTimeline', 'colorSpaceOutput').
+        setting_value: Value to set for the setting (string).
+    """
+    _, tl, err = _get_timeline()
+    if err:
+        return err
+    result = tl.SetSetting(setting_name, setting_value)
+    return {"success": bool(result), "setting_name": setting_name, "setting_value": setting_value}
+
+
+@mcp.tool()
+def get_selected_timeline_items() -> Dict[str, Any]:
+    """Get the timeline items currently selected in the timeline (Resolve 21.0.4+).
+
+    Calls Timeline.GetSelectedClips() on the current timeline. An empty list
+    means nothing is selected — that is an answer, not a failure. (Distinct
+    from get_selected_clips, which reads the Media Pool selection.)
+    """
+    _, tl, err = _get_timeline()
+    if err:
+        return err
+    missing = _requires_method(tl, "GetSelectedClips", "21.0.4")
+    if missing:
+        return missing
+    items = tl.GetSelectedClips() or []
+    summaries = []
+    for item in items:
+        entry = {}
+        for getter, key in (("GetName", "name"), ("GetUniqueId", "unique_id"),
+                            ("GetStart", "start"), ("GetEnd", "end")):
+            method = getattr(item, getter, None)
+            if callable(method):
+                try:
+                    entry[key] = method()
+                except Exception:
+                    pass
+        summaries.append(entry)
+    return {"count": len(summaries), "items": summaries}

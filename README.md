@@ -1,692 +1,481 @@
 # DaVinci Resolve MCP Server
 
-[![Version](https://img.shields.io/badge/version-2.0.7-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
-[![API Coverage](https://img.shields.io/badge/API%20Coverage-100%25-brightgreen.svg)](#api-coverage)
-[![Tools](https://img.shields.io/badge/MCP%20Tools-26%20(342%20full)-blue.svg)](#server-modes)
-[![Tested](https://img.shields.io/badge/Live%20Tested-98.5%25-green.svg)](#test-results)
+English | [简体中文](README.zh-CN.md)
+
+[![Version](https://img.shields.io/badge/version-4.14.4-blue.svg)](https://github.com/samuelgursky/davinci-resolve-mcp/releases)
+[![npm](https://img.shields.io/npm/v/davinci-resolve-mcp.svg?label=npm&color=CB3837)](https://www.npmjs.com/package/davinci-resolve-mcp)
+[![API Coverage](https://img.shields.io/badge/API%20Coverage-100%25-brightgreen.svg)](docs/reference/api-coverage.md)
+[![Tools](https://img.shields.io/badge/MCP%20Tools-37%20(390%20full)-blue.svg)](#server-modes)
+[![Advanced](https://img.shields.io/badge/Advanced%20(offline)-18%20tools-blueviolet.svg)](#server-modes)
+[![Tested](https://img.shields.io/badge/Live%20Tested-93.6%25-green.svg)](docs/reference/api-coverage.md#test-results)
 [![DaVinci Resolve](https://img.shields.io/badge/DaVinci%20Resolve-18.5+-darkred.svg)](https://www.blackmagicdesign.com/products/davinciresolve)
-[![Python](https://img.shields.io/badge/python-3.10--3.12-green.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10+-green.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-A Model Context Protocol (MCP) server providing **complete coverage** of the DaVinci Resolve Scripting API. Connect AI assistants (Claude, Cursor, Windsurf) to DaVinci Resolve and control every aspect of your post-production workflow through natural language.
+A Model Context Protocol (MCP) server that lets AI assistants control DaVinci Resolve Studio through the official Scripting API. It provides full API coverage plus guarded workflow helpers for editing, media pool organization, render setup, review markers, grading, Fusion, Fairlight, project lifecycle tasks, extension authoring, and source-safe media analysis.
 
-### What's New in v2.0.7
+[![Local control panel](https://raw.githubusercontent.com/samuelgursky/davinci-resolve-mcp/main/docs/images/control-panel/01-overview.png)](docs/guides/control-panel.md)
 
-- **Security: path traversal protection for layout preset tools** — `export_layout_preset`, `import_layout_preset`, and `delete_layout_preset` now validate that resolved file paths stay within the expected Resolve presets directory, preventing path traversal via crafted preset names
-- **Security: document destructive tool risk** — added Security Considerations section noting that `quit_app`/`restart_app` tools can terminate Resolve; MCP clients should require user confirmation before invoking
+A local browser control panel ships with the server for inspecting Resolve state, running source-safe analysis, drilling into analyzed clips and shots, and editing analysis output inline. See the [Control Panel Guide](docs/guides/control-panel.md) for the full tour.
 
-### v2.0.6
+## Quick Start
 
-- **Fix color group operations crash** — `timeline_item_color` unpacked `_check()` as `(proj, _, _)` but `_check()` returns `(pm, proj, err)`, so `proj` got the ProjectManager instead of the Project, crashing `assign_color_group` and `remove_from_color_group`
+```bash
+npx davinci-resolve-mcp setup
+```
 
-### v2.0.5
+Before connecting, open DaVinci Resolve Studio and set **Preferences > General > External scripting using** to **Local**. (On the **free edition** that preference does not help — see [Free edition](#free-edition-in-app-bridge) below.) The npm launcher installs a managed copy under your user application-data directory, then runs the universal Python installer. The installer creates a virtual environment, detects Resolve paths, and can configure Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Zed, Continue, Cline, Roo Code, OpenCode, Codex CLI, and JetBrains IDEs.
 
-- **Lazy connection recovery** — full server (`--full` mode) now auto-reconnects and auto-launches Resolve, matching the compound server behavior
-- **Null guards on all chained API calls** — `GetProjectManager()`, `GetCurrentProject()`, `GetCurrentTimeline()` failures now return clear errors instead of `NoneType` crashes
-- **Helper functions** — `get_resolve()`, `get_project_manager()`, `get_current_project()` replace 178 boilerplate blocks
+For source installs:
 
-### v2.0.4
+```bash
+git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
+cd davinci-resolve-mcp
+python install.py
+```
 
-- **Fix apply_grade_from_drx parameter** — renamed `mode` to `grade_mode` to match Resolve API; corrected documentation from replace/append to actual keyframe alignment modes (0=No keyframes, 1=Source Timecode aligned, 2=Start Frames aligned)
-- **Backward compatible** — still accepts `mode` for existing clients, `grade_mode` takes precedence
+For platform paths, client-specific config, and manual setup, see [Installation and Configuration](docs/install.md).
 
-### v2.0.3
+The installer and server check the latest GitHub release for MCP updates. Checks are best-effort and throttled; the server never blocks MCP startup for a prompt. The installer can prompt, snooze, ignore a release, disable checks, or apply an opt-in safe auto-update for clean git checkouts.
 
-- **Fix GetNodeGraph crash** — `GetNodeGraph(0)` returns `False` in Resolve; now calls without args unless `layer_index` is explicitly provided
-- **Falsy node graph check** — guard checks `not g` instead of `g is None` to catch `False` returns
+## Free edition (in-app bridge)
 
-### v2.0.2
+Blackmagic gates *external* scripting to Studio: on the free edition
+`scriptapp("Resolve")` refuses a foreign process, whatever the preference says.
+Through Resolve 21.0.x the **Workspace ▸ Scripts** menu was not gated — a script
+launched from it is handed the live `resolve` object (measured on free 21.0.3.7) —
+so the server can reach the free edition through a small script that runs *inside*
+Resolve and re-exports it over an authenticated loopback listener. **Resolve 21.1
+moved Python scripting to Studio.** On free 21.1 the Scripts menu no longer lists
+`.py` files at all (reported on Fedora 44 in #203; a Lua script in the same folder
+lists normally). Whether the Console still runs Python there is unconfirmed, so
+treat the bridge as a 21.0.x path until that is measured.
 
-- **Antigravity support** — Google's agentic AI coding assistant added as 10th MCP client
-- **Alphabetical client ordering** — MCP_CLIENTS list sorted for easier maintenance
+```bash
+python scripts/install_resolve_bridge.py
+# restart Resolve, open a project, then: Workspace > Scripts > resolve_bridge
+```
 
-### v2.0.1
+The installer and MCP client use `~/.config/davinci-resolve-mcp/bridge.json`
+by default. To keep the authenticated bridge config elsewhere, set
+`DAVINCI_RESOLVE_BRIDGE_CONFIG` while running the installer and in the MCP
+client environment; both sides will use that path.
 
-- **26-tool compound server** — all 324 API methods grouped into 26 context-efficient tools (default)
-- **Universal installer** — single `python install.py` for macOS/Windows/Linux, 10 MCP clients
-- **Dedicated timeline_item actions** — retime/speed, transform, crop, composite, audio, keyframes with validation
-- **Lazy Resolve connection** — server starts instantly, connects when first tool is called
-- **Bug fixes** — CreateMagicMask param type, GetCurrentClipThumbnailImage args, Python 3.13+ warning
+Once that listener is running it is used **automatically** whenever external
+scripting is unavailable — no environment variable required. Setting
+`DAVINCI_RESOLVE_BRIDGE=1` *forces* the bridge instead: it becomes the only
+transport tried, so a bridge that stops answering reports its own fault rather
+than quietly falling back to another transport. Use it when the bridge is the
+path you intend to depend on.
+
+On **macOS**, Resolve looks for Python 3 in exactly two places: the
+`PYTHON3HOME` environment variable, then `/usr/local/bin/python3`. Homebrew,
+pyenv, uv and conda land in neither, so the script silently never appears in the
+menu. A python.org install works because its installer creates
+`/usr/local/bin/python3` — but you do not need one: point Resolve at the
+interpreter you already have, no `sudo` required.
+
+```bash
+launchctl setenv PYTHON3HOME "$(python3 -c 'import sys; print(sys.prefix)')"
+```
+
+Use `launchctl setenv`, not `export` — Resolve is launched from the Dock and
+never sees your shell's environment. Restart Resolve afterwards. A Lua canary is
+installed alongside so you can tell "Python not detected" apart from a wrong
+folder.
+
+Two things that bite (#182). The prefix must contain **both**
+`lib/libpython3.X.dylib` and `bin/python3` under that exact **unversioned**
+name — Homebrew's framework builds often ship only `bin/python3.13`, which is
+half a Python as far as Resolve is concerned, and the installer's preflight now
+says so instead of reporting a usable prefix. And `launchctl setenv` **does not
+survive a reboot**; if scripts stop listing weeks later with no error, that is
+why. For something persistent, put an interpreter where Resolve already looks
+(this one needs `sudo`, and check that `/usr/local/bin` does not precede your
+normal Python on `PATH`):
+
+```bash
+sudo ln -s "$(command -v python3)" /usr/local/bin/python3
+```
+
+Validated on free 21.0.3.7 and Studio 19.1.3.7, both macOS. The Windows paths
+added in v2.70.1 (issue #106) shipped unverified; reports on free 21.0.1.11
+(issue #109) and free 21.0.3.7 (issue #112) have since shown the bridge
+installing, listing and serving from **both** `%PROGRAMDATA%` and `%APPDATA%` on
+Windows 11, so those paths are now confirmed rather than assumed. Linux is
+confirmed as well: a report on free 20.3.2.9 (issue #129, Fedora 43) shows the
+bridge installing to `~/.local/share/DaVinciResolve/Fusion/Scripts/Utility`,
+listing against the system Python — Linux has none of this discovery problem —
+and serving end-to-end. No platform now rests on an assumption: macOS was
+validated directly, Windows and Linux on user reports.
+
+Note that the bridge holds its port for as long as it serves. Before v2.70.3 a
+Windows bridge could outlive Resolve and block the next session's listener; if
+you are on an older build and a bridge stops answering, check for a stale
+`fuscript.exe` still holding the port.
+
+This is the documented in-app path, not a licence circumvention, but Blackmagic
+could close it — treat it as a supported-until-it-is-not tier. Loopback only,
+HMAC-signed requests, one-use nonces.
+
+## Local Control Panel
+
+Launch the single-user local control panel from the repository root:
+
+```bash
+venv/bin/python -m src.control_panel
+```
+
+The command starts a loopback-only server and opens the control panel in your browser at a URL that carries a per-launch access token (`http://127.0.0.1:8765/#token=…`) — use that exact URL; the panel refuses requests without it. To have an AI coding agent do this, ask: **"Open the Resolve MCP control panel for this repo."** Agents should use `venv/bin/python -m src.control_panel` unless your Python environment is already active. Persisted analysis jobs refresh the local search index automatically after successful slices; the manual Build Index action is for rebuilding from existing reports.
+
+## Server Modes
+
+| Mode | Entry point | Tools | Best for |
+|------|-------------|-------|----------|
+| Compound | `src/server.py` | 37 | Default mode for most assistants. Related Resolve operations are grouped behind action parameters to keep context usage low. |
+| Full / granular | `src/server.py --full` or `src/resolve_mcp_server.py` | 390 | Power users who want one MCP tool per Resolve API method. |
+
+The compound server is recommended unless you specifically need the granular one-tool-per-method surface.
+
+### Advanced server — beyond the scripting API (optional, Node)
+
+The same package ships a second, optional MCP server: **`davinci-resolve-advanced-mcp`** (bin
+`bin/davinci-resolve-advanced-mcp.mjs`). Where the Python server drives a *live* Resolve over the
+sanctioned scripting API, the advanced server does what the API **can't** — it reads and edits Resolve
+**files** (`.drp` / `.drt` / `.drx`) and applies DB/XML-level changes **with no Resolve running**, so it
+runs cloud *or* local. 18 tools: `drp`, `drt`, `drx` (per-clip grade codec **plus a deterministic,
+offline grading/QC catalog** — within-camera + cross-camera skin (v2 skin-line metric) + b-roll +
+neutral-patch WB matching, match-to-reference, saturation/black-balance, contrast-normalize, ASC CDL
+import, lossless grade-transfer + season-look authoring, named-LUT attach, scope reads + intent tags,
+verify-grade, display-referred frame extraction, broadcast-legal QC), `offline_ref`,
+`conform` (frame-oracle conform/relink QC + lineage), `color_trace` (carry grades across a re-conform),
+`fusion`, `audio_plan`, `fairlight` (bus routing), `audio`, `project_read`, `project_db`, `pipeline`
+(a **DB-as-truth pipeline**: compile YAML project specs into a canonical SQLite DB, then run stages with
+gates, provenance, and intent↔actual drift detection), `capabilities`, `deliverable` (deliverable QC /
+compliance), `media` (media front-end / AE ingest), `editorial` (editorial integrity / changelist),
+`provenance` (provenance / audit / episode report). It can also be consumed **as a
+library** (importable engine API), not just spawned as a server.
+
+DRX grade writes are **live-calibrated against Resolve Studio**: grade params take Resolve's
+on-screen panel units by default (`space: 'ui' | 'drx'`), and the structural writes (power windows,
+qualifiers, HDR zones, HSL curves, ColorSlice, blur/key/motion-effects) are panel-readback-verified —
+per-control status in `resolve-advanced/vendor/drx-parameters/CALIBRATION-STATUS.md`. It also closes
+a UI-only gap: **programmatic "Cleanup Node Graph"** (`drx` `relayout` for one clip, `project_db`
+`relayout_node_graphs` for a whole project) — node layout tidied, grade content byte-preserved.
+
+Add it alongside the live server (both ship in one `npm install`):
+
+```json
+{
+  "mcpServers": {
+    "davinci-resolve": { "command": "<python>", "args": ["<path>/src/server.py"] },
+    "davinci-resolve-advanced": { "command": "node", "args": ["<path>/bin/davinci-resolve-advanced-mcp.mjs"] }
+  }
+}
+```
+
+`install.py` prints both entries. The core is pure-JS/MIT with no required native modules; a few features
+need user-installed tools (ffmpeg for `audio`, `sharp`/`better-sqlite3` for some paths) — call the
+`capabilities` tool for live status and install hints.
+
+Unlike the Python server, this one has Node dependencies. `npx davinci-resolve-mcp setup` installs them
+into the managed install (`npm install --omit=dev --omit=optional` under `resolve-advanced/`) and only
+then registers the bin. If that install could not run — offline, or npm unavailable — setup registers
+an `npx` command for the advanced server instead, so the entry it writes always boots. To repair an
+existing install without re-running setup: `npx davinci-resolve-mcp sync`.
+
+### Bradford Post Assistant — managed application (closed beta)
+
+The maintainers also build **Bradford Post Assistant**, a desktop application on top of this
+open foundation. Where the MCP servers give an agent hands, Post Assistant is the working
+copilot around them — an on-device AI assistant for post-production where client material
+never leaves the workstation:
+
+- **A post-production copilot** — a desktop app that sits alongside DaVinci Resolve and
+  watches the session live (timeline, grades, and frames — not just API calls), with an
+  embedded AI assistant and agent runtime, local media analysis (transcription, frame
+  analysis, editorial intelligence), and in-app conform QC.
+- **Memory** — persistent, encrypted on-device assistant memory plus cross-episode learning
+  mined from your pipeline's decoded facts (season-look drift, per-camera correction priors,
+  hero-frame libraries, conform path-map reuse), with accumulation managed for you and a
+  reviewed-insight workflow.
+- **Self-contained by design** — Post Assistant wires everything itself: this MCP for
+  Resolve control, the Bradford API for its extended services, and your choice of LLM
+  provider. Nothing to configure by hand, no separate clients to manage, and the app keeps
+  itself (and its bundled MCP) current with signed auto-updates.
+- **An extended professional toolset** — grade surgery on live projects, 22+ adaptive grade
+  families, a curated looks library, delivery-spec validation, editorial pacing/cleanup
+  analysis, natural-language color direction, and Fusion composition authoring — delivered
+  through the managed Bradford API.
+- **Production workflows** — the raw tools composed into finished, real-world flows
+  (turnover → conform → QC → delivery, season-look carry, episode reporting) with the
+  guardrails and approvals a client-facing shop expects.
+
+It is currently in **closed beta** — you can request access at
+[bradfordoperations.com/software/post-assistant](https://www.bradfordoperations.com/software/post-assistant).
+The open-source servers are complete and fully functional on their own.
+
+## What You Can Do
+
+```text
+"List all projects and open the one called 'My Film'"
+"Create a timeline called 'Assembly Cut' from all clips in the current bin"
+"Build a multicam prep timeline from selected camera angles and preserve source media"
+"Detect 2-pops or slate claps and suggest record offsets for sync prep"
+"Publish analysis summaries, keywords, people, and slate hints into Resolve clip metadata"
+"Probe this timeline for gaps, overlaps, missing media, and source frame ranges"
+"Safely import this image sequence, organize it into bins, and normalize clip metadata"
+"Build a ProRes 422 HQ render plan, validate the settings, and queue the job"
+"Copy review markers from the timeline to the selected clip and export a review report"
+"Snapshot this clip's grade, validate a CDL update, and export a temp LUT"
+"Create a Fusion TextPlus overlay on the selected clip and verify graph connections"
+"Report audio channel mappings, voice isolation availability, and subtitle support"
+"Install this MCP-marked DCTL or script, classify refresh/restart needs, then remove it"
+```
+
+## Core Capabilities
+
+| Area | What the compound server supports |
+|------|-----------------------------------|
+| App and project control | Launch/reconnect, page switching, project CRUD, project folders, databases, cloud project wrappers, settings, presets, archives |
+| Media pool and ingest | Safe import, image sequences, multicam prep timelines, bin organization, metadata normalization, metadata field inventory, marks, annotations, relink/proxy/full-resolution guards |
+| Media analysis | Source-safe file/clip/bin/project analysis, 2-pop/slate-clap sync-event detection, default Resolve metadata and Media Pool marker writeback, persisted analysis artifacts, existing-report reuse, host_chat_paths visual analysis (finalized per clip with `commit_vision`, works with any vision-capable MCP client) with opt-out, transcription with opt-out |
+| Timeline editing and conform | Track/item probing, title text key scans/writes, copy/move/duplicate helpers, ripple insert, range operations, gaps/overlaps, source ranges, checked interchange exports/imports |
+| Review annotations | Timeline/item/clip markers, custom data, flags, clip color, copy/move/sync cleanup, review reports, marker thumbnail review |
+| Color and grading | Node graph probing, CDL validation, grade copy, DRX/LUT helpers, versions, Gallery stills, color groups |
+| Fusion | Timeline-item comps, safe tool creation, input writes, port inspection, validated connections, scoped bulk writes |
+| Audio and Fairlight | Track/item probes, source mapping, guarded audio property writes, voice isolation, auto-sync planning, transcription/subtitle probes |
+| Render and deliver | Format/codec matrix probing, render settings validation, queued job lifecycle checks, guarded Quick Export |
+| Extension authoring | Fuse, DCTL, ACES DCTL, and Resolve-page Lua/Python script lifecycle helpers with safe MCP-marked install/remove |
+| Craft guidance | The bundled editorial, colour, audio, and workflow guidance served as prose over MCP — indexed, searchable, and readable by any client, not just ones with this repository on disk |
+
+### Operation envelope
+
+Every compound tool return carries an `_operation` block beside its payload, so
+an agent reads one shape instead of a different key per tool: `status`
+(`success` / `partial` / `blocked` / `failed`), `verification` (with
+`contradiction` kept distinct — Resolve reported success and the readback
+disagreed), `changes` (the semantic delta), `warnings`, and an `execution_id`.
+
+Two absences are meaningful and deliberate. `verification.status: "unverified"`
+means *no evidence was reported*, not "checked and clean". A missing `changes`
+means the action did not report a delta, not that nothing changed — an empty
+`{}` there would be a confident, wrong answer about an edit that simply never
+declared one.
+
+The envelope is namespaced rather than merged into the top level because
+`status`, `operation`, `warnings`, `result` and `changes` are all already domain
+keys here; flattening would rewrite a background job's `status: "done"` and a
+confirm gate's `status: "confirmation_required"`. `setup(action="set_defaults",
+params={"result_envelope": "pure" | "legacy"})` changes the shape, per call via
+`params={"envelope": ...}`, per process via `RESOLVE_MCP_RESULT_ENVELOPE`.
+
+### Agent execution traces ("Why did the editor do this?")
+
+Multi-step AI operations correlate across tool calls into unified execution
+traces. Each trace aggregates tool durations (`duration_ms`), call counts, cumulative
+semantic deltas (`items_deleted`, `items_added`), and readback verifications.
+Agents and editors can inspect workflows via `resolve_control`:
+`get_execution_trace(execution_id?)`, `list_recent_executions()`, or open a
+scoped execution with `begin_execution(request="...")` / `end_execution()`.
+`export_execution_report(execution_id?, format="markdown"|"json")` writes a
+reviewable audit artifact with the same summary, defaulting to
+`logs/execution-reports/<execution_id>.md`. `path` writes it anywhere you want
+it instead — alongside a conform in a dated TransferFiles folder, say — and
+creates the directories to get there, so check the path before you send it.
+An existing file is never replaced without `overwrite: true`.
+`inspect_operation(tool?, target_action?, target_params?)` evaluates pre-flight
+risk level (`low`, `medium`, `high`, `critical`), destructive potential, and blast
+radius (`item`, `track`, `timeline`, `project`, `system`) before taking action, while
+`list_lifecycle_hooks()` inspects active execution interceptors.
+
+It is a heuristic over action names, not a simulation — it never touches the
+project and does not validate your parameters, so `recognised: false` means the
+levels are defaults rather than a finding, and `snapshot_available: null` means
+rollback availability was not determined rather than absent. Every shipped hook
+observes; none replaces a tool's result, so `dry_run` always reaches the real
+handler and nothing synthesises a preview for an action that has none.
+
+A report for a run where nothing was verified says **"not established — no
+checks recorded"**, not "passed". Absence of evidence is a question still open,
+and an audit document is the last place to let a reader read it as an all-clear.
+
+Traces live in a 100-entry in-memory ring and are appended to
+`logs/execution-traces.jsonl` beside `server.log` — `RESOLVE_MCP_TRACE_FILE`
+moves it, and `RESOLVE_MCP_LOG_FILE` moves `server.log` itself (a path, or empty
+for no file; the offline test suite points it at a temporary file so it never
+writes into the operator's log). `list_recent_executions` reports that path and whether it is
+writable, so "the log is empty" and "nothing is being written" are
+distinguishable without reading the source. What is recorded is tool name,
+action, timing, status, semantic deltas and verification — no parameters and no
+file paths. The one free-text field is the `request` you pass to
+`begin_execution`, so treat it the way you would a commit message on a client
+project.
+
+## Verified-Trap Guard
+
+`src/utils/api_truth.py` records behaviours of the Resolve API that were measured
+against a live build rather than read off a signature — calls that return `True`
+having done nothing, settings keys silently rejected, methods that are not there
+at all. That ledger used to be **pull-only**: it answered
+`resolve_control(action="api_truth")` and was otherwise a file nobody greps in
+the middle of a job.
+
+It now reaches the caller at the callsite. An action mapped to a symbol with a
+recorded fact carries a compact `known_limitation` on its result — symbol,
+reality, recommendation, and nothing else, because response weight is a real cost
+on a long grading session and the full entry is one lookup away.
+
+A fact is only attached when the mapping names that exact symbol. Nothing is
+inferred from a similar name: an unrelated explanation stapled to a failure reads
+as a diagnosis, and a wrong diagnosis is worse than none.
+
+**One behaviour refuses rather than warns.** `TimelineItem.CopyGrades` replaces
+the target's grade wholesale — measured by baking each state to a 33-point LUT
+and comparing bytes — returns `True` while doing it, and creates no version to go
+back to. Applied to clips carrying hand-work, that is unrecoverable loss reported
+as success. So actions that call it refuse until the caller passes
+`acknowledge_trap: true`:
+
+```json
+{
+  "success": false,
+  "error": "'timeline_item_color.copy_grades' is refused: its verified behaviour destroys existing work that cannot be recovered afterwards.",
+  "known_limitation": [{"symbol": "TimelineItem.CopyGrades", "reality": "...", "recommended": "..."}],
+  "retry_with": {"acknowledge_trap": true}
+}
+```
+
+The intent is not to forbid the operation — it is to make the caller say out loud
+that they know what it does. Dry runs are exempt: a preview destroys nothing.
+
+Set `RESOLVE_MCP_DISABLE_TRAP_GUARD=1` to turn both the refusal and the advisory
+push off. This is a behaviour change for callers that previously received a bare
+`{"success": true}` from a destructive copy.
+
+Facts that power a refusal must stay re-measurable, so a live probe re-derives
+each one and records `drifted` when Resolve stops agreeing; a test fails if a
+`destroys_prior_work` entry has no probe.
+
+## Optional Extras
+
+The core install is deliberately small: Python, ffmpeg, and the Resolve scripting
+API. Some features need more, and **each one refuses honestly with its own
+install line rather than degrading into a guess** — a fabricated tempo or an
+invented level produces confident, wrong output, which is worse than no feature.
+
+Run `python scripts/doctor.py` to see which of these you have.
+
+| Extra | Unlocks | Licence |
+|---|---|---|
+| **ffmpeg** on PATH | Silence detection, dead-space markers, level measurement, audio analysis. The single most useful thing to install. | LGPL/GPL — invoked as a subprocess, never bundled |
+| `pip install numpy` | Colour pre-balance, reference-still matching, sound-density audit | BSD |
+| `pip install librosa` | Beat, bar and phrase detection for music-driven cutting | ISC |
+| `pip install -U openai-whisper` | Transcription, and everything word-level built on it | MIT |
+| `pip install open_clip_torch` | Visual similarity and `find_similar` | MIT |
+| `pip install transformers` | CLAP audio embeddings | Apache-2.0 |
+| `pip install opencv-python` | Additional frame analysis | Apache-2.0 |
+
+`media_analysis` action `capabilities` reports the analysis stack in detail and
+tells you what each missing piece would enable.
+
+**Nothing here is bundled.** Model weights carry their own licences separate from
+the code that loads them; check them before commercial use.
+
+## What This Does Not Do
+
+Knowing where a tool stops is worth as much as knowing what it does, and it is
+cheaper to read it here than to discover it mid-project.
+
+| Not supported | Why, and what you get instead |
+|---|---|
+| **Choosing the best take** | Performance is most of what makes a take right, and none of it is measurable from a waveform or a transcript. `rank_takes` ranks *fluency* — fillers, restarts, script coverage — and says so in every response. The take that plays is regularly the least fluent one, because the hesitation is often the acting. Use it to find the clean safety take, not to choose the read. |
+| **Automatic music editing** | Optional `librosa` support provides beat detection and beat/bar/phrase cut-point plans, not a finished assembly. Downbeats are inferred from the first beat; use `beat_offset` for pickups. Speech-silence tools are unsuitable for finding musical edit points. |
+| **Judging a cut** | Nothing here has an opinion about whether an edit is good. Every destructive action is plan → review → confirm for that reason. |
+| **Replacing an editor** | The output is a first-pass assembly, in the assistant-editor sense: ingest, sync, organize, string out, flag problems. It is a starting point you cut, not a finished cut. Defaults are deliberately **generous** — a first assembly is supposed to run long, because trimming is fast and visible while recovering discarded material is slow and invisible. |
+| **Modifying your source media** | By design and without exception — see below. |
+
+Anything analyzed but unverifiable is reported as unverified, never folded into
+"fine". An empty result means "nothing found", never "nothing to find".
+
+## Source Media Safety
+
+This project treats camera originals and source media as immutable. Analysis tools read source files and write reports only to sidecar, scratch, or project analysis directories; confirmed metadata publishing writes only to Resolve's project database. The server must not modify, transcode, proxy, or create derivatives of source media unless the user explicitly asks for that. See [Media Analysis Guide](docs/guides/media-analysis-guide.md) for the detailed source-safe workflow.
+
+## Security Posture
+
+The default server is a local stdio process launched by your MCP client; it does not expose a network listener or built-in multi-user auth surface. The two opt-in local HTTP surfaces — the control panel and the networked MCP transport — bind loopback only and require a per-launch bearer token on every request, with Host/Origin checks against DNS rebinding and CSRF. Tool metadata includes MCP client-safety hints for read-only, destructive, idempotent, and external-resource operations. Destructive writes on both servers honour `destructive.safe_mode` and the security audit log; only the compound server archives a timeline before mutating it — granular writes are refused or recorded, never recovered. See [Security Policy](SECURITY.md) for operational boundaries, confirmation guidance, and vulnerability reporting.
 
 ## Key Stats
 
 | Metric | Value |
 |--------|-------|
-| MCP Tools | **26** compound (default) / **342** granular |
-| API Methods Covered | **324/324** (100%) |
-| Methods Live Tested | **319/324** (98.5%) |
-| Live Test Pass Rate | **319/319** (100%) |
-| API Object Classes | 13 |
-| Tested Against | DaVinci Resolve 19.1.3 Studio |
+| MCP Tools | **37** compound / **390** granular (live server) |
+| Advanced (offline) tools | **18** — .drp/.drt/.drx + DB authoring, no Resolve running |
+| Kernel Actions | **136** guarded workflow actions across 9 compound tools |
+| API Methods Covered | **361/361** (100%) |
+| Methods Live Tested | **338/361** (93.6%) |
+| Live Test Pass Rate | **338/338** (100%) |
+| Tested Against | DaVinci Resolve 19.1.3 Studio + Resolve 20.3.2 Studio + Resolve 21.0.2 Studio + Resolve 21.0.3 **free** (via the in-app bridge) |
 
-## API Coverage
+For method-by-method status, see [API Coverage and Test Results](docs/reference/api-coverage.md). For current workflow support, see [Kernel Action Coverage](docs/kernels/README.md).
 
-Every non-deprecated method in the DaVinci Resolve Scripting API is covered. The default compound server exposes **26 tools** that group related operations by action parameter, keeping LLM context windows lean. The full granular server provides **342 individual tools** for power users. Both modes cover all 13 API object classes:
+`analyze_media` executes directly by default, persists inspectable reports/artifacts under the analysis root, requests host-chat visual analysis via the `host_chat_paths` protocol (analyze returns absolute frame paths + a JSON schema; the host chat reads each frame as an image and calls `media_analysis(action="commit_vision", ...)` to finalize), runs transcription through the configured local backend, and writes analysis summaries plus source-time Media Pool clip markers back to the Resolve project. Pass `include_visuals=false`, `include_transcription=false`, `publish_metadata=false`, `timed_markers=no`, or `dry_run=true` only when you want to opt out of those default behaviors. Skipping `commit_vision` leaves the run in `pending_host_vision_analysis` — surfaced as a failure mode, not silently downgraded.
 
-| Class | Methods | Tools | Description |
-|-------|---------|-------|-------------|
-| Resolve | 21 | 21 | App control, pages, layout presets, render/burn-in presets, keyframe mode |
-| ProjectManager | 25 | 25 | Project CRUD, folders, databases, cloud projects, archive/restore |
-| Project | 42 | 42 | Timelines, render pipeline, settings, LUTs, color groups |
-| MediaStorage | 9 | 9 | Volumes, file browsing, media import, mattes |
-| MediaPool | 27 | 27 | Folders, clips, timelines, metadata, stereo, sync |
-| Folder | 8 | 8 | Clip listing, export, transcription |
-| MediaPoolItem | 32 | 32 | Metadata, markers, flags, properties, proxy, transcription |
-| Timeline | 56 | 56 | Tracks, markers, items, export, generators, titles, stills, stereo |
-| TimelineItem | 76 | 76 | Properties, markers, Fusion comps, versions, takes, CDL, AI tools |
-| Gallery | 8 | 8 | Albums, stills, power grades |
-| GalleryStillAlbum | 6 | 6 | Stills management, import/export, labels |
-| Graph | 11 | 22 | Node operations, LUTs, cache, grades (timeline + clip graph variants) |
-| ColorGroup | 5 | 10 | Group management, pre/post clip node graphs |
+## Documentation
+
+| Document | Use it for |
+|----------|------------|
+| [Installation and Configuration](docs/install.md) | Requirements, installer options, supported clients, server modes, manual config |
+| [API Coverage and Test Results](docs/reference/api-coverage.md) | Key stats, API coverage table, live-test status, full method reference |
+| [Kernel Action Coverage](docs/kernels/README.md) | Current guarded workflow action map |
+| [AI Skill Reference](docs/SKILL.md) | Operational context for AI assistants using the compound server |
+| [Control Panel Guide](docs/guides/control-panel.md) | Local browser panel tour: Overview, Review (bin/clip/shot), Analyze, Setup, Preferences |
+| [Media Analysis Guide](docs/guides/media-analysis-guide.md) | Source-safe FFprobe, FFmpeg, Whisper, sidecar, and analysis-root workflows |
+| [Multicam Setup Helper Guide](docs/guides/multicam-setup-guide.md) | Stacked timeline prep, helper/API boundary, and Resolve UI conversion steps |
+| [Editorial Decision Guide](docs/guides/editorial-decision-guide.md) | Project-owned editorial craft guidance for analysis and timeline decisions |
+| [Conforming an Avid AAF](docs/guides/conforming-an-avid-aaf.md) | Why all three Resolve-native routes fail on a consolidated turnover, and which one is dangerous |
+| [Native .drt Authoring](docs/guides/native-drt-authoring.md) | Offline template-spliced timeline authoring: cuts, retimes, transitions, fades, markers, compounds — and the measured laws behind them |
+| [Headless Edit Loop](docs/guides/headless-edit-loop.md) | Driving Resolve from the command line: which interchange formats relink and round-trip, measured in GUI and -nogui |
+| [Color Decision Guide](docs/guides/color-decision-guide.md) | Project-owned color correction guidance and Resolve color API boundaries |
+| [Contributing and Project Layout](docs/contributing.md) | Contribution workflow, platform support, security notes, repository structure |
+| [Security Policy](SECURITY.md) | Local stdio trust boundary, tool metadata, confirmation guidance, reporting |
+| [Release Process](docs/process/release-process.md) | Maintainer release checklist, version surfaces, validation, tags, and release notes |
+| [Changelog](CHANGELOG.md) | Historical release notes |
+
+Extension authoring references live in [docs/authoring](docs/authoring/). Resolve developer-package notes live in [docs/notes](docs/notes/) and [docs/integrations](docs/integrations/). Prompt recipes live in [examples](examples/).
 
 ## Requirements
 
-- **DaVinci Resolve Studio** 18.5+ (macOS, Windows, or Linux) — the free edition does not support external scripting
-- **Python 3.10–3.12** recommended (3.13+ may have ABI incompatibilities with Resolve's scripting library)
-- DaVinci Resolve running with **Preferences > General > "External scripting using"** set to **Local**
+- DaVinci Resolve 18.5+ on macOS, Windows, or Linux. **Studio** supports external scripting directly. The **free edition** does not — Blackmagic gates external scripting to Studio — but it is still reachable through the [in-app bridge](#free-edition-in-app-bridge), which runs inside Resolve from the ungated **Workspace ▸ Scripts** menu.
+- Python 3.10+ (3.10-3.12 is the lowest-risk range). Python 3.13/3.14 also work on recent Resolve builds (verified on Studio 20.3.2); older builds may fail to connect on 3.13+, in which case use 3.10-3.12.
+- Resolve external scripting set to **Local** (Studio). On the free edition this
+  preference has no effect — use the [in-app bridge](#free-edition-in-app-bridge)
+  instead.
 
-## Quick Start
+Resolve 19.1.3 remains the compatibility baseline. Resolve 20.x scripting calls are additive, version-guarded, and live-tested on 20.3.2. Resolve 21.0 scripting additions (audio classification, speaker-detection transcription, IntelliSearch, slate analysis, motion-deblur, speech generation, session background-task control) are exposed behind runtime capability detection, so they stay inert on older builds and activate automatically on Resolve 21+. They are live-tested on Studio 21.0.2.4 — see the [Resolve 21 delta](docs/reference/api-coverage.md#resolve-21-delta-detail). Note that `AnalyzeForIntellisearch`, `AnalyzeForSlate` and `GenerateSpeech` each require a separately-downloaded AI Extras pack, and Resolve reports a missing pack inconsistently (some return `False`, others an error string), so these actions report `success: false` with the Resolve-supplied reason rather than guessing.
 
-```bash
-# Clone the repository
-git clone https://github.com/samuelgursky/davinci-resolve-mcp.git
-cd davinci-resolve-mcp
+## Reporting Bugs and Requesting Features
 
-# Make sure DaVinci Resolve is running, then:
-python install.py
-```
+Tell your assistant "send this as a bug" or "send this as a feature request". It
+drafts a GitHub issue from the conversation, including the failing call and
+its error, and attaches the server version, Resolve build, connection mode and
+OS. Local paths, your username and anything that looks like a secret are
+redacted. Nothing is filed for you: you get a prefilled link, review the
+draft, and submit it on GitHub yourself. You can also
+[open an issue](https://github.com/samuelgursky/davinci-resolve-mcp/issues/new/choose)
+directly.
 
-The universal installer auto-detects your platform, finds your DaVinci Resolve installation, creates a virtual environment, and configures your MCP client — all in one step.
-
-### Supported MCP Clients
-
-The installer can automatically configure any of these clients:
-
-| Client | Config Written To |
-|--------|-------------------|
-| Claude Desktop | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) |
-| Claude Code | `.mcp.json` (project root) |
-| Cursor | `~/.cursor/mcp.json` |
-| VS Code (Copilot) | `.vscode/mcp.json` (workspace) |
-| Windsurf | `~/.codeium/windsurf/mcp_config.json` |
-| Cline | VS Code global storage |
-| Roo Code | VS Code global storage |
-| Zed | `~/.config/zed/settings.json` |
-| Continue | `~/.continue/config.json` |
-| JetBrains IDEs | Manual (Settings > Tools > AI Assistant > MCP) |
-
-You can configure multiple clients at once, or use `--clients manual` to get copy-paste config snippets.
-
-### Installer Options
+## Development
 
 ```bash
-python install.py                              # Interactive mode
-python install.py --clients all                # Configure all clients
-python install.py --clients cursor,claude-desktop  # Specific clients
-python install.py --clients manual             # Just print the config
-python install.py --dry-run --clients all      # Preview without writing
-python install.py --no-venv --clients cursor   # Skip venv creation
+python src/server.py          # Compound server
+python src/server.py --full   # Granular server
+venv/bin/python tests/test_import.py
+venv/bin/python scripts/audit_api_parity.py
 ```
 
-### Server Modes
-
-The MCP server comes in two modes:
-
-| Mode | File | Tools | Best For |
-|------|------|-------|----------|
-| **Compound** (default) | `src/server.py` | 26 | Most users — fast, clean, low context usage |
-| **Full** | `src/resolve_mcp_server.py` | 342 | Power users who want one tool per API method |
-
-The compound server's `timeline_item` tool includes dedicated actions for common workflows:
-
-| Category | Actions | Parameters |
-|----------|---------|------------|
-| **Retime** | `get_retime`, `set_retime` | process (nearest, frame_blend, optical_flow), motion_estimation (0-6) |
-| **Transform** | `get_transform`, `set_transform` | Pan, Tilt, ZoomX/Y, RotationAngle, AnchorPointX/Y, Pitch, Yaw, FlipX/Y |
-| **Crop** | `get_crop`, `set_crop` | CropLeft, CropRight, CropTop, CropBottom, CropSoftness, CropRetain |
-| **Composite** | `get_composite`, `set_composite` | Opacity, CompositeMode |
-| **Audio** | `get_audio`, `set_audio` | Volume, Pan, AudioSyncOffset |
-| **Keyframes** | `get_keyframes`, `add_keyframe`, `modify_keyframe`, `delete_keyframe`, `set_keyframe_interpolation` | property, frame, value, interpolation (Linear, Bezier, EaseIn, EaseOut, EaseInOut) |
-
-The installer uses the compound server by default. To use the full server:
-```bash
-python src/server.py --full    # Launch full 342-tool server
-# Or point your MCP config directly at src/resolve_mcp_server.py
-```
-
-### Manual Configuration
-
-If you prefer to set things up yourself, add to your MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "davinci-resolve": {
-      "command": "/path/to/venv/bin/python",
-      "args": ["/path/to/davinci-resolve-mcp/src/server.py"]
-    }
-  }
-}
-```
-
-Platform-specific paths:
-
-| Platform | API Path | Library Path |
-|----------|----------|-------------|
-| macOS | `/Library/Application Support/Blackmagic Design/DaVinci Resolve/Developer/Scripting` | `fusionscript.so` in DaVinci Resolve.app |
-| Windows | `C:\ProgramData\Blackmagic Design\DaVinci Resolve\Support\Developer\Scripting` | `fusionscript.dll` in Resolve install dir |
-| Linux | `/opt/resolve/Developer/Scripting` | `/opt/resolve/libs/Fusion/fusionscript.so` |
-
-## Usage Examples
-
-Once connected, you can control DaVinci Resolve through natural language:
-
-```
-"What version of DaVinci Resolve is running?"
-"List all projects and open the one called 'My Film'"
-"Create a new timeline called 'Assembly Cut' and add all clips from the media pool"
-"Add a blue marker at the current playhead position with note 'Review this'"
-"Set up a ProRes 422 HQ render for the current timeline"
-"Export the timeline as an EDL"
-"Switch to the Color page and grab a still"
-"Create a Fusion composition on the selected clip"
-```
-
-## Test Results
-
-All testing performed against **DaVinci Resolve 19.1.3 Studio** on macOS with live API calls (no mocks).
-
-| Phase | Tests | Pass Rate | Scope |
-|-------|-------|-----------|-------|
-| Phase 1 | 204/204 | 100% | Safe read-only operations across all classes |
-| Phase 2 | 79/79 | 100% | Destructive operations with create-test-cleanup patterns |
-| Phase 3 | 20/20 | 100% | Real media import, sync, transcription, database switching, Resolve.Quit |
-| Phase 4 | 10/10 | 100% | AI/ML methods, Fusion clips, stereo, gallery stills |
-| Phase 5 | 6/6 | 100% | Scene cuts, subtitles from audio, graph node cache/tools/enable |
-| **Total** | **319/319** | **100%** | **98.5% of all API methods tested live** |
-
-### Untested Methods (5 of 324)
-
-| Method | Reason | Help Wanted |
-|--------|--------|-------------|
-| `PM.CreateCloudProject` | Requires DaVinci Resolve cloud infrastructure | Yes |
-| `PM.LoadCloudProject` | Requires DaVinci Resolve cloud infrastructure | Yes |
-| `PM.ImportCloudProject` | Requires DaVinci Resolve cloud infrastructure | Yes |
-| `PM.RestoreCloudProject` | Requires DaVinci Resolve cloud infrastructure | Yes |
-| `TL.AnalyzeDolbyVision` | Requires HDR/Dolby Vision content | Yes |
-
----
-
-## Complete API Reference
-
-Every method in the DaVinci Resolve Scripting API and its test status. Methods are listed by object class.
-
-**Status Key:**
-- ✅ = Tested live, returned expected result
-- ⚠️ = Tested live, API accepted call (returned `False` — needs specific context to fully execute)
-- ☁️ = Requires cloud infrastructure (untested)
-- 🔬 = Requires specific content/hardware (untested — PRs welcome)
-
-### Resolve
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `Fusion()` | ✅ | Returns Fusion object |
-| 2 | `GetMediaStorage()` | ✅ | Returns MediaStorage object |
-| 3 | `GetProjectManager()` | ✅ | Returns ProjectManager object |
-| 4 | `OpenPage(pageName)` | ✅ | Switches Resolve page |
-| 5 | `GetCurrentPage()` | ✅ | Returns current page name (e.g. `"edit"`) |
-| 6 | `GetProductName()` | ✅ | Returns `"DaVinci Resolve Studio"` |
-| 7 | `GetVersion()` | ✅ | Returns `[19, 1, 3, 7, '']` |
-| 8 | `GetVersionString()` | ✅ | Returns `"19.1.3.7"` |
-| 9 | `LoadLayoutPreset(presetName)` | ✅ | Loads saved layout |
-| 10 | `UpdateLayoutPreset(presetName)` | ✅ | Updates existing preset |
-| 11 | `ExportLayoutPreset(presetName, presetFilePath)` | ✅ | Exports preset to file |
-| 12 | `DeleteLayoutPreset(presetName)` | ✅ | Deletes preset |
-| 13 | `SaveLayoutPreset(presetName)` | ⚠️ | API accepts; returns `False` when preset name conflicts |
-| 14 | `ImportLayoutPreset(presetFilePath, presetName)` | ✅ | Imports preset from file |
-| 15 | `Quit()` | ✅ | Quits DaVinci Resolve |
-| 16 | `ImportRenderPreset(presetPath)` | ⚠️ | API accepts; needs valid preset file |
-| 17 | `ExportRenderPreset(presetName, exportPath)` | ⚠️ | API accepts; needs valid preset name |
-| 18 | `ImportBurnInPreset(presetPath)` | ⚠️ | API accepts; needs valid preset file |
-| 19 | `ExportBurnInPreset(presetName, exportPath)` | ⚠️ | API accepts; needs valid preset name |
-| 20 | `GetKeyframeMode()` | ✅ | Returns keyframe mode |
-| 21 | `SetKeyframeMode(keyframeMode)` | ⚠️ | API accepts; mode must match valid enum |
-
-### ProjectManager
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `ArchiveProject(projectName, filePath, ...)` | ⚠️ | API accepts; archiving is slow |
-| 2 | `CreateProject(projectName)` | ✅ | Creates new project |
-| 3 | `DeleteProject(projectName)` | ⚠️ | Returns `False` if project is open |
-| 4 | `LoadProject(projectName)` | ✅ | Returns Project object |
-| 5 | `GetCurrentProject()` | ✅ | Returns current Project |
-| 6 | `SaveProject()` | ✅ | Saves current project |
-| 7 | `CloseProject(project)` | ✅ | Closes project |
-| 8 | `CreateFolder(folderName)` | ✅ | Creates project folder |
-| 9 | `DeleteFolder(folderName)` | ✅ | Deletes project folder |
-| 10 | `GetProjectListInCurrentFolder()` | ✅ | Returns project name list |
-| 11 | `GetFolderListInCurrentFolder()` | ✅ | Returns folder name list |
-| 12 | `GotoRootFolder()` | ✅ | Navigates to root |
-| 13 | `GotoParentFolder()` | ✅ | Returns `False` at root (expected) |
-| 14 | `GetCurrentFolder()` | ✅ | Returns current folder name |
-| 15 | `OpenFolder(folderName)` | ✅ | Opens folder |
-| 16 | `ImportProject(filePath, projectName)` | ✅ | Imports .drp file |
-| 17 | `ExportProject(projectName, filePath, ...)` | ✅ | Exports .drp file |
-| 18 | `RestoreProject(filePath, projectName)` | ⚠️ | API accepts; needs backup archive |
-| 19 | `GetCurrentDatabase()` | ✅ | Returns `{DbType, DbName}` |
-| 20 | `GetDatabaseList()` | ✅ | Returns list of databases |
-| 21 | `SetCurrentDatabase({dbInfo})` | ✅ | Switches database |
-| 22 | `CreateCloudProject({cloudSettings})` | ☁️ | Requires cloud infrastructure |
-| 23 | `LoadCloudProject({cloudSettings})` | ☁️ | Requires cloud infrastructure |
-| 24 | `ImportCloudProject(filePath, {cloudSettings})` | ☁️ | Requires cloud infrastructure |
-| 25 | `RestoreCloudProject(folderPath, {cloudSettings})` | ☁️ | Requires cloud infrastructure |
-
-### Project
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetMediaPool()` | ✅ | Returns MediaPool object |
-| 2 | `GetTimelineCount()` | ✅ | Returns integer count |
-| 3 | `GetTimelineByIndex(idx)` | ✅ | Returns Timeline object |
-| 4 | `GetCurrentTimeline()` | ✅ | Returns current Timeline |
-| 5 | `SetCurrentTimeline(timeline)` | ✅ | Sets active timeline |
-| 6 | `GetGallery()` | ✅ | Returns Gallery object |
-| 7 | `GetName()` | ✅ | Returns project name |
-| 8 | `SetName(projectName)` | ⚠️ | Returns `False` on open project |
-| 9 | `GetPresetList()` | ✅ | Returns preset list with dimensions |
-| 10 | `SetPreset(presetName)` | ⚠️ | API accepts; preset must exist |
-| 11 | `AddRenderJob()` | ✅ | Returns job ID string |
-| 12 | `DeleteRenderJob(jobId)` | ✅ | Deletes render job |
-| 13 | `DeleteAllRenderJobs()` | ✅ | Clears render queue |
-| 14 | `GetRenderJobList()` | ✅ | Returns job list |
-| 15 | `GetRenderPresetList()` | ✅ | Returns preset names |
-| 16 | `StartRendering(...)` | ✅ | Starts render |
-| 17 | `StopRendering()` | ✅ | Stops render |
-| 18 | `IsRenderingInProgress()` | ✅ | Returns `False` when idle |
-| 19 | `LoadRenderPreset(presetName)` | ✅ | Loads render preset |
-| 20 | `SaveAsNewRenderPreset(presetName)` | ✅ | Creates render preset |
-| 21 | `DeleteRenderPreset(presetName)` | ✅ | Deletes render preset |
-| 22 | `SetRenderSettings({settings})` | ✅ | Applies render settings |
-| 23 | `GetRenderJobStatus(jobId)` | ✅ | Returns `{JobStatus, CompletionPercentage}` |
-| 24 | `GetQuickExportRenderPresets()` | ✅ | Returns preset names |
-| 25 | `RenderWithQuickExport(preset, {params})` | ✅ | Initiates quick export |
-| 26 | `GetSetting(settingName)` | ✅ | Returns project settings dict |
-| 27 | `SetSetting(settingName, settingValue)` | ✅ | Sets project setting |
-| 28 | `GetRenderFormats()` | ✅ | Returns format map |
-| 29 | `GetRenderCodecs(renderFormat)` | ✅ | Returns codec map |
-| 30 | `GetCurrentRenderFormatAndCodec()` | ✅ | Returns `{format, codec}` |
-| 31 | `SetCurrentRenderFormatAndCodec(format, codec)` | ✅ | Sets format and codec |
-| 32 | `GetCurrentRenderMode()` | ✅ | Returns mode integer |
-| 33 | `SetCurrentRenderMode(renderMode)` | ✅ | Sets render mode |
-| 34 | `GetRenderResolutions(format, codec)` | ✅ | Returns resolution list |
-| 35 | `RefreshLUTList()` | ✅ | Refreshes LUT list |
-| 36 | `GetUniqueId()` | ✅ | Returns UUID string |
-| 37 | `InsertAudioToCurrentTrackAtPlayhead(...)` | ⚠️ | Tested; needs Fairlight page context |
-| 38 | `LoadBurnInPreset(presetName)` | ⚠️ | API accepts; preset must exist |
-| 39 | `ExportCurrentFrameAsStill(filePath)` | ⚠️ | API accepts; needs valid playhead position |
-| 40 | `GetColorGroupsList()` | ✅ | Returns color group list |
-| 41 | `AddColorGroup(groupName)` | ✅ | Returns ColorGroup object |
-| 42 | `DeleteColorGroup(colorGroup)` | ✅ | Deletes color group |
-
-### MediaStorage
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetMountedVolumeList()` | ✅ | Returns mounted volume paths |
-| 2 | `GetSubFolderList(folderPath)` | ✅ | Returns subfolder paths |
-| 3 | `GetFileList(folderPath)` | ✅ | Returns file paths |
-| 4 | `RevealInStorage(path)` | ✅ | Reveals path in Media Storage |
-| 5 | `AddItemListToMediaPool(...)` | ✅ | Imports media, returns clips |
-| 6 | `AddClipMattesToMediaPool(item, [paths], eye)` | ✅ | Adds clip mattes |
-| 7 | `AddTimelineMattesToMediaPool([paths])` | ✅ | Returns MediaPoolItem list |
-
-### MediaPool
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetRootFolder()` | ✅ | Returns root Folder |
-| 2 | `AddSubFolder(folder, name)` | ✅ | Creates subfolder |
-| 3 | `RefreshFolders()` | ✅ | Refreshes folder list |
-| 4 | `CreateEmptyTimeline(name)` | ✅ | Creates timeline |
-| 5 | `AppendToTimeline(...)` | ✅ | Appends clips, returns TimelineItems |
-| 6 | `CreateTimelineFromClips(name, ...)` | ✅ | Creates timeline from clips |
-| 7 | `ImportTimelineFromFile(filePath, {options})` | ✅ | Imports AAF/EDL/XML |
-| 8 | `DeleteTimelines([timeline])` | ✅ | Deletes timelines |
-| 9 | `GetCurrentFolder()` | ✅ | Returns current Folder |
-| 10 | `SetCurrentFolder(folder)` | ✅ | Sets current folder |
-| 11 | `DeleteClips([clips])` | ✅ | Deletes clips |
-| 12 | `ImportFolderFromFile(filePath)` | ✅ | Imports DRB folder |
-| 13 | `DeleteFolders([subfolders])` | ✅ | Deletes folders |
-| 14 | `MoveClips([clips], targetFolder)` | ✅ | Moves clips |
-| 15 | `MoveFolders([folders], targetFolder)` | ✅ | Moves folders |
-| 16 | `GetClipMatteList(item)` | ✅ | Returns matte paths |
-| 17 | `GetTimelineMatteList(folder)` | ✅ | Returns matte items |
-| 18 | `DeleteClipMattes(item, [paths])` | ✅ | Deletes clip mattes |
-| 19 | `RelinkClips([items], folderPath)` | ⚠️ | API accepts; needs offline clips |
-| 20 | `UnlinkClips([items])` | ✅ | Unlinks clips |
-| 21 | `ImportMedia([items])` | ✅ | Imports media files |
-| 22 | `ExportMetadata(fileName, [clips])` | ✅ | Exports metadata CSV |
-| 23 | `GetUniqueId()` | ✅ | Returns UUID string |
-| 24 | `CreateStereoClip(left, right)` | ✅ | Creates stereo pair |
-| 25 | `AutoSyncAudio([items], {settings})` | ⚠️ | Tested; needs matching A/V clips |
-| 26 | `GetSelectedClips()` | ✅ | Returns selected clips |
-| 27 | `SetSelectedClip(item)` | ✅ | Selects clip |
-
-### Folder
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetClipList()` | ✅ | Returns clip list |
-| 2 | `GetName()` | ✅ | Returns folder name |
-| 3 | `GetSubFolderList()` | ✅ | Returns subfolder list |
-| 4 | `GetIsFolderStale()` | ✅ | Returns `False` |
-| 5 | `GetUniqueId()` | ✅ | Returns UUID string |
-| 6 | `Export(filePath)` | ✅ | Exports DRB file |
-| 7 | `TranscribeAudio()` | ✅ | Starts audio transcription |
-| 8 | `ClearTranscription()` | ✅ | Clears transcription |
-
-### MediaPoolItem
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetName()` | ✅ | Returns clip name |
-| 2 | `GetMetadata(metadataType)` | ✅ | Returns metadata dict |
-| 3 | `SetMetadata(type, value)` | ✅ | Sets metadata |
-| 4 | `GetThirdPartyMetadata(type)` | ✅ | Returns third-party metadata |
-| 5 | `SetThirdPartyMetadata(type, value)` | ✅ | Sets third-party metadata |
-| 6 | `GetMediaId()` | ✅ | Returns media UUID |
-| 7 | `AddMarker(frameId, color, name, note, duration, customData)` | ✅ | Adds marker |
-| 8 | `GetMarkers()` | ✅ | Returns marker dict |
-| 9 | `GetMarkerByCustomData(customData)` | ✅ | Finds marker by data |
-| 10 | `UpdateMarkerCustomData(frameId, customData)` | ✅ | Updates marker data |
-| 11 | `GetMarkerCustomData(frameId)` | ✅ | Returns custom data string |
-| 12 | `DeleteMarkersByColor(color)` | ✅ | Deletes markers by color |
-| 13 | `DeleteMarkerAtFrame(frameNum)` | ⚠️ | Returns `False` if no marker at frame |
-| 14 | `DeleteMarkerByCustomData(customData)` | ⚠️ | Returns `False` if no match |
-| 15 | `AddFlag(color)` | ✅ | Adds flag |
-| 16 | `GetFlagList()` | ✅ | Returns flag colors |
-| 17 | `ClearFlags(color)` | ✅ | Clears flags |
-| 18 | `GetClipColor()` | ✅ | Returns clip color |
-| 19 | `SetClipColor(colorName)` | ✅ | Sets clip color |
-| 20 | `ClearClipColor()` | ✅ | Clears clip color |
-| 21 | `GetClipProperty(propertyName)` | ✅ | Returns property dict |
-| 22 | `SetClipProperty(propertyName, value)` | ⚠️ | API accepts; some properties read-only |
-| 23 | `LinkProxyMedia(proxyMediaFilePath)` | ✅ | Links proxy media |
-| 24 | `UnlinkProxyMedia()` | ✅ | Unlinks proxy media |
-| 25 | `ReplaceClip(filePath)` | ✅ | Replaces clip source |
-| 26 | `GetUniqueId()` | ✅ | Returns UUID string |
-| 27 | `TranscribeAudio()` | ✅ | Starts audio transcription |
-| 28 | `ClearTranscription()` | ✅ | Clears transcription |
-| 29 | `GetAudioMapping()` | ✅ | Returns JSON audio mapping |
-| 30 | `GetMarkInOut()` | ✅ | Returns mark in/out dict |
-| 31 | `SetMarkInOut(in, out, type)` | ✅ | Sets mark in/out |
-| 32 | `ClearMarkInOut(type)` | ✅ | Clears mark in/out |
-
-### Timeline
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetName()` | ✅ | Returns timeline name |
-| 2 | `SetName(timelineName)` | ⚠️ | Returns `False` on active timeline |
-| 3 | `GetStartFrame()` | ✅ | Returns start frame |
-| 4 | `GetEndFrame()` | ✅ | Returns end frame |
-| 5 | `SetStartTimecode(timecode)` | ✅ | Sets start timecode |
-| 6 | `GetStartTimecode()` | ✅ | Returns `"01:00:00:00"` |
-| 7 | `GetTrackCount(trackType)` | ✅ | Returns track count |
-| 8 | `AddTrack(trackType, subTrackType)` | ✅ | Adds track |
-| 9 | `DeleteTrack(trackType, trackIndex)` | ✅ | Deletes track |
-| 10 | `GetTrackSubType(trackType, trackIndex)` | ✅ | Returns sub-type (e.g. `"stereo"`) |
-| 11 | `SetTrackEnable(trackType, trackIndex, enabled)` | ✅ | Enables/disables track |
-| 12 | `GetIsTrackEnabled(trackType, trackIndex)` | ✅ | Returns enabled state |
-| 13 | `SetTrackLock(trackType, trackIndex, locked)` | ✅ | Locks/unlocks track |
-| 14 | `GetIsTrackLocked(trackType, trackIndex)` | ✅ | Returns lock state |
-| 15 | `DeleteClips([timelineItems], ripple)` | ✅ | Deletes clips from timeline |
-| 16 | `SetClipsLinked([timelineItems], linked)` | ✅ | Links/unlinks clips |
-| 17 | `GetItemListInTrack(trackType, index)` | ✅ | Returns items on track |
-| 18 | `AddMarker(frameId, color, name, note, duration, customData)` | ✅ | Adds timeline marker |
-| 19 | `GetMarkers()` | ✅ | Returns marker dict |
-| 20 | `GetMarkerByCustomData(customData)` | ✅ | Finds marker by data |
-| 21 | `UpdateMarkerCustomData(frameId, customData)` | ✅ | Updates marker data |
-| 22 | `GetMarkerCustomData(frameId)` | ✅ | Returns custom data |
-| 23 | `DeleteMarkersByColor(color)` | ✅ | Deletes markers by color |
-| 24 | `DeleteMarkerAtFrame(frameNum)` | ⚠️ | Returns `False` if no marker at frame |
-| 25 | `DeleteMarkerByCustomData(customData)` | ⚠️ | Returns `False` if no match |
-| 26 | `GetCurrentTimecode()` | ✅ | Returns timecode string |
-| 27 | `SetCurrentTimecode(timecode)` | ⚠️ | Returns `False` if playback not active |
-| 28 | `GetCurrentVideoItem()` | ✅ | Returns item at playhead |
-| 29 | `GetCurrentClipThumbnailImage()` | ✅ | Returns thumbnail data |
-| 30 | `GetTrackName(trackType, trackIndex)` | ✅ | Returns track name |
-| 31 | `SetTrackName(trackType, trackIndex, name)` | ✅ | Sets track name |
-| 32 | `DuplicateTimeline(timelineName)` | ✅ | Duplicates timeline |
-| 33 | `CreateCompoundClip([items], {clipInfo})` | ✅ | Returns compound clip item |
-| 34 | `CreateFusionClip([timelineItems])` | ✅ | Returns Fusion clip item |
-| 35 | `ImportIntoTimeline(filePath, {options})` | ⚠️ | Tested; result depends on file format |
-| 36 | `Export(fileName, exportType, exportSubtype)` | ✅ | Exports EDL/XML/AAF |
-| 37 | `GetSetting(settingName)` | ✅ | Returns settings dict |
-| 38 | `SetSetting(settingName, settingValue)` | ⚠️ | API accepts; some settings read-only |
-| 39 | `InsertGeneratorIntoTimeline(name)` | ✅ | Inserts generator |
-| 40 | `InsertFusionGeneratorIntoTimeline(name)` | ✅ | Inserts Fusion generator |
-| 41 | `InsertFusionCompositionIntoTimeline()` | ✅ | Inserts Fusion composition |
-| 42 | `InsertOFXGeneratorIntoTimeline(name)` | ⚠️ | API accepts; needs valid OFX plugin |
-| 43 | `InsertTitleIntoTimeline(name)` | ✅ | Inserts title |
-| 44 | `InsertFusionTitleIntoTimeline(name)` | ✅ | Inserts Fusion title |
-| 45 | `GrabStill()` | ✅ | Returns GalleryStill object |
-| 46 | `GrabAllStills(stillFrameSource)` | ✅ | Returns list of GalleryStill objects |
-| 47 | `GetUniqueId()` | ✅ | Returns UUID string |
-| 48 | `CreateSubtitlesFromAudio({settings})` | ✅ | Returns `True` — creates subtitles from audio |
-| 49 | `DetectSceneCuts()` | ✅ | Returns `True` — detects scene cuts in timeline |
-| 50 | `ConvertTimelineToStereo()` | ✅ | Converts timeline to stereo 3D |
-| 51 | `GetNodeGraph()` | ✅ | Returns Graph object |
-| 52 | `AnalyzeDolbyVision([items], analysisType)` | 🔬 | Requires HDR/Dolby Vision content |
-| 53 | `GetMediaPoolItem()` | ✅ | Returns MediaPoolItem for timeline |
-| 54 | `GetMarkInOut()` | ✅ | Returns mark in/out dict |
-| 55 | `SetMarkInOut(in, out, type)` | ✅ | Sets mark in/out |
-| 56 | `ClearMarkInOut(type)` | ✅ | Clears mark in/out |
-
-### TimelineItem
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetName()` | ✅ | Returns item name |
-| 2 | `GetDuration(subframe_precision)` | ✅ | Returns duration |
-| 3 | `GetEnd(subframe_precision)` | ✅ | Returns end frame |
-| 4 | `GetSourceEndFrame()` | ✅ | Returns source end frame |
-| 5 | `GetSourceEndTime()` | ✅ | Returns source end time |
-| 6 | `GetFusionCompCount()` | ✅ | Returns comp count |
-| 7 | `GetFusionCompByIndex(compIndex)` | ✅ | Returns Fusion composition |
-| 8 | `GetFusionCompNameList()` | ✅ | Returns comp names |
-| 9 | `GetFusionCompByName(compName)` | ✅ | Returns Fusion composition |
-| 10 | `GetLeftOffset(subframe_precision)` | ✅ | Returns left offset |
-| 11 | `GetRightOffset(subframe_precision)` | ✅ | Returns right offset |
-| 12 | `GetStart(subframe_precision)` | ✅ | Returns start frame |
-| 13 | `GetSourceStartFrame()` | ✅ | Returns source start |
-| 14 | `GetSourceStartTime()` | ✅ | Returns source start time |
-| 15 | `SetProperty(propertyKey, propertyValue)` | ✅ | Sets item property |
-| 16 | `GetProperty(propertyKey)` | ✅ | Returns property dict |
-| 17 | `AddMarker(frameId, color, name, note, duration, customData)` | ✅ | Adds marker to item |
-| 18 | `GetMarkers()` | ✅ | Returns marker dict |
-| 19 | `GetMarkerByCustomData(customData)` | ✅ | Finds marker by data |
-| 20 | `UpdateMarkerCustomData(frameId, customData)` | ✅ | Updates marker data |
-| 21 | `GetMarkerCustomData(frameId)` | ✅ | Returns custom data |
-| 22 | `DeleteMarkersByColor(color)` | ✅ | Deletes markers by color |
-| 23 | `DeleteMarkerAtFrame(frameNum)` | ⚠️ | Returns `False` if no marker at frame |
-| 24 | `DeleteMarkerByCustomData(customData)` | ⚠️ | Returns `False` if no match |
-| 25 | `AddFlag(color)` | ✅ | Adds flag |
-| 26 | `GetFlagList()` | ✅ | Returns flag colors |
-| 27 | `ClearFlags(color)` | ✅ | Clears flags |
-| 28 | `GetClipColor()` | ✅ | Returns clip color |
-| 29 | `SetClipColor(colorName)` | ✅ | Sets clip color |
-| 30 | `ClearClipColor()` | ✅ | Clears clip color |
-| 31 | `AddFusionComp()` | ✅ | Creates Fusion composition |
-| 32 | `ImportFusionComp(path)` | ✅ | Imports .comp file |
-| 33 | `ExportFusionComp(path, compIndex)` | ✅ | Exports .comp file |
-| 34 | `DeleteFusionCompByName(compName)` | ⚠️ | Returns `False` if comp not found |
-| 35 | `LoadFusionCompByName(compName)` | ✅ | Loads composition |
-| 36 | `RenameFusionCompByName(oldName, newName)` | ✅ | Renames composition |
-| 37 | `AddVersion(versionName, versionType)` | ✅ | Adds grade version |
-| 38 | `GetCurrentVersion()` | ✅ | Returns version info |
-| 39 | `DeleteVersionByName(versionName, versionType)` | ⚠️ | Returns `False` if version not found |
-| 40 | `LoadVersionByName(versionName, versionType)` | ✅ | Loads grade version |
-| 41 | `RenameVersionByName(oldName, newName, type)` | ✅ | Renames version |
-| 42 | `GetVersionNameList(versionType)` | ✅ | Returns version names |
-| 43 | `GetMediaPoolItem()` | ✅ | Returns source MediaPoolItem |
-| 44 | `GetStereoConvergenceValues()` | ✅ | Returns stereo keyframes |
-| 45 | `GetStereoLeftFloatingWindowParams()` | ✅ | Returns stereo params |
-| 46 | `GetStereoRightFloatingWindowParams()` | ✅ | Returns stereo params |
-| 47 | `SetCDL([CDL map])` | ✅ | Sets CDL values |
-| 48 | `AddTake(mediaPoolItem, startFrame, endFrame)` | ✅ | Adds take |
-| 49 | `GetSelectedTakeIndex()` | ✅ | Returns selected take index |
-| 50 | `GetTakesCount()` | ✅ | Returns take count |
-| 51 | `GetTakeByIndex(idx)` | ✅ | Returns take info |
-| 52 | `DeleteTakeByIndex(idx)` | ✅ | Deletes take |
-| 53 | `SelectTakeByIndex(idx)` | ✅ | Selects take |
-| 54 | `FinalizeTake()` | ⚠️ | Returns `False` when no take selected |
-| 55 | `CopyGrades([tgtTimelineItems])` | ⚠️ | API accepts; needs matching items |
-| 56 | `SetClipEnabled(enabled)` | ✅ | Enables/disables clip |
-| 57 | `GetClipEnabled()` | ✅ | Returns enabled state |
-| 58 | `UpdateSidecar()` | ⚠️ | Returns `False` for non-BRAW clips |
-| 59 | `GetUniqueId()` | ✅ | Returns UUID string |
-| 60 | `LoadBurnInPreset(presetName)` | ⚠️ | API accepts; preset must exist |
-| 61 | `CreateMagicMask(mode)` | ⚠️ | Tested; needs DaVinci Neural Engine + Color page context |
-| 62 | `RegenerateMagicMask()` | ⚠️ | Tested; needs existing mask |
-| 63 | `Stabilize()` | ✅ | Returns `True` on supported clips |
-| 64 | `SmartReframe()` | ⚠️ | Tested; needs specific aspect ratio setup |
-| 65 | `GetNodeGraph(layerIdx)` | ✅ | Returns Graph object |
-| 66 | `GetColorGroup()` | ✅ | Returns ColorGroup |
-| 67 | `AssignToColorGroup(colorGroup)` | ✅ | Assigns to group |
-| 68 | `RemoveFromColorGroup()` | ⚠️ | Returns `False` if not in group |
-| 69 | `ExportLUT(exportType, path)` | ✅ | Exports LUT file |
-| 70 | `GetLinkedItems()` | ✅ | Returns linked items |
-| 71 | `GetTrackTypeAndIndex()` | ✅ | Returns `[trackType, trackIndex]` |
-| 72 | `GetSourceAudioChannelMapping()` | ✅ | Returns audio mapping |
-| 73 | `GetIsColorOutputCacheEnabled()` | ✅ | Returns cache state |
-| 74 | `GetIsFusionOutputCacheEnabled()` | ✅ | Returns cache state |
-| 75 | `SetColorOutputCache(cache_value)` | ⚠️ | Tested; needs active color pipeline |
-| 76 | `SetFusionOutputCache(cache_value)` | ⚠️ | Tested; needs active Fusion pipeline |
-
-### Gallery
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetAlbumName(galleryStillAlbum)` | ✅ | Returns album name |
-| 2 | `SetAlbumName(galleryStillAlbum, albumName)` | ✅ | Sets album name |
-| 3 | `GetCurrentStillAlbum()` | ✅ | Returns GalleryStillAlbum |
-| 4 | `SetCurrentStillAlbum(galleryStillAlbum)` | ✅ | Sets current album |
-| 5 | `GetGalleryStillAlbums()` | ✅ | Returns album list |
-| 6 | `GetGalleryPowerGradeAlbums()` | ✅ | Returns power grade albums |
-| 7 | `CreateGalleryStillAlbum()` | ✅ | Creates still album |
-| 8 | `CreateGalleryPowerGradeAlbum()` | ✅ | Creates power grade album |
-
-### GalleryStillAlbum
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetStills()` | ✅ | Returns list of GalleryStill objects |
-| 2 | `GetLabel(galleryStill)` | ✅ | Returns label string |
-| 3 | `SetLabel(galleryStill, label)` | ⚠️ | API accepts; may not persist in all versions |
-| 4 | `ImportStills([filePaths])` | ✅ | Imports DRX still files (requires Color page) |
-| 5 | `ExportStills([stills], folderPath, prefix, format)` | ✅ | Exports stills as DRX+DPX (requires Color page) |
-| 6 | `DeleteStills([galleryStill])` | ✅ | Deletes stills from album |
-
-### Graph
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetNumNodes()` | ✅ | Returns node count (via ColorGroup pre/post graphs) |
-| 2 | `SetLUT(nodeIndex, lutPath)` | ✅ | Sets LUT on node |
-| 3 | `GetLUT(nodeIndex)` | ✅ | Returns LUT path |
-| 4 | `SetNodeCacheMode(nodeIndex, cache_value)` | ✅ | Returns `True` |
-| 5 | `GetNodeCacheMode(nodeIndex)` | ✅ | Returns `-1` (no cache mode set) |
-| 6 | `GetNodeLabel(nodeIndex)` | ✅ | Returns node label string |
-| 7 | `GetToolsInNode(nodeIndex)` | ✅ | Returns `None` (no OFX tools in node) |
-| 8 | `SetNodeEnabled(nodeIndex, isEnabled)` | ✅ | Returns `True` |
-| 9 | `ApplyGradeFromDRX(path, gradeMode)` | ✅ | Applies grade from DRX file |
-| 10 | `ApplyArriCdlLut()` | ✅ | Applies ARRI CDL LUT |
-| 11 | `ResetAllGrades()` | ✅ | Resets all grades |
-
-### ColorGroup
-
-| # | Method | Status | Test Result / Notes |
-|---|--------|--------|---------------------|
-| 1 | `GetName()` | ✅ | Returns group name |
-| 2 | `SetName(groupName)` | ✅ | Sets group name |
-| 3 | `GetClipsInTimeline(timeline)` | ✅ | Returns clips in group |
-| 4 | `GetPreClipNodeGraph()` | ✅ | Returns Graph object |
-| 5 | `GetPostClipNodeGraph()` | ✅ | Returns Graph object |
-
----
-
-## Contributing
-
-We welcome contributions! The following areas especially need help:
-
-### Help Wanted: Untested API Methods
-
-**5 methods** (1.5%) remain untested against a live DaVinci Resolve instance. If you have access to the required infrastructure or content, we'd love a PR with test confirmation:
-
-1. **Cloud Project Methods** (4 methods) — Need DaVinci Resolve cloud infrastructure:
-   - `ProjectManager.CreateCloudProject`
-   - `ProjectManager.LoadCloudProject`
-   - `ProjectManager.ImportCloudProject`
-   - `ProjectManager.RestoreCloudProject`
-
-2. **HDR Analysis** (1 method) — Needs specific content:
-   - `Timeline.AnalyzeDolbyVision` — needs HDR/Dolby Vision content
-
-### How to Contribute
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-contribution`)
-3. Run the existing test suite to ensure nothing breaks
-4. Add your test results or fixes
-5. Submit a pull request
-
-### Other Contribution Ideas
-
-- **Windows testing** — All tests were run on macOS; Windows verification welcome
-- **Linux testing** — DaVinci Resolve supports Linux; test coverage needed
-- **Resolve version compatibility** — Test against Resolve 18.x, 19.0, or newer versions
-- **Bug reports** — If a tool returns unexpected results on your setup, file an issue
-- **Documentation** — Improve examples, add tutorials, translate docs
-
-## Platform Support
-
-| Platform | Status | Resolve Paths Auto-Detected | Notes |
-|----------|--------|----------------------------|-------|
-| macOS | ✅ Tested | `/Library/Application Support/Blackmagic Design/...` | Primary development and test platform |
-| Windows | ✅ Supported | `C:\ProgramData\Blackmagic Design\...` | Community-tested; PRs welcome |
-| Linux | ⚠️ Experimental | `/opt/resolve/...` | Should work — testing and feedback welcome |
-
-## Security Considerations
-
-This MCP server controls DaVinci Resolve via its Scripting API. Some tools perform actions that are destructive or interact with the host filesystem:
-
-| Tool | Risk | Mitigation |
-|------|------|------------|
-| `quit_app` / `restart_app` | Terminates the Resolve process — can cause data loss if unsaved changes exist or a render is in progress | MCP clients should require explicit user confirmation before calling these tools. Subprocess calls use hardcoded command lists (no shell injection possible). |
-| `export_layout_preset` / `import_layout_preset` / `delete_layout_preset` | Read/write/delete files in the Resolve layout presets directory | Path traversal protection validates all resolved paths stay within the expected presets directory (v2.0.7+). |
-| `save_project` | Creates and removes a temporary `.drp` file in the system temp directory | Path is constructed server-side with no LLM-controlled input. |
-
-**Recommendations for MCP client developers:**
-- Enable tool-call confirmation prompts for destructive tools (`quit_app`, `restart_app`, `delete_layout_preset`)
-- Do not grant blanket auto-approval to all tools in this server
-
-## Project Structure
-
-```
-davinci-resolve-mcp/
-├── install.py                    # Universal installer (macOS/Windows/Linux)
-├── src/
-│   ├── server.py                # Compound MCP server — 26 tools (default)
-│   ├── resolve_mcp_server.py    # Full MCP server — 342 tools (power users)
-│   └── utils/                   # Platform detection, Resolve connection helpers
-├── tests/                       # 5-phase live API test suite (319/319 pass)
-├── docs/
-│   └── resolve_scripting_api.txt # Official Resolve Scripting API reference
-└── examples/                    # Getting started, markers, media, timeline examples
-```
+Release and validation rules are in [docs/process/release-process.md](docs/process/release-process.md). AI agents working in this repository should start with [AGENTS.md](AGENTS.md); Claude Code users can also read [CLAUDE.md](CLAUDE.md), which points to the same canonical instructions.
 
 ## License
 
@@ -701,4 +490,3 @@ Samuel Gursky (samgursky@gmail.com)
 
 - Blackmagic Design for DaVinci Resolve and its scripting API
 - The Model Context Protocol team for enabling AI assistant integration
-- Anthropic for Claude Code, used extensively in development and testing

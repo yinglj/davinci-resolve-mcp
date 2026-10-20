@@ -1,6 +1,18 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Granular Tools Package."""
+"""Granular DaVinci Resolve MCP server package."""
 
-from .common import VERSION, mcp
+from src.granular.common import VERSION, mcp
+from src.granular import (
+    folder,
+    gallery,
+    graph,
+    media_pool,
+    media_pool_item,
+    media_storage,
+    project,
+    resolve_control,
+    resolve_211,
+    timeline,
+    timeline_item,
+)
 
 __all__ = ["VERSION", "mcp"]

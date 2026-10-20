@@ -9,14 +9,55 @@ This module provides functions for controlling DaVinci Resolve application:
 """
 
 import logging
+import os
 import time
 import sys
 import platform
 import subprocess
-from typing import Dict, Any
+from typing import Dict, Any, List
+
+from src.utils.resolve_probe import has_method
 
 # Configure logging
 logger = logging.getLogger("davinci-resolve-mcp.app_control")
+APP_CONTROL_TIMEOUT_SECONDS = 10
+
+
+def _run_app_command(
+    cmd: List[str],
+    description: str,
+    timeout: int = APP_CONTROL_TIMEOUT_SECONDS,
+) -> bool:
+    """Run a platform app-control command with a bounded wait."""
+    try:
+        result = subprocess.run(
+            cmd,
+            stdin=subprocess.DEVNULL,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        logger.error("%s timed out after %ss: %s", description, timeout, cmd)
+        return False
+    except OSError as exc:
+        logger.error("%s failed to launch: %s", description, exc)
+        return False
+
+    if result.returncode != 0:
+        stderr = (result.stderr or "").strip()
+        logger.warning(
+            "%s exited with code %s%s",
+            description,
+            result.returncode,
+            f": {stderr}" if stderr else "",
+        )
+        return False
+    return True
+
 
 
 def quit_resolve_app(
@@ -43,14 +84,24 @@ def quit_resolve_app(
             if project and save_project:
                 logger.info("Saving project before quitting")
                 # Try to save the project
+                # Only the exception was handled. SaveProject also reports a
+                # refusal with a bare False -- which is what a project attached
+                # to no database returns -- and quitting on that throws the
+                # session away silently.
                 try:
-                    project.SaveProject()
+                    saved = project.SaveProject()
                 except Exception as e:
                     logger.error(f"Failed to save project: {str(e)}")
                     if not force:
                         logger.error("Aborting quit due to save failure")
                         return False
-
+                else:
+                    if saved is False:
+                        logger.error("SaveProject returned False; the project was NOT saved")
+                        if not force:
+                            logger.error("Aborting quit due to save failure")
+                            return False
+        
         # Attempt to quit using the API
         if hasattr(resolve_obj, "Quit") and callable(getattr(resolve_obj, "Quit")):
             logger.info("Using Resolve.Quit() API")
@@ -71,28 +122,37 @@ def quit_resolve_app(
                     "-e",
                     'tell application "DaVinci Resolve" to quit with saving',
                 ]
-
-            subprocess.run(cmd)
-            return True
-
-        elif sys_platform == "windows":
+            
+            return _run_app_command(cmd, "macOS Resolve quit command")
+            
+        elif sys_platform == 'windows':
             # Windows - use taskkill
             logger.info("Using taskkill to quit Resolve on Windows")
             if force:
-                subprocess.run(["taskkill", "/F", "/IM", "Resolve.exe"])
+                return _run_app_command(
+                    ['taskkill', '/F', '/IM', 'Resolve.exe'],
+                    "Windows Resolve force-quit command",
+                )
             else:
-                subprocess.run(["taskkill", "/IM", "Resolve.exe"])
-            return True
-
-        elif sys_platform == "linux":
+                return _run_app_command(
+                    ['taskkill', '/IM', 'Resolve.exe'],
+                    "Windows Resolve quit command",
+                )
+            
+        elif sys_platform == 'linux':
             # Linux - use pkill
             logger.info("Using pkill to quit Resolve on Linux")
             if force:
-                subprocess.run(["pkill", "-9", "resolve"])
+                return _run_app_command(
+                    ['pkill', '-9', 'resolve'],
+                    "Linux Resolve force-quit command",
+                )
             else:
-                subprocess.run(["pkill", "resolve"])
-            return True
-
+                return _run_app_command(
+                    ['pkill', 'resolve'],
+                    "Linux Resolve quit command",
+                )
+            
         # If all methods fail, return False
         logger.error("Failed to quit Resolve via any method")
         return False
@@ -124,16 +184,17 @@ def get_app_state(resolve_obj) -> Dict[str, Any]:
         try:
             state["version"] = resolve_obj.GetVersionString()
         except Exception:
-            pass
-
+            logger.debug("Could not read Resolve version string", exc_info=True)
+            
         try:
             state["product_name"] = resolve_obj.GetProductName()
         except Exception:
-            pass
-
+            logger.debug("Could not read Resolve product name", exc_info=True)
+            
         try:
             state["current_page"] = resolve_obj.GetCurrentPage()
         except Exception:
+            logger.debug("Could not read Resolve current page", exc_info=True)
             state["current_page"] = "Unknown"
 
         # Get project manager and project information
@@ -177,9 +238,12 @@ def restart_resolve_app(resolve_obj, wait_seconds: int = 5) -> bool:
     """
     try:
         # Get Resolve executable path for restart
-        if platform.system().lower() == "darwin":
-            resolve_path = "/Applications/DaVinci Resolve/DaVinci Resolve.app"
-        elif platform.system().lower() == "windows":
+        if platform.system().lower() == 'darwin':
+            from src.utils.resolve_runtime import MACOS_RESOLVE_APPS
+            resolve_path = next((p for p in MACOS_RESOLVE_APPS if os.path.exists(p)), None)
+            if resolve_path is None:
+                return False
+        elif platform.system().lower() == 'windows':
             # Default path, may need to be customized
             resolve_path = (
                 r"C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe"
@@ -201,92 +265,173 @@ def restart_resolve_app(resolve_obj, wait_seconds: int = 5) -> bool:
 
         # Start Resolve again
         logger.info("Attempting to start Resolve")
-
-        if platform.system().lower() == "darwin":
-            subprocess.Popen(["open", resolve_path])
-        elif platform.system().lower() == "windows":
-            subprocess.Popen([resolve_path])
-        elif platform.system().lower() == "linux":
-            subprocess.Popen([resolve_path])
-
+        
+        if platform.system().lower() == 'darwin':
+            subprocess.Popen(['open', resolve_path], stdin=subprocess.DEVNULL)
+        elif platform.system().lower() == 'windows':
+            subprocess.Popen([resolve_path], stdin=subprocess.DEVNULL)
+        elif platform.system().lower() == 'linux':
+            subprocess.Popen([resolve_path], stdin=subprocess.DEVNULL)
+        
         return True
     except Exception as e:
         logger.error(f"Error restarting DaVinci Resolve: {str(e)}")
         return False
 
+def _open_dialog(resolve_obj, method_name: str, label: str) -> Dict[str, Any]:
+    """Ask Resolve to open a dialog, and say what actually happened.
 
-def open_project_settings(resolve_obj) -> bool:
+    Returns {"success", "supported", "message"}.
+
+    The route this module has always used is Resolve.GetUIManager() and then a
+    method on the manager. Neither half exists on any build measured so far.
+    On Studio 19.1.3.7 (2026-09-30): dir(resolve) lists 23 methods and
+    GetUIManager is not one of them; Fusion().UIManager is real but offers
+    neither OpenProjectSettings nor OpenPreferences; and none of the three
+    names appears in the 21.1 typed API. So the old code raised "'NoneType'
+    object is not callable" on its first line, caught it, logged an error and
+    returned a bare False — a tool that could never work, reporting that as an
+    ordinary failure with no reason.
+
+    `hasattr` cannot make this distinction: it is True for every name on a
+    Resolve object (see src/utils/resolve_probe.py). `has_method` can, so the
+    route is probed with it, and a build that does grow these calls is used
+    and its answer reported instead of assumed.
     """
-    Open the Project Settings dialog in DaVinci Resolve.
-
-    Args:
-        resolve_obj: DaVinci Resolve API object
-
-    Returns:
-        True if successful, False otherwise
-    """
+    if not has_method(resolve_obj, "GetUIManager"):
+        return {
+            "success": False,
+            "supported": False,
+            "message": (
+                f"Not supported: DaVinci Resolve's scripting API has no call that opens the "
+                f"{label} dialog. Resolve.GetUIManager does not exist on this build."
+            ),
+        }
+    ui_manager = resolve_obj.GetUIManager()
+    if not has_method(ui_manager, method_name):
+        return {
+            "success": False,
+            "supported": False,
+            "message": (
+                f"Not supported: DaVinci Resolve's scripting API has no call that opens the "
+                f"{label} dialog. UIManager.{method_name} does not exist on this build."
+            ),
+        }
     try:
-        # Check if UI Manager is available
-        ui_manager = resolve_obj.GetUIManager()
-        if not ui_manager:
-            logger.error("Failed to get UI Manager")
-            return False
-
-        # Open Project Settings dialog
-        if hasattr(ui_manager, "OpenProjectSettings") and callable(
-            getattr(ui_manager, "OpenProjectSettings")
-        ):
-            ui_manager.OpenProjectSettings()
-            return True
-
-        # Alternative method - send keyboard shortcut based on platform
-        current_page = resolve_obj.GetCurrentPage()
-
-        # Ensure we're on a page that supports project settings
-        if current_page not in [
-            "media",
-            "cut",
-            "edit",
-            "fusion",
-            "color",
-            "fairlight",
-            "deliver",
-        ]:
-            logger.error(f"Can't open settings from page: {current_page}")
-            return False
-
-        return False  # Keyboard shortcuts not implemented yet
-    except Exception as e:
-        logger.error(f"Error opening project settings: {str(e)}")
-        return False
+        opened = getattr(ui_manager, method_name)()
+    except Exception as exc:
+        logger.error("UIManager.%s raised: %s", method_name, exc)
+        return {
+            "success": False,
+            "supported": True,
+            "message": f"Failed to open the {label} dialog: UIManager.{method_name} raised {exc}",
+        }
+    if opened is False:
+        return {
+            "success": False,
+            "supported": True,
+            "message": f"Failed to open the {label} dialog: UIManager.{method_name} returned False",
+        }
+    return {"success": True, "supported": True, "message": f"{label} dialog opened"}
 
 
-def open_preferences(resolve_obj) -> bool:
+def open_project_settings(resolve_obj) -> Dict[str, Any]:
+    """Open the Project Settings dialog. See `_open_dialog` for the result shape."""
+    return _open_dialog(resolve_obj, "OpenProjectSettings", "Project Settings")
+
+
+def open_preferences(resolve_obj) -> Dict[str, Any]:
+    """Open the Preferences dialog. See `_open_dialog` for the result shape."""
+    return _open_dialog(resolve_obj, "OpenPreferences", "Preferences")
+
+
+# ── Script execution priority ───────────────────────────────────────────────
+#
+# Resolve 21.1 retyped `Resolve.SetHighPriority(highPriority: bool) -> bool`
+# ("Sets the script execution priority to high or normal"). Reported by
+# @legionsound on Studio 21.1.0.14 (issue #207): (False) -> True, (True) ->
+# True, and the no-argument call this server used to make -> False, a no-op;
+# (1) and ("high") also -> False. So on 21.1 the argument must be a real bool
+# and the setting is reversible. On 19.1.3.7 the method takes no argument and
+# there is no way to lower it again within the session. No build has a getter.
+
+#: First build whose stub types the boolean argument.
+HIGH_PRIORITY_TYPED_FLOOR = "21.1"
+
+_NO_READBACK_NOTE = (
+    "Resolve exposes no getter for script execution priority on any build, so "
+    "the state cannot be read back; success reflects the native return only."
+)
+
+
+def set_high_priority(resolve_obj, high: Any = True) -> Dict[str, Any]:
+    """Set script execution priority, choosing the call form by build.
+
+    `high` is coerced with `recognised_bool` (so "false" means False) and a
+    value that names no boolean is refused before any call: Resolve 21.1
+    returns a silent False for 1 or "high", so forwarding a guess would turn
+    the caller's mistake into a no-op. The native call always receives a real
+    bool. Returns a plain dict; a refusal carries `error` and `refused: True`
+    and means nothing was called.
     """
-    Open the Preferences dialog in DaVinci Resolve.
+    from src.utils.bool_params import recognised_bool
+    from src.utils.resolve_versions import at_least
 
-    Args:
-        resolve_obj: DaVinci Resolve API object
-
-    Returns:
-        True if successful, False otherwise
-    """
+    requested = recognised_bool(high)
+    if requested is None:
+        return {
+            "success": False,
+            "refused": True,
+            "error": "high must be a boolean (true for high priority, false for normal)",
+        }
     try:
-        # Check if UI Manager is available
-        ui_manager = resolve_obj.GetUIManager()
-        if not ui_manager:
-            logger.error("Failed to get UI Manager")
-            return False
+        version = resolve_obj.GetVersion()
+    except Exception:  # noqa: BLE001 — an unreadable version routes as unknown
+        version = None
+    typed = at_least(version, HIGH_PRIORITY_TYPED_FLOOR)
+    base: Dict[str, Any] = {
+        "high_priority": requested,
+        "resolve_version": version,
+        "readback": None,
+        "note": _NO_READBACK_NOTE,
+    }
 
-        # Open Preferences dialog
-        if hasattr(ui_manager, "OpenPreferences") and callable(
-            getattr(ui_manager, "OpenPreferences")
-        ):
-            ui_manager.OpenPreferences()
-            return True
+    def _typed_call() -> Dict[str, Any]:
+        ok = bool(resolve_obj.SetHighPriority(requested))
+        out = dict(base, success=ok, signature="SetHighPriority(bool)", reversible=True)
+        if not ok:
+            out["warning"] = (
+                "SetHighPriority returned False. On 21.1 that is the answer to a "
+                "rejected call; the priority is most likely unchanged, but it "
+                "cannot be read back to confirm."
+            )
+        return out
 
-        # Alternative method - send keyboard shortcut based on platform
-        return False  # Keyboard shortcuts not implemented yet
-    except Exception as e:
-        logger.error(f"Error opening preferences: {str(e)}")
-        return False
+    def _legacy_call() -> Dict[str, Any]:
+        if not requested:
+            return dict(
+                base,
+                success=False,
+                refused=True,
+                signature="SetHighPriority()",
+                reversible=False,
+                error=(
+                    "This Resolve build takes SetHighPriority() with no argument and "
+                    "can only RAISE priority; it cannot be lowered back to normal "
+                    "without restarting Resolve (Resolve 21.1+ accepts a boolean). "
+                    "Nothing was called."
+                ),
+            )
+        ok = bool(resolve_obj.SetHighPriority())
+        return dict(base, success=ok, signature="SetHighPriority()", reversible=False)
+
+    if typed is True:
+        return _typed_call()
+    if typed is False:
+        return _legacy_call()
+    # Version unreadable: try the typed form and fall back only on the
+    # signature mismatch an older build raises, never on a False return.
+    try:
+        return _typed_call()
+    except TypeError:
+        return _legacy_call()

@@ -1,10 +1,124 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Media_Pool_Item Operations (Granular Tools)."""
+"""MediaPoolItem operations and metadata helpers."""
 
-from typing import Any, Dict, List, Optional, Union, Tuple
-from .common import mcp, get_resolve
+from src.granular.common import *  # noqa: F401,F403
+from src.utils.media_analysis import mark_registry_stale_for_clip as _mark_analysis_registry_stale
+
+resolve = ResolveProxy()
+
+
+def _invalidate_analysis_registry_for_clip(project, clip, *, reason: str) -> Optional[Dict[str, Any]]:
+    """Best-effort: mark cached analysis stale after a Resolve clip replace.
+
+    Called from replace_clip / replace_media_pool_clip / preserve_sub_clip
+    after the Resolve API confirms the mutation. Failures here must NEVER
+    block the Resolve mutation — we return the result for diagnostics but
+    swallow exceptions so registry trouble does not corrupt the user's edit.
+    """
+    if project is None or clip is None:
+        return None
+    try:
+        project_name = project.GetName() if _has_method(project, "GetName") else None
+        project_id = project.GetUniqueId() if _has_method(project, "GetUniqueId") else None
+        clip_id = clip.GetUniqueId() if _has_method(clip, "GetUniqueId") else None
+        media_id = clip.GetMediaId() if _has_method(clip, "GetMediaId") else None
+        source_file = None
+        try:
+            source_file = clip.GetClipProperty("File Path") if _has_method(clip, "GetClipProperty") else None
+        except Exception:
+            source_file = None
+        return _mark_analysis_registry_stale(
+            project_name=project_name,
+            project_id=project_id,
+            clip_id=clip_id,
+            media_id=media_id,
+            source_file=source_file,
+            reason=reason,
+        )
+    except Exception as exc:  # noqa: BLE001 — never break a Resolve mutation
+        return {"success": False, "error": f"registry invalidation skipped: {type(exc).__name__}: {exc}"}
+
+@mcp.tool(annotations=EXTERNAL_DESTRUCTIVE_TOOL)
+def link_proxy_media(clip_name: str, proxy_file_path: str) -> str:
+    """Link a proxy media file to a clip.
+    
+    Args:
+        clip_name: Name of the clip to link proxy to
+        proxy_file_path: Path to the proxy media file
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    media_pool = current_project.GetMediaPool()
+    if not media_pool:
+        return "Error: Failed to get Media Pool"
+    
+    # Find the clip by name (lazy walk; stops at the first match)
+    clips = iter_all_media_pool_clips(media_pool)
+    target_clip = None
+
+    for clip in clips:
+        if clip.GetName() == clip_name:
+            target_clip = clip
+            break
+    
+    if not target_clip:
+        return f"Error: Clip '{clip_name}' not found in Media Pool"
+    
+    # Check if file exists
+    if not os.path.exists(proxy_file_path):
+        return f"Error: Proxy file '{proxy_file_path}' does not exist"
+    
+    try:
+        result = target_clip.LinkProxyMedia(proxy_file_path)
+        if result:
+            return f"Successfully linked proxy media '{proxy_file_path}' to clip '{clip_name}'"
+        else:
+            return f"Failed to link proxy media to clip '{clip_name}'"
+    except Exception as e:
+        return f"Error linking proxy media: {str(e)}"
+
 
 @mcp.tool()
+@granular_destructive_op()
+def unlink_proxy_media(clip_name: str) -> str:
+    """Unlink proxy media from a clip.
+    
+    Args:
+        clip_name: Name of the clip to unlink proxy from
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    media_pool = current_project.GetMediaPool()
+    if not media_pool:
+        return "Error: Failed to get Media Pool"
+    
+    # Find the clip by name (lazy walk; stops at the first match)
+    clips = iter_all_media_pool_clips(media_pool)
+    target_clip = None
+
+    for clip in clips:
+        if clip.GetName() == clip_name:
+            target_clip = clip
+            break
+    
+    if not target_clip:
+        return f"Error: Clip '{clip_name}' not found in Media Pool"
+    
+    try:
+        result = target_clip.UnlinkProxyMedia()
+        if result:
+            return f"Successfully unlinked proxy media from clip '{clip_name}'"
+        else:
+            return f"Failed to unlink proxy media from clip '{clip_name}'"
+    except Exception as e:
+        return f"Error unlinking proxy media: {str(e)}"
+
+
+@mcp.tool()
+@granular_destructive_op()
 def replace_clip(clip_name: str, replacement_path: str) -> str:
     """Replace a clip with another media file.
     
@@ -20,10 +134,10 @@ def replace_clip(clip_name: str, replacement_path: str) -> str:
     if not media_pool:
         return "Error: Failed to get Media Pool"
     
-    # Find the clip by name
-    clips = get_all_media_pool_clips(media_pool)
+    # Find the clip by name (lazy walk; stops at the first match)
+    clips = iter_all_media_pool_clips(media_pool)
     target_clip = None
-    
+
     for clip in clips:
         if clip.GetName() == clip_name:
             target_clip = clip
@@ -39,11 +153,100 @@ def replace_clip(clip_name: str, replacement_path: str) -> str:
     try:
         result = target_clip.ReplaceClip(replacement_path)
         if result:
+            _invalidate_analysis_registry_for_clip(
+                current_project, target_clip, reason="replace_clip"
+            )
             return f"Successfully replaced clip '{clip_name}' with '{replacement_path}'"
         else:
             return f"Failed to replace clip '{clip_name}'"
     except Exception as e:
         return f"Error replacing clip: {str(e)}"
+
+
+@mcp.tool()
+def transcribe_audio(clip_name: str, use_speaker_detection: Optional[bool] = None) -> str:
+    """Transcribe audio for a clip.
+
+    The transcription language follows the project's Speech Recognition setting
+    (Project Settings > Subtitles), not a per-call argument.
+
+    Args:
+        clip_name: Name of the clip to transcribe
+        use_speaker_detection: Optional (Resolve 21+). Enable speaker detection.
+            If omitted, the project's setting is used.
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    media_pool = current_project.GetMediaPool()
+    if not media_pool:
+        return "Error: Failed to get Media Pool"
+    
+    # Find the clip by name (lazy walk; stops at the first match)
+    clips = iter_all_media_pool_clips(media_pool)
+    target_clip = None
+
+    for clip in clips:
+        if clip.GetName() == clip_name:
+            target_clip = clip
+            break
+    
+    if not target_clip:
+        return f"Error: Clip '{clip_name}' not found in Media Pool"
+    
+    # Resolve 21's signature is TranscribeAudio(useSpeakerDetection=None); pass the
+    # bool only when supplied so older Resolve builds (no arg) keep working.
+    try:
+        if use_speaker_detection is None:
+            result = target_clip.TranscribeAudio()
+        else:
+            result = target_clip.TranscribeAudio(use_speaker_detection)
+        if result:
+            return f"Successfully started audio transcription for clip '{clip_name}'"
+        else:
+            return f"Failed to start audio transcription for clip '{clip_name}'"
+    except Exception as e:
+        return f"Error during audio transcription: {str(e)}"
+
+
+@mcp.tool()
+@granular_destructive_op()
+def clear_transcription(clip_name: str) -> str:
+    """Clear audio transcription for a clip.
+    
+    Args:
+        clip_name: Name of the clip to clear transcription from
+    """
+    pm, current_project = get_current_project()
+    if not current_project:
+        return "Error: No project currently open"
+    
+    media_pool = current_project.GetMediaPool()
+    if not media_pool:
+        return "Error: Failed to get Media Pool"
+    
+    # Find the clip by name (lazy walk; stops at the first match)
+    clips = iter_all_media_pool_clips(media_pool)
+    target_clip = None
+
+    for clip in clips:
+        if clip.GetName() == clip_name:
+            target_clip = clip
+            break
+    
+    if not target_clip:
+        return f"Error: Clip '{clip_name}' not found in Media Pool"
+    
+    try:
+        result = target_clip.ClearTranscription()
+        if result:
+            return f"Successfully cleared audio transcription for clip '{clip_name}'"
+        else:
+            return f"Failed to clear audio transcription for clip '{clip_name}'"
+    except Exception as e:
+        return f"Error clearing audio transcription: {str(e)}"
+
 
 @mcp.tool()
 def get_clip_metadata(clip_id: str, metadata_type: str = "") -> Dict[str, Any]:
@@ -65,7 +268,9 @@ def get_clip_metadata(clip_id: str, metadata_type: str = "") -> Dict[str, Any]:
         result = clip.GetMetadata()
     return {"clip_id": clip_id, "metadata": result if result else {}}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_clip_metadata(clip_id: str, metadata: Dict[str, str]) -> Dict[str, Any]:
     """Set metadata on a Media Pool clip.
 
@@ -81,6 +286,7 @@ def set_clip_metadata(clip_id: str, metadata: Dict[str, str]) -> Dict[str, Any]:
         return {"error": f"Clip {clip_id} not found"}
     result = clip.SetMetadata(metadata)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def get_clip_third_party_metadata(clip_id: str, metadata_key: str = "") -> Dict[str, Any]:
@@ -102,7 +308,9 @@ def get_clip_third_party_metadata(clip_id: str, metadata_key: str = "") -> Dict[
         result = clip.GetThirdPartyMetadata()
     return {"clip_id": clip_id, "third_party_metadata": result if result else {}}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_clip_third_party_metadata(clip_id: str, metadata: Dict[str, str]) -> Dict[str, Any]:
     """Set third-party metadata on a clip.
 
@@ -119,6 +327,7 @@ def set_clip_third_party_metadata(clip_id: str, metadata: Dict[str, str]) -> Dic
     result = clip.SetThirdPartyMetadata(metadata)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def get_clip_media_id(clip_id: str) -> Dict[str, Any]:
     """Get the media ID for a clip.
@@ -134,6 +343,7 @@ def get_clip_media_id(clip_id: str) -> Dict[str, Any]:
         return {"error": f"Clip {clip_id} not found"}
     media_id = clip.GetMediaId()
     return {"clip_id": clip_id, "media_id": media_id}
+
 
 @mcp.tool()
 def add_clip_marker(clip_id: str, frame_id: int, color: str, name: str, note: str = "", duration: int = 1, custom_data: str = "") -> Dict[str, Any]:
@@ -157,6 +367,7 @@ def add_clip_marker(clip_id: str, frame_id: int, color: str, name: str, note: st
     result = clip.AddMarker(frame_id, color, name, note, duration, custom_data)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def get_clip_markers(clip_id: str) -> Dict[str, Any]:
     """Get all markers on a Media Pool clip.
@@ -172,6 +383,7 @@ def get_clip_markers(clip_id: str) -> Dict[str, Any]:
         return {"error": f"Clip {clip_id} not found"}
     markers = clip.GetMarkers()
     return {"clip_id": clip_id, "markers": markers if markers else {}}
+
 
 @mcp.tool()
 def get_clip_marker_by_custom_data(clip_id: str, custom_data: str) -> Dict[str, Any]:
@@ -189,6 +401,7 @@ def get_clip_marker_by_custom_data(clip_id: str, custom_data: str) -> Dict[str, 
         return {"error": f"Clip {clip_id} not found"}
     marker = clip.GetMarkerByCustomData(custom_data)
     return {"marker": marker if marker else {}}
+
 
 @mcp.tool()
 def update_clip_marker_custom_data(clip_id: str, frame_id: int, custom_data: str) -> Dict[str, Any]:
@@ -208,6 +421,7 @@ def update_clip_marker_custom_data(clip_id: str, frame_id: int, custom_data: str
     result = clip.UpdateMarkerCustomData(frame_id, custom_data)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def get_clip_marker_custom_data(clip_id: str, frame_id: int) -> Dict[str, Any]:
     """Get the custom data of a clip marker at a specific frame.
@@ -225,7 +439,9 @@ def get_clip_marker_custom_data(clip_id: str, frame_id: int) -> Dict[str, Any]:
     data = clip.GetMarkerCustomData(frame_id)
     return {"frame_id": frame_id, "custom_data": data if data else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def delete_clip_markers_by_color(clip_id: str, color: str) -> Dict[str, Any]:
     """Delete all markers of a specific color on a clip.
 
@@ -242,7 +458,9 @@ def delete_clip_markers_by_color(clip_id: str, color: str) -> Dict[str, Any]:
     result = clip.DeleteMarkersByColor(color)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def delete_clip_marker_at_frame(clip_id: str, frame_id: int) -> Dict[str, Any]:
     """Delete a marker at a specific frame on a clip.
 
@@ -259,7 +477,9 @@ def delete_clip_marker_at_frame(clip_id: str, frame_id: int) -> Dict[str, Any]:
     result = clip.DeleteMarkerAtFrame(frame_id)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def delete_clip_marker_by_custom_data(clip_id: str, custom_data: str) -> Dict[str, Any]:
     """Delete a marker by its custom data string.
 
@@ -275,6 +495,7 @@ def delete_clip_marker_by_custom_data(clip_id: str, custom_data: str) -> Dict[st
         return {"error": f"Clip {clip_id} not found"}
     result = clip.DeleteMarkerByCustomData(custom_data)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def add_clip_flag(clip_id: str, color: str) -> Dict[str, Any]:
@@ -293,6 +514,7 @@ def add_clip_flag(clip_id: str, color: str) -> Dict[str, Any]:
     result = clip.AddFlag(color)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def get_clip_flag_list(clip_id: str) -> Dict[str, Any]:
     """Get list of flags on a clip.
@@ -309,7 +531,9 @@ def get_clip_flag_list(clip_id: str) -> Dict[str, Any]:
     flags = clip.GetFlagList()
     return {"clip_id": clip_id, "flags": flags if flags else []}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def clear_clip_flags(clip_id: str, color: str = "") -> Dict[str, Any]:
     """Clear flags on a clip.
 
@@ -325,6 +549,7 @@ def clear_clip_flags(clip_id: str, color: str = "") -> Dict[str, Any]:
         return {"error": f"Clip {clip_id} not found"}
     result = clip.ClearFlags(color)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def get_clip_color(clip_id: str) -> Dict[str, Any]:
@@ -342,7 +567,9 @@ def get_clip_color(clip_id: str) -> Dict[str, Any]:
     color = clip.GetClipColor()
     return {"clip_id": clip_id, "clip_color": color if color else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_clip_color(clip_id: str, color: str) -> Dict[str, Any]:
     """Set the clip color of a Media Pool item.
 
@@ -359,7 +586,9 @@ def set_clip_color(clip_id: str, color: str) -> Dict[str, Any]:
     result = clip.SetClipColor(color)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def clear_clip_color(clip_id: str) -> Dict[str, Any]:
     """Clear the clip color of a Media Pool item.
 
@@ -375,7 +604,9 @@ def clear_clip_color(clip_id: str) -> Dict[str, Any]:
     result = clip.ClearClipColor()
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_clip_property(clip_id: str, property_name: str, property_value: str) -> Dict[str, Any]:
     """Set a property on a Media Pool clip.
 
@@ -392,6 +623,7 @@ def set_clip_property(clip_id: str, property_name: str, property_value: str) -> 
         return {"error": f"Clip {clip_id} not found"}
     result = clip.SetClipProperty(property_name, property_value)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def get_clip_property(clip_id: str, property_name: str = "") -> Dict[str, Any]:
@@ -413,6 +645,29 @@ def get_clip_property(clip_id: str, property_name: str = "") -> Dict[str, Any]:
         result = clip.GetClipProperty()
     return {"clip_id": clip_id, "property": result if result else {}}
 
+
+@mcp.tool()
+@granular_destructive_op()
+def set_media_pool_clip_name(clip_id: str, new_name: str) -> Dict[str, Any]:
+    """Rename a Media Pool clip.
+
+    Args:
+        clip_id: Unique ID of the clip.
+        new_name: New clip name.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "SetName", "20.2")
+    if missing:
+        return missing
+    result = clip.SetName(new_name)
+    return {"success": bool(result), "name": new_name}
+
+
 @mcp.tool()
 def link_clip_proxy_media(clip_id: str, proxy_path: str) -> Dict[str, Any]:
     """Link proxy media to a clip.
@@ -430,7 +685,30 @@ def link_clip_proxy_media(clip_id: str, proxy_path: str) -> Dict[str, Any]:
     result = clip.LinkProxyMedia(proxy_path)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+def link_clip_full_resolution_media(clip_id: str, full_res_media_path: str) -> Dict[str, Any]:
+    """Link full resolution media to a proxy clip.
+
+    Args:
+        clip_id: Unique ID of the clip.
+        full_res_media_path: Absolute path to the full resolution media file.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "LinkFullResolutionMedia", "20.0")
+    if missing:
+        return missing
+    result = clip.LinkFullResolutionMedia(full_res_media_path)
+    return {"success": bool(result)}
+
+
+@mcp.tool()
+@granular_destructive_op()
 def unlink_clip_proxy_media(clip_id: str) -> Dict[str, Any]:
     """Unlink proxy media from a clip.
 
@@ -446,7 +724,9 @@ def unlink_clip_proxy_media(clip_id: str) -> Dict[str, Any]:
     result = clip.UnlinkProxyMedia()
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def replace_media_pool_clip(clip_id: str, new_file_path: str) -> Dict[str, Any]:
     """Replace a clip with a new media file.
 
@@ -454,14 +734,67 @@ def replace_media_pool_clip(clip_id: str, new_file_path: str) -> Dict[str, Any]:
         clip_id: Unique ID of the clip to replace.
         new_file_path: Absolute path to the new media file.
     """
-    _, mp, err = _get_mp()
+    project, mp, err = _get_mp()
     if err:
         return err
     clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
     if not clip:
         return {"error": f"Clip {clip_id} not found"}
     result = clip.ReplaceClip(new_file_path)
+    response: Dict[str, Any] = {"success": bool(result)}
+    if result:
+        registry = _invalidate_analysis_registry_for_clip(
+            project, clip, reason="replace_media_pool_clip"
+        )
+        if registry is not None:
+            response["analysis_registry_invalidation"] = registry
+    return response
+
+
+@mcp.tool()
+@granular_destructive_op()
+def replace_media_pool_clip_preserve_sub_clip(clip_id: str, file_path: str) -> Dict[str, Any]:
+    """Replace a clip's underlying media while preserving subclip extents.
+
+    Args:
+        clip_id: Unique ID of the clip to replace.
+        file_path: Absolute path to the replacement media file.
+    """
+    project, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "ReplaceClipPreserveSubClip", "20.0")
+    if missing:
+        return missing
+    result = clip.ReplaceClipPreserveSubClip(file_path)
+    response: Dict[str, Any] = {"success": bool(result)}
+    if result:
+        registry = _invalidate_analysis_registry_for_clip(
+            project, clip, reason="replace_media_pool_clip_preserve_sub_clip"
+        )
+        if registry is not None:
+            response["analysis_registry_invalidation"] = registry
+    return response
+
+
+@mcp.tool()
+def monitor_clip_growing_file(clip_id: str) -> Dict[str, Any]:
+    """Monitor a growing media file for the given Media Pool clip."""
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "MonitorGrowingFile", "20.0")
+    if missing:
+        return missing
+    result = clip.MonitorGrowingFile()
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def get_clip_unique_id_by_name(clip_name: str) -> Dict[str, Any]:
@@ -489,6 +822,7 @@ def get_clip_unique_id_by_name(clip_name: str) -> Dict[str, Any]:
         return {"name": clip.GetName(), "unique_id": clip.GetUniqueId()}
     return {"error": f"Clip '{clip_name}' not found"}
 
+
 @mcp.tool()
 def transcribe_clip_audio(clip_id: str) -> Dict[str, Any]:
     """Transcribe audio for a specific clip.
@@ -505,7 +839,9 @@ def transcribe_clip_audio(clip_id: str) -> Dict[str, Any]:
     result = clip.TranscribeAudio()
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def clear_clip_transcription(clip_id: str) -> Dict[str, Any]:
     """Clear transcription for a specific clip.
 
@@ -520,6 +856,7 @@ def clear_clip_transcription(clip_id: str) -> Dict[str, Any]:
         return {"error": f"Clip {clip_id} not found"}
     result = clip.ClearTranscription()
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def get_clip_audio_mapping(clip_id: str) -> Dict[str, Any]:
@@ -537,6 +874,7 @@ def get_clip_audio_mapping(clip_id: str) -> Dict[str, Any]:
     mapping = clip.GetAudioMapping()
     return {"clip_id": clip_id, "audio_mapping": mapping if mapping else ""}
 
+
 @mcp.tool()
 def get_clip_mark_in_out(clip_id: str) -> Dict[str, Any]:
     """Get mark in/out points for a clip.
@@ -553,7 +891,9 @@ def get_clip_mark_in_out(clip_id: str) -> Dict[str, Any]:
     result = clip.GetMarkInOut()
     return {"clip_id": clip_id, "mark_in_out": result if result else {}}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_clip_mark_in_out(clip_id: str, mark_in: int, mark_out: int) -> Dict[str, Any]:
     """Set mark in/out points for a clip.
 
@@ -571,7 +911,9 @@ def set_clip_mark_in_out(clip_id: str, mark_in: int, mark_out: int) -> Dict[str,
     result = clip.SetMarkInOut(mark_in, mark_out)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def clear_clip_mark_in_out(clip_id: str) -> Dict[str, Any]:
     """Clear mark in/out points for a clip.
 
@@ -588,7 +930,158 @@ def clear_clip_mark_in_out(clip_id: str) -> Dict[str, Any]:
     return {"success": bool(result)}
 
 
-# ------------------
-# Gallery Tools
-# ------------------
+_MARKER_COLORS = [
+    "Blue", "Cyan", "Green", "Yellow", "Red", "Pink", "Purple", "Fuchsia",
+    "Rose", "Lavender", "Sky", "Mint", "Lemon", "Sand", "Cocoa", "Cream",
+]
 
+
+@mcp.tool()
+def perform_clip_audio_classification(clip_id: str) -> Dict[str, Any]:
+    """Classify a clip's audio into categories and subcategories (Resolve 21+).
+
+    Args:
+        clip_id: Unique ID of the clip.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "PerformAudioClassification", "21.0")
+    if missing:
+        return missing
+    return _ai_result_payload(clip.PerformAudioClassification())
+
+
+@mcp.tool()
+@granular_destructive_op()
+def clear_clip_audio_classification(clip_id: str) -> Dict[str, Any]:
+    """Clear a clip's audio classification (Resolve 21+).
+
+    Args:
+        clip_id: Unique ID of the clip.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "ClearAudioClassification", "21.0")
+    if missing:
+        return missing
+    return _ai_result_payload(clip.ClearAudioClassification())
+
+
+@mcp.tool()
+def analyze_clip_for_intellisearch(clip_id: str, identify_faces: bool = False, is_better_mode: bool = False) -> Dict[str, Any]:
+    """Run IntelliSearch analysis on a clip (Resolve 21+, requires AI IntelliSearch Extra).
+
+    Args:
+        clip_id: Unique ID of the clip.
+        identify_faces: Whether to identify faces.
+        is_better_mode: Use Better mode (vs Faster).
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "AnalyzeForIntellisearch", "21.0")
+    if missing:
+        return missing
+    return _ai_result_payload(clip.AnalyzeForIntellisearch(bool(identify_faces), bool(is_better_mode)))
+
+
+@mcp.tool()
+def analyze_clip_for_slate(clip_id: str, marker_color: str = "Blue") -> Dict[str, Any]:
+    """Run Slate analysis on a clip (Resolve 21+, requires AI Slate ID Extra).
+
+    Args:
+        clip_id: Unique ID of the clip.
+        marker_color: Marker color for detected slates (Blue, Cyan, Green, Yellow, Red, Pink,
+            Purple, Fuchsia, Rose, Lavender, Sky, Mint, Lemon, Sand, Cocoa, Cream).
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "AnalyzeForSlate", "21.0")
+    if missing:
+        return missing
+    if marker_color not in _MARKER_COLORS:
+        return {"error": f"Invalid marker_color '{marker_color}'. Valid: {', '.join(_MARKER_COLORS)}"}
+    return _ai_result_payload(clip.AnalyzeForSlate(marker_color))
+
+
+@mcp.tool()
+@granular_destructive_op()
+def remove_clip_motion_blur(clip_id: str, deblur_option: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Render a motion-deblurred copy of a clip (Resolve 21+).
+
+    Creates a NEW media file; the source clip is not modified.
+
+    Args:
+        clip_id: Unique ID of the clip.
+        deblur_option: Settings dict (FileName, Format, Codec, EncodingProfile,
+            UseExtremeMode, UseMarkInMarkOut, RenderAtSourceRes, UseMoreGpuMemory).
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "RemoveMotionBlur", "21.0")
+    if missing:
+        return missing
+    new_clip = clip.RemoveMotionBlur(deblur_option or {})
+    # An error string is truthy, so a bare `if not new_clip` let a missing
+    # Extras pack through to .GetName() and raised AttributeError.
+    ok, message = _ai_result(new_clip)
+    if not ok:
+        return {"success": False, "error": message} if message else {"success": False}
+    return {"success": True, "new": new_clip.GetName(), "new_id": new_clip.GetUniqueId()}
+
+
+@mcp.tool()
+def get_clip_timeline(clip_id: str) -> Dict[str, Any]:
+    """Resolve a Media Pool timeline entry to its timeline summary (Resolve 21.0.4+).
+
+    Calls MediaPoolItem.GetTimeline(). Returns is_timeline=false for ordinary
+    clips — that is an answer, not a failure.
+
+    Args:
+        clip_id: Unique ID of the Media Pool item.
+    """
+    _, mp, err = _get_mp()
+    if err:
+        return err
+    clip = _find_clip_by_id(mp.GetRootFolder(), clip_id)
+    if not clip:
+        return {"error": f"Clip {clip_id} not found"}
+    missing = _requires_method(clip, "GetTimeline", "21.0.4")
+    if missing:
+        return missing
+    try:
+        tl_obj = clip.GetTimeline()
+    except Exception as exc:
+        return {"error": f"GetTimeline failed: {exc}"}
+    if not tl_obj:
+        return {"is_timeline": False, "timeline": None,
+                "note": "This media pool item is not a timeline entry."}
+    summary = {}
+    for getter, key in (("GetName", "name"), ("GetUniqueId", "unique_id"),
+                        ("GetStartFrame", "start_frame"), ("GetEndFrame", "end_frame")):
+        method = getattr(tl_obj, getter, None)
+        if callable(method):
+            try:
+                summary[key] = method()
+            except Exception:
+                pass
+    return {"is_timeline": True, "timeline": summary}

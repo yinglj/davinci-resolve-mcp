@@ -1,66 +1,22 @@
-#!/usr/bin/env python3
-"""DaVinci Resolve MCP - Gallery Operations (Granular Tools)."""
+"""Gallery, still album, and powergrade tools."""
 
-from typing import Any, Dict, List, Optional, Union, Tuple
-from .common import mcp, get_resolve
+from src.granular.common import *  # noqa: F401,F403
 
-@mcp.tool()
-def get_color_groups_list() -> Dict[str, Any]:
-    """Get list of all color groups in the current project."""
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project currently open"}
-    groups = project.GetColorGroupsList()
-    if groups:
-        return {"color_groups": [{"name": g.GetName()} for g in groups]}
-    return {"color_groups": []}
+resolve = ResolveProxy()
 
-@mcp.tool()
-def add_color_group(group_name: str) -> Dict[str, Any]:
-    """Create a new color group in the current project.
 
-    Args:
-        group_name: Name for the new color group.
-    """
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project currently open"}
-    result = project.AddColorGroup(group_name)
-    return {"success": bool(result), "group_name": group_name}
+def _index_in_range(idx, length):
+    """True for a real 0-based position. Negatives are refused: Python would read
+    `albums[-1]` as the last album and act on something nobody named."""
+    return isinstance(idx, int) and not isinstance(idx, bool) and 0 <= idx < length
 
-@mcp.tool()
-def delete_color_group(group_name: str) -> Dict[str, Any]:
-    """Delete a color group from the current project.
 
-    Args:
-        group_name: Name of the color group to delete.
-    """
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project currently open"}
-    # Find the group by name
-    groups = project.GetColorGroupsList()
-    target = None
-    if groups:
-        for g in groups:
-            if g.GetName() == group_name:
-                target = g
-                break
-    if not target:
-        return {"error": f"Color group '{group_name}' not found"}
-    result = project.DeleteColorGroup(target)
-    return {"success": bool(result), "group_name": group_name}
+def _invalid_indices(indices, length):
+    """The entries of `indices` that are not a 0-based position below `length`."""
+    return [i for i in indices if not _index_in_range(i, length)]
 
-@mcp.tool()
+
+@mcp.tool(annotations=READ_ONLY_TOOL)
 def get_gallery_album_name() -> Dict[str, Any]:
     """Get the name of the current gallery album."""
     resolve = get_resolve()
@@ -75,7 +31,9 @@ def get_gallery_album_name() -> Dict[str, Any]:
     name = gallery.GetAlbumName()
     return {"album_name": name if name else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_gallery_album_name(name: str) -> Dict[str, Any]:
     """Set the name of the current gallery album.
 
@@ -94,6 +52,7 @@ def set_gallery_album_name(name: str) -> Dict[str, Any]:
     result = gallery.SetAlbumName(name)
     return {"success": bool(result)}
 
+
 @mcp.tool()
 def get_gallery_still_albums() -> Dict[str, Any]:
     """Get list of all gallery still albums."""
@@ -108,6 +67,7 @@ def get_gallery_still_albums() -> Dict[str, Any]:
         return {"error": "Failed to get Gallery"}
     albums = gallery.GetGalleryStillAlbums()
     return {"albums": [str(a) for a in albums] if albums else []}
+
 
 @mcp.tool()
 def get_gallery_power_grade_albums() -> Dict[str, Any]:
@@ -124,6 +84,7 @@ def get_gallery_power_grade_albums() -> Dict[str, Any]:
     albums = gallery.GetGalleryPowerGradeAlbums()
     return {"albums": [str(a) for a in albums] if albums else []}
 
+
 @mcp.tool()
 def get_current_still_album() -> Dict[str, Any]:
     """Get the current still album."""
@@ -139,7 +100,9 @@ def get_current_still_album() -> Dict[str, Any]:
     album = gallery.GetCurrentStillAlbum()
     return {"has_album": album is not None}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_current_still_album(album_index: int) -> Dict[str, Any]:
     """Set the current still album by index.
 
@@ -156,10 +119,11 @@ def set_current_still_album(album_index: int) -> Dict[str, Any]:
     if not gallery:
         return {"error": "Failed to get Gallery"}
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     result = gallery.SetCurrentStillAlbum(albums[album_index])
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def create_gallery_still_album(album_name: str = "") -> Dict[str, Any]:
@@ -182,6 +146,7 @@ def create_gallery_still_album(album_name: str = "") -> Dict[str, Any]:
     else:
         album = gallery.CreateGalleryStillAlbum()
     return {"success": album is not None}
+
 
 @mcp.tool()
 def create_gallery_power_grade_album(album_name: str = "") -> Dict[str, Any]:
@@ -206,10 +171,6 @@ def create_gallery_power_grade_album(album_name: str = "") -> Dict[str, Any]:
     return {"success": album is not None}
 
 
-# ------------------
-# GalleryStillAlbum Tools
-# ------------------
-
 @mcp.tool()
 def get_album_stills(album_index: int = 0) -> Dict[str, Any]:
     """Get list of stills in a gallery album.
@@ -227,10 +188,11 @@ def get_album_stills(album_index: int = 0) -> Dict[str, Any]:
     if not gallery:
         return {"error": "Failed to get Gallery"}
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     stills = albums[album_index].GetStills()
     return {"still_count": len(stills) if stills else 0}
+
 
 @mcp.tool()
 def get_still_label(album_index: int, still_index: int) -> Dict[str, Any]:
@@ -248,15 +210,17 @@ def get_still_label(album_index: int, still_index: int) -> Dict[str, Any]:
         return {"error": "No project open"}
     gallery = project.GetGallery()
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     stills = albums[album_index].GetStills()
-    if not stills or still_index >= len(stills):
+    if not stills or still_index < 0 or still_index >= len(stills):
         return {"error": f"No still at index {still_index}"}
     label = albums[album_index].GetLabel(stills[still_index])
     return {"label": label if label else ""}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def set_still_label(album_index: int, still_index: int, label: str) -> Dict[str, Any]:
     """Set the label of a still in a gallery album.
 
@@ -273,13 +237,14 @@ def set_still_label(album_index: int, still_index: int, label: str) -> Dict[str,
         return {"error": "No project open"}
     gallery = project.GetGallery()
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     stills = albums[album_index].GetStills()
-    if not stills or still_index >= len(stills):
+    if not stills or still_index < 0 or still_index >= len(stills):
         return {"error": f"No still at index {still_index}"}
     result = albums[album_index].SetLabel(stills[still_index], label)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def import_stills_to_album(album_index: int, file_paths: List[str]) -> Dict[str, Any]:
@@ -297,10 +262,11 @@ def import_stills_to_album(album_index: int, file_paths: List[str]) -> Dict[str,
         return {"error": "No project open"}
     gallery = project.GetGallery()
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     result = albums[album_index].ImportStills(file_paths)
     return {"success": bool(result)}
+
 
 @mcp.tool()
 def export_stills_from_album(album_index: int, folder_path: str, file_prefix: str = "still", format: str = "dpx") -> Dict[str, Any]:
@@ -320,7 +286,7 @@ def export_stills_from_album(album_index: int, folder_path: str, file_prefix: st
         return {"error": "No project open"}
     gallery = project.GetGallery()
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     stills = albums[album_index].GetStills()
     if not stills:
@@ -328,7 +294,9 @@ def export_stills_from_album(album_index: int, folder_path: str, file_prefix: st
     result = albums[album_index].ExportStills(stills, folder_path, file_prefix, format)
     return {"success": bool(result)}
 
+
 @mcp.tool()
+@granular_destructive_op()
 def delete_stills_from_album(album_index: int, still_indices: List[int]) -> Dict[str, Any]:
     """Delete stills from a gallery album.
 
@@ -344,103 +312,17 @@ def delete_stills_from_album(album_index: int, still_indices: List[int]) -> Dict
         return {"error": "No project open"}
     gallery = project.GetGallery()
     albums = gallery.GetGalleryStillAlbums()
-    if not albums or album_index >= len(albums):
+    if not albums or album_index < 0 or album_index >= len(albums):
         return {"error": f"No album at index {album_index}"}
     stills = albums[album_index].GetStills()
     if not stills:
         return {"error": "No stills in album"}
-    to_delete = [stills[i] for i in still_indices if i < len(stills)]
+    # A negative index is a real Python index (`stills[-1]` is the last still),
+    # and an out-of-range one used to be dropped while the rest were deleted.
+    # Refuse the whole call instead of deleting a set nobody asked for.
+    invalid = _invalid_indices(still_indices, len(stills))
+    if invalid:
+        return {"error": f"still_indices out of range for {len(stills)} stills: {invalid}"}
+    to_delete = [stills[i] for i in still_indices]
     result = albums[album_index].DeleteStills(to_delete)
     return {"success": bool(result)}
-
-
-# ------------------
-# Graph Tools
-# ------------------
-
-@mcp.tool()
-def get_color_group_clips(group_name: str) -> Dict[str, Any]:
-    """Get clips in a color group for the current timeline.
-
-    Args:
-        group_name: Name of the color group.
-    """
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project open"}
-    groups = project.GetColorGroupsList()
-    target = None
-    if groups:
-        for g in groups:
-            if g.GetName() == group_name:
-                target = g
-                break
-    if not target:
-        return {"error": f"Color group '{group_name}' not found"}
-    clips = target.GetClipsInTimeline()
-    if clips:
-        return {"group": group_name, "clips": [{"name": c.GetName()} for c in clips]}
-    return {"group": group_name, "clips": []}
-
-@mcp.tool()
-def get_color_group_pre_clip_node_graph(group_name: str) -> Dict[str, Any]:
-    """Get the pre-clip node graph for a color group.
-
-    Args:
-        group_name: Name of the color group.
-    """
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project open"}
-    groups = project.GetColorGroupsList()
-    target = None
-    if groups:
-        for g in groups:
-            if g.GetName() == group_name:
-                target = g
-                break
-    if not target:
-        return {"error": f"Color group '{group_name}' not found"}
-    graph = target.GetPreClipNodeGraph()
-    if graph:
-        return {"group": group_name, "graph_type": "pre_clip", "num_nodes": graph.GetNumNodes()}
-    return {"error": "No pre-clip node graph available"}
-
-@mcp.tool()
-def get_color_group_post_clip_node_graph(group_name: str) -> Dict[str, Any]:
-    """Get the post-clip node graph for a color group.
-
-    Args:
-        group_name: Name of the color group.
-    """
-    resolve = get_resolve()
-    if resolve is None:
-        return {"error": "Not connected to DaVinci Resolve"}
-    project = resolve.GetProjectManager().GetCurrentProject()
-    if not project:
-        return {"error": "No project open"}
-    groups = project.GetColorGroupsList()
-    target = None
-    if groups:
-        for g in groups:
-            if g.GetName() == group_name:
-                target = g
-                break
-    if not target:
-        return {"error": f"Color group '{group_name}' not found"}
-    graph = target.GetPostClipNodeGraph()
-    if graph:
-        return {"group": group_name, "graph_type": "post_clip", "num_nodes": graph.GetNumNodes()}
-    return {"error": "No post-clip node graph available"}
-
-
-# ------------------
-# Timeline Tools (remaining)
-# ------------------
-

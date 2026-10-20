@@ -1,38 +1,44 @@
 #!/usr/bin/env python3
-"""
-DaVinci Resolve MCP Server - Granular Entry Point
-Version: 2.0.7
-"""
+"""DaVinci Resolve MCP Server (granular tools)."""
 
-import sys
 import os
-import logging
-from pathlib import Path
+import sys
 
-# Add parent directory to path
-project_dir = Path(__file__).parent.parent
-if str(project_dir) not in sys.path:
-    sys.path.insert(0, str(project_dir))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_dir = os.path.dirname(current_dir)
 
-from src.granular.common import mcp, VERSION
+for path in (project_dir, current_dir):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("davinci-resolve-mcp-granular")
+from src.utils.platform import get_resolve_paths
 
-# Import granular tools
-from src.granular import (
-    folder, gallery, graph, media_pool, media_pool_item,
-    media_storage, project, resolve_control, timeline, timeline_item,
-    render, presets, layout, cloud
-)
+paths = get_resolve_paths()
+api_path = os.environ.get("RESOLVE_SCRIPT_API") or paths["api_path"]
+lib_path = os.environ.get("RESOLVE_SCRIPT_LIB") or paths["lib_path"]
+modules_path = os.path.join(api_path, "Modules") if api_path else paths["modules_path"]
 
-def main():
-    logger.info(f"Starting DaVinci Resolve MCP Server (Granular Mode) v{VERSION}")
-    logger.info("342 granular tools available")
-    mcp.run()
+if api_path:
+    os.environ["RESOLVE_SCRIPT_API"] = api_path
+if lib_path:
+    os.environ["RESOLVE_SCRIPT_LIB"] = lib_path
+if modules_path and modules_path not in sys.path:
+    sys.path.append(modules_path)
+
+from src.granular import VERSION, mcp
+from src.granular.common import connect_at_startup, logger
+from src.utils.mcp_stdio import run_fastmcp_stdio
+from src.utils.update_check import start_background_update_check
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        connect_at_startup()
+        start_background_update_check(VERSION, project_dir, logger)
+        logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION} (390 granular tools)")
+        run_fastmcp_stdio(mcp)
+    except KeyboardInterrupt:
+        logger.info("Server shutdown requested")
+    except Exception as exc:
+        logger.error(f"Server error: {exc}")
+        sys.exit(1)

@@ -9,8 +9,6 @@ from typing import List, Dict, Any
 
 from src.utils.layout_presets import (
     list_layout_presets,
-    save_layout_preset,
-    load_layout_preset,
     export_layout_preset,
     import_layout_preset,
     delete_layout_preset,
@@ -33,7 +31,7 @@ def register_layout_tools(mcp, resolve, logger):
         if resolve is None:
             return "Error: Not connected to DaVinci Resolve"
 
-        result = save_layout_preset(resolve, preset_name, layout_type="ui")
+        result = resolve.SaveLayoutPreset(preset_name)
         if result:
             return f"Successfully saved layout preset '{preset_name}'"
         else:
@@ -52,7 +50,7 @@ def register_layout_tools(mcp, resolve, logger):
         if resolve is None:
             return "Error: Not connected to DaVinci Resolve"
 
-        result = load_layout_preset(resolve, preset_name, layout_type="ui")
+        result = resolve.LoadLayoutPreset(preset_name)
         if result:
             return f"Successfully loaded layout preset '{preset_name}'"
         else:

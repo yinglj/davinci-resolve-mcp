@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
 DaVinci Resolve MCP Cloud Project Tools
-Cloud project operations including create, import, export, and user management
+Cloud project operations including create, load, import, and restore
 """
 
-from typing import Dict, Any
+from typing import Any, Dict, Optional
 
 from src.utils.cloud_operations import (
     create_cloud_project,
+    load_cloud_project,
     import_cloud_project,
     restore_cloud_project,
-    export_project_to_cloud,
-    add_user_to_cloud_project,
-    remove_user_from_cloud_project,
 )
 
 
@@ -21,13 +19,20 @@ def register_cloud_tools(mcp, resolve, logger):
 
     @mcp.tool()
     def create_cloud_project_tool(
-        project_name: str, folder_path: str = None
+        project_name: str,
+        project_media_path: Optional[str] = None,
+        is_collab: Optional[bool] = None,
+        sync_mode: Optional[str] = None,
+        is_camera_access: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """Create a new cloud project.
 
         Args:
             project_name: Name for the new cloud project
-            folder_path: Optional path for the cloud project folder
+            project_media_path: Optional media path for the project
+            is_collab: Whether the project is a collaboration project
+            sync_mode: Sync mode ('none', 'proxy_only', 'proxy_and_orig')
+            is_camera_access: Whether to enable camera access
 
         Returns:
             Dict[str, Any]: A dictionary containing the result of the operation.
@@ -35,18 +40,59 @@ def register_cloud_tools(mcp, resolve, logger):
         if resolve is None:
             return {"error": "Not connected to DaVinci Resolve", "success": False}
 
-        return create_cloud_project(resolve, project_name, folder_path)
+        return create_cloud_project(
+            resolve,
+            project_name=project_name,
+            project_media_path=project_media_path,
+            is_collab=is_collab,
+            sync_mode=sync_mode,
+            is_camera_access=is_camera_access,
+        )
+
+    @mcp.tool()
+    def load_cloud_project_tool(
+        project_name: str,
+        project_media_path: Optional[str] = None,
+        sync_mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Load an existing cloud project.
+
+        Args:
+            project_name: Name of the cloud project to load
+            project_media_path: Optional media path
+            sync_mode: Sync mode ('none', 'proxy_only', 'proxy_and_orig')
+
+        Returns:
+            Dict[str, Any]: A dictionary containing the result of the operation.
+        """
+        if resolve is None:
+            return {"error": "Not connected to DaVinci Resolve", "success": False}
+
+        return load_cloud_project(
+            resolve,
+            project_name=project_name,
+            project_media_path=project_media_path,
+            sync_mode=sync_mode,
+        )
 
     @mcp.tool()
     def import_cloud_project_tool(
-        cloud_id: str, project_name: str = None
+        file_path: str,
+        project_name: Optional[str] = None,
+        project_media_path: Optional[str] = None,
+        is_collab: Optional[bool] = None,
+        sync_mode: Optional[str] = None,
+        is_camera_access: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Import a project from DaVinci Resolve cloud.
+        """Import a cloud project from a file.
 
         Args:
-            cloud_id: Cloud ID or reference of the project to import
+            file_path: Path to the cloud project file
             project_name: Optional custom name for the imported project
-                          (uses original name if None)
+            project_media_path: Optional media path
+            is_collab: Whether the project is a collaboration project
+            sync_mode: Sync mode ('none', 'proxy_only', 'proxy_and_orig')
+            is_camera_access: Whether to enable camera access
 
         Returns:
             Dict[str, Any]: A dictionary containing the result of the operation.
@@ -54,18 +100,34 @@ def register_cloud_tools(mcp, resolve, logger):
         if resolve is None:
             return {"error": "Not connected to DaVinci Resolve", "success": False}
 
-        return import_cloud_project(resolve, cloud_id, project_name)
+        return import_cloud_project(
+            resolve,
+            file_path=file_path,
+            project_name=project_name,
+            project_media_path=project_media_path,
+            is_collab=is_collab,
+            sync_mode=sync_mode,
+            is_camera_access=is_camera_access,
+        )
 
     @mcp.tool()
     def restore_cloud_project_tool(
-        cloud_id: str, project_name: str = None
+        folder_path: str,
+        project_name: Optional[str] = None,
+        project_media_path: Optional[str] = None,
+        is_collab: Optional[bool] = None,
+        sync_mode: Optional[str] = None,
+        is_camera_access: Optional[bool] = None,
     ) -> Dict[str, Any]:
-        """Restore a project from DaVinci Resolve cloud.
+        """Restore a cloud project from a folder.
 
         Args:
-            cloud_id: Cloud ID or reference of the project to restore
+            folder_path: Path to the cloud project folder
             project_name: Optional custom name for the restored project
-                          (uses original name if None)
+            project_media_path: Optional media path
+            is_collab: Whether the project is a collaboration project
+            sync_mode: Sync mode ('none', 'proxy_only', 'proxy_and_orig')
+            is_camera_access: Whether to enable camera access
 
         Returns:
             Dict[str, Any]: A dictionary containing the result of the operation.
@@ -73,59 +135,14 @@ def register_cloud_tools(mcp, resolve, logger):
         if resolve is None:
             return {"error": "Not connected to DaVinci Resolve", "success": False}
 
-        return restore_cloud_project(resolve, cloud_id, project_name)
-
-    @mcp.tool()
-    def export_project_to_cloud_tool(project_name: str = None) -> Dict[str, Any]:
-        """Export current or specified project to DaVinci Resolve cloud.
-
-        Args:
-            project_name: Optional name of project to export
-                          (uses current project if None)
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the result of the operation.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve", "success": False}
-
-        return export_project_to_cloud(resolve, project_name)
-
-    @mcp.tool()
-    def add_user_to_cloud_project_tool(
-        cloud_id: str, user_email: str, permissions: str = "viewer"
-    ) -> Dict[str, Any]:
-        """Add a user to a cloud project with specified permissions.
-
-        Args:
-            cloud_id: Cloud ID of the project
-            user_email: Email of the user to add
-            permissions: Permission level (viewer, editor, admin)
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the result of the operation.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve", "success": False}
-
-        return add_user_to_cloud_project(resolve, cloud_id, user_email, permissions)
-
-    @mcp.tool()
-    def remove_user_from_cloud_project_tool(
-        cloud_id: str, user_email: str
-    ) -> Dict[str, Any]:
-        """Remove a user from a cloud project.
-
-        Args:
-            cloud_id: Cloud ID of the project
-            user_email: Email of the user to remove
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the result of the operation.
-        """
-        if resolve is None:
-            return {"error": "Not connected to DaVinci Resolve", "success": False}
-
-        return remove_user_from_cloud_project(resolve, cloud_id, user_email)
+        return restore_cloud_project(
+            resolve,
+            folder_path=folder_path,
+            project_name=project_name,
+            project_media_path=project_media_path,
+            is_collab=is_collab,
+            sync_mode=sync_mode,
+            is_camera_access=is_camera_access,
+        )
 
     logger.info("Registered cloud tools")
