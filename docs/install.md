@@ -128,6 +128,9 @@ npx davinci-resolve-mcp doctor                # Dry-run environment/config check
 npx davinci-resolve-mcp server                # Launch the managed MCP server
 npx davinci-resolve-mcp control-panel         # Launch the local control panel
 npx davinci-resolve-mcp sync                  # Refresh the managed install only
+npx davinci-resolve-mcp skills install        # Skills + IDE rules into the current project
+npx davinci-resolve-mcp skills install --global   # ~/.claude/skills for every project
+npx davinci-resolve-mcp skills install --dir <path> --claude-only  # Skills only, no rule files
 
 python install.py                              # Interactive mode
 python install.py --clients all                # Configure all clients
@@ -136,6 +139,12 @@ python install.py --clients manual             # Just print the config
 python install.py --dry-run --clients all      # Preview without writing
 python install.py --no-venv --clients cursor   # Skip venv creation
 ```
+
+`skills install` copies the portable skill corpus into `.claude/skills/` and
+renders the per-IDE rule files (`.cursor/rules/`, `.windsurf/rules/`,
+`.clinerules`, `.roo/rules/`, `.continue/rules/`, `.github/instructions/`, and the
+generated block in `AGENTS.md`) for the target directory. `--global` installs only
+the skills, into `~/.claude/skills/`; rule files stay per-project by convention.
 
 ### Server Modes
 

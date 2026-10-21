@@ -38,6 +38,8 @@ python install.py
 
 各平台路径、客户端专属配置和手动安装步骤，见 [安装与配置](docs/install.md)。
 
+仓库还附带一套可移植的 skill 语料（调色、剪辑、conform、交付、音频、Fusion、媒体池、素材分析、粗剪各有一个领域路由，外加记录剪辑偏好、越用越懂你的 `house-style`）。`npx davinci-resolve-mcp skills install` 会把它装进项目的 `.claude/skills/`，并同步生成 Cursor、Windsurf、Cline、Roo、Continue、GitHub Copilot、Codex 对应的规则文件（`--global` 只装到 `~/.claude/skills/`；`--claude-only` 跳过规则文件）。
+
 安装器和服务器会检查 GitHub 最新 release 是否有 MCP 更新。检查是尽力而为且有节流的；服务器绝不会为了弹提示而阻塞 MCP 启动。安装器支持提示更新、稍后再问、忽略某个版本、关闭检查，或对干净的 git checkout 启用可选的安全自动更新。
 
 ## 免费版（应用内桥接）

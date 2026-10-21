@@ -24,6 +24,9 @@ const PY_ABI_RISK_MINOR = 13;
 const SYNC_ITEMS = [
   "bin",
   "src",
+  // The portable skill corpus. `skills install` reads it from here, so a
+  // managed install has to carry it too.
+  ".agents",
   // The Node 'advanced' bin resolves ../resolve-advanced/server/index.mjs
   // relative to itself, and install.py registers that bin into every generated
   // client config. Leaving the tree out of the sync shipped configs that
@@ -58,6 +61,7 @@ Usage:
   davinci-resolve-mcp control-panel [control panel options]
   davinci-resolve-mcp batch <plan|run|status|list|resume|cancel> [options]
   davinci-resolve-mcp sync [--no-deps]
+  davinci-resolve-mcp skills install [--global | --dir <path>] [--claude-only]
   davinci-resolve-mcp --version
   davinci-resolve-mcp --help
 
@@ -68,6 +72,8 @@ Examples:
   npx davinci-resolve-mcp batch run /path/to/footage --depth standard
   npx davinci-resolve-mcp batch run /path/to/footage --json > progress.log
   npx davinci-resolve-mcp sync            # refresh the managed install only
+  npx davinci-resolve-mcp skills install  # skills + rules into the current project
+  npx davinci-resolve-mcp skills install --global   # ~/.claude/skills for every project
 
 Environment:
   DAVINCI_RESOLVE_MCP_INSTALL_ROOT   Override the managed install directory.
@@ -591,6 +597,63 @@ function commandSync(args) {
   }
 }
 
+// Skills are plain markdown: copying them into a project's `.claude/skills/`
+// is the whole install. The rule files Cursor / Windsurf / Cline / Roo /
+// Continue / Codex read are rendered by generate.mjs, which is the same source
+// of truth the repo uses — no second copy of that formatting logic here.
+function commandSkills(args) {
+  const setup = args[0] === undefined || args[0].startsWith("-") ? "install" : args[0];
+  if (setup !== "install") {
+    throw new Error(`Unknown skills command: ${setup}\n\n${usage()}`);
+  }
+  const rest = args.slice(setup === "install" ? 0 : 1).filter((a) => a !== "install");
+  const global = rest.includes("--global");
+  const claudeOnly = rest.includes("--claude-only");
+  const dirIndex = rest.indexOf("--dir");
+  if (dirIndex > -1 && !rest[dirIndex + 1]) {
+    throw new Error("--dir needs a path");
+  }
+  const dest = path.resolve(
+    dirIndex > -1 ? rest[dirIndex + 1] : global ? os.homedir() : process.cwd()
+  );
+
+  const source = path.join(PACKAGE_ROOT, ".agents", "skills");
+  if (!fs.existsSync(source)) {
+    throw new Error(
+      `Skill corpus not found at ${source}.\nRun from a source checkout, or update the package (npm install ${APP_NAME}@latest).`
+    );
+  }
+
+  const skillsDir = path.join(dest, ".claude", "skills");
+  const installed = [];
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const from = path.join(source, entry.name);
+    if (!fs.existsSync(path.join(from, "SKILL.md"))) continue;
+    const to = path.join(skillsDir, entry.name);
+    fs.rmSync(to, { recursive: true, force: true });
+    fs.cpSync(from, to, { recursive: true });
+    installed.push(entry.name);
+  }
+  console.log(`Installed ${installed.length} skill(s) into ${skillsDir}`);
+  for (const name of installed) console.log(`  ${name}`);
+
+  if (claudeOnly || global) {
+    // Rule files are per-project by convention; --global only carries the
+    // skill corpus, so a home directory does not sprout .cursor/.windsurf.
+    return;
+  }
+  const generator = path.join(PACKAGE_ROOT, "scripts", "agent-rules", "generate.mjs");
+  if (!fs.existsSync(generator)) {
+    console.log("Rule generator not shipped; skills installed without IDE rule files.");
+    return;
+  }
+  const result = spawnSync(process.execPath, [generator, "--root", dest], { stdio: "inherit" });
+  if (result.status !== 0) {
+    throw new Error("Generating IDE rule files failed");
+  }
+}
+
 function main() {
   const argv = process.argv.slice(2);
   // No args → run the MCP stdio server. Anything printed to stdout would
@@ -628,6 +691,10 @@ function main() {
     }
     if (command === "sync") {
       commandSync(args);
+      return;
+    }
+    if (command === "skills") {
+      commandSkills(args);
       return;
     }
 

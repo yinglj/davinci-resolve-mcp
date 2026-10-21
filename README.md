@@ -36,6 +36,8 @@ python install.py
 
 For platform paths, client-specific config, and manual setup, see [Installation and Configuration](docs/install.md).
 
+The repo also ships a portable skill corpus (domain routers for grading, editing, conform, delivery, audio, Fusion, media pool, analysis, rough cut, and a `house-style` preference log). `npx davinci-resolve-mcp skills install` copies it into a project's `.claude/skills/` and renders the matching rule files for Cursor, Windsurf, Cline, Roo, Continue, GitHub Copilot, and Codex (`--global` installs the skills to `~/.claude/skills/` only; `--claude-only` skips the rule files).
+
 The installer and server check the latest GitHub release for MCP updates. Checks are best-effort and throttled; the server never blocks MCP startup for a prompt. The installer can prompt, snooze, ignore a release, disable checks, or apply an opt-in safe auto-update for clean git checkouts.
 
 ## Free edition (in-app bridge)

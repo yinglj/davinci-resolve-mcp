@@ -47,6 +47,8 @@
     "examples/**/*.md",
     "scripts/**/*.py",
     "scripts/edit_subtitle_timeline.mjs",
+    "scripts/agent-rules/generate.mjs",
+    ".agents/skills/",
     "install.py",
     "README.md",
     "CHANGELOG.md",
