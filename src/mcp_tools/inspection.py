@@ -10,6 +10,7 @@ from src.utils.object_inspection import (
     inspect_object,
     print_object_help,
 )
+from src.utils.resolve_probe import MISSING
 
 
 def register_inspection_tools(mcp, resolve, logger):
@@ -96,10 +97,14 @@ def register_inspection_tools(mcp, resolve, logger):
                             "error": f"Method '{method_name}' not found or not callable"
                         }
                 else:
-                    if hasattr(obj, part):
-                        obj = getattr(obj, part)
-                    else:
+                    # On Resolve objects `hasattr` is a constant True, so it
+                    # could never report a missing path segment — the walk just
+                    # fell to None and failed on the NEXT name with a wrong
+                    # message. A getattr default distinguishes the two.
+                    value = getattr(obj, part, MISSING)
+                    if value is MISSING:
                         return {"error": f"Attribute '{part}' not found"}
+                    obj = value
 
             return inspect_object(obj)
         except Exception as e:

@@ -354,6 +354,14 @@ to the user as verified.
 |---|---|---|---|
 | Compound (default) | `src/server.py` | 37 tools | Most workflows — keeps context lean |
 | Granular (full) | `src/server.py --full` | 390 tools | Power users needing one tool per API method |
+| Modular | `src/__main__.py` → `src/core.py` | 535 tools (145 modular + 390 granular under `/granular`) | Clients that want the modular tool set *and* the upstream granular set in one server |
+
+The modular server (`src/core.py`) is the one `src/__main__.py` starts. It
+registers the project's own modular tools (`src/mcp_tools/`, `src/tools/`,
+`src/mcp_resources/`, `src/mcp_prompts/`, `src/mcp_tasks/`) and mounts the
+upstream granular server under the `/granular` namespace. It is a superset of
+the granular mode, not a replacement — the compound server remains the
+context-lean option.
 
 Resolve 21.1 adds [twelve read-only discovery controls](reference/resolve211-read-controls.md)
 for edition, presets, audio formats/codecs, normalization modes, speed, fades

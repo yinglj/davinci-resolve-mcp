@@ -6,6 +6,8 @@ Project management operations
 
 from typing import List, Dict, Any
 
+from src.utils.resolve_probe import has_method
+
 
 def register_project_tools(mcp, resolve, logger):
     """Register project management MCP tools."""
@@ -143,12 +145,12 @@ def register_project_tools(mcp, resolve, logger):
         success = False
 
         try:
-            if hasattr(current_project, "SaveProject"):
+            if has_method(current_project, "SaveProject"):
                 result = current_project.SaveProject()
                 if result:
                     success = True
 
-            if not success and hasattr(project_manager, "SaveProject"):
+            if not success and has_method(project_manager, "SaveProject"):
                 result = project_manager.SaveProject()
                 if result:
                     success = True

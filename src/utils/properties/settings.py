@@ -7,6 +7,8 @@ SuperScale, color, and metadata settings
 import logging
 from typing import Dict, Any
 
+from src.utils.resolve_probe import has_method
+
 from .core import (
     get_project_property,
     set_project_property,
@@ -182,7 +184,7 @@ def get_project_metadata(project_obj) -> Dict[str, Any]:
 
         metadata["name"] = project_obj.GetName()
 
-        if hasattr(project_obj, "GetPath"):
+        if has_method(project_obj, "GetPath"):
             metadata["path"] = project_obj.GetPath()
 
         current_timeline = project_obj.GetCurrentTimeline()

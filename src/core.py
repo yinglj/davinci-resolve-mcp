@@ -45,7 +45,7 @@ logging.basicConfig(
 logger = logging.getLogger("davinci-resolve-mcp")
 
 # Log server version and platform
-VERSION = "2.0.7"
+VERSION = "4.14.4"
 logger.info(f"Starting DaVinci Resolve MCP Server v{VERSION}")
 logger.info(f"Detected platform: {get_platform()}")
 logger.info(f"Using Resolve API path: {RESOLVE_API_PATH}")
@@ -185,13 +185,16 @@ except Exception as e:
 
 # Mount granular server tools under /granular prefix
 try:
-    from src.granular import folder, gallery, graph, media_pool, media_pool_item
-    from src.granular import media_storage, project, resolve_control, timeline, timeline_item
-    from src.granular import render, presets, layout, cloud
+    # Importing any submodule runs src/granular/__init__.py first, which
+    # imports every module the granular server exposes — that is what
+    # registers the tools on granular_mcp. Importing a stray module that
+    # __init__ does not export would register duplicate tool names on top of
+    # the real ones (34 such shadow duplicates once existed in the legacy
+    # render/presets/layout modules; those files are now removed).
     from src.granular.common import mcp as granular_mcp
 
     mcp.mount(granular_mcp, namespace="granular")
-    logger.info("Mounted granular server (342 tools) under /granular prefix")
+    logger.info("Mounted granular server (390 tools) under /granular prefix")
 except ImportError as e:
     logger.warning(f"Could not mount granular tools: {e}")
 except Exception as e:

@@ -10,7 +10,10 @@ from typing import Dict, Any, Optional
 def register_color_tools(mcp, resolve, logger):
     """Register color page MCP tools."""
 
-    # @mcp.tool() - SKIPPED: apply_lut is in granular (prefer upstream)
+    # Not skipped: the granular server has no apply_lut (only the graph-level
+    # graph_set_lut / graph_apply_arri_cdl_lut), so skipping this took the
+    # tool out of the server entirely.
+    @mcp.tool()
     def apply_lut(lut_path: str, node_index: Optional[int] = None) -> str:
         """Apply a Look-Up Table (LUT) to a specific node in the color page.
 

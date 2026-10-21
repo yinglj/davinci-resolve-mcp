@@ -14,12 +14,21 @@ async def test_mcp_tools_registration():
     tools = await mcp.list_tools()
     tool_names = [t.name for t in tools]
 
-    # Check for core and essential tools
-    assert "switch_page" in tool_names
-    assert "create_timeline" in tool_names
-    assert "add_marker_to_timeline" in tool_names
-    assert "apply_lut" in tool_names
-    assert "set_project_property_tool" in tool_names
+    # The server exposes a capability either at top level or through the
+    # mounted granular namespace. Where the granular server renamed the tool
+    # (timeline_add_marker for add_marker_to_timeline), the rename is the
+    # point of the mount, so the test tracks the name that is actually served.
+    equivalents = {
+        "switch_page": "switch_page",
+        "create_timeline": "create_timeline",
+        "add_marker_to_timeline": "timeline_add_marker",
+        "apply_lut": "apply_lut",
+        "set_project_property_tool": "set_project_property_tool",
+    }
+    for label, name in equivalents.items():
+        assert name in tool_names or f"granular_{name}" in tool_names, (
+            f"{label} is not reachable (looked for {name} and granular_{name})"
+        )
 
 
 @pytest.mark.anyio
