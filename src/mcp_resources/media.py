@@ -3,92 +3,57 @@
 DaVinci Resolve MCP Resources - Media related resources
 """
 
+import json
 from typing import List, Dict, Any
+
+from fastmcp.resources import ResourceContent, ResourceResult
+
+import src.api.media as media_api
 
 
 def register_media_resources(mcp, resolve, logger):
     """Register media-related resources."""
 
-    def safe_invoke(obj: Any, method_name: str, *args: Any) -> Any:
-        method = getattr(obj, method_name, None)
-        if not callable(method):
-            return None
-        try:
-            return method(*args)
-        except Exception:
-            return None
+    def _clip_result(payload: List[Dict[str, Any]]) -> ResourceResult:
+        """Normalize a media_api payload into the resource's stable contract.
 
-    def safe_clip_duration(clip: Any) -> Any:
-        # Resolve Python bridge may expose GetDuration as None/non-callable on some clips.
-        duration = safe_invoke(clip, "GetDuration")
-        if duration is not None:
-            return duration
-
-        clip_prop = safe_invoke(clip, "GetClipProperty", "Duration")
-        if clip_prop in (None, ""):
-            clip_prop = safe_invoke(clip, "GetClipProperty", "Frames")
-        return clip_prop if clip_prop not in (None, "") else 0
+        Clients read this resource as a JSON array of clip dicts:
+        - error/info marker entries degrade to `[]` (a connector failure must
+          not look like clip data);
+        - every clip carries `name`, `clip_name` and `clipName` so consumers
+          written against either key get the same value.
+        """
+        clips = []
+        for entry in payload or []:
+            if not isinstance(entry, dict) or "error" in entry or "info" in entry:
+                continue
+            clip = dict(entry)
+            if clip.get("name") is not None:
+                clip.setdefault("clip_name", clip["name"])
+                clip.setdefault("clipName", clip["name"])
+            clips.append(clip)
+        return ResourceResult(
+            contents=[ResourceContent(content=json.dumps(clips, ensure_ascii=False))]
+        )
 
     @mcp.resource("resolve://media-pool-clips")
-    def list_media_pool_clips() -> List[Dict[str, Any]]:
+    def list_media_pool_clips() -> ResourceResult:
         """List all clips in the root folder of the media pool."""
-        if resolve is None:
-            return [{"error": "Not connected to DaVinci Resolve"}]
-
-        project_manager = resolve.GetProjectManager()
-        if not project_manager:
-            return [{"error": "Failed to get Project Manager"}]
-
-        current_project = project_manager.GetCurrentProject()
-        if not current_project:
-            return [{"error": "No project currently open"}]
-
-        media_pool = current_project.GetMediaPool()
-        if not media_pool:
-            return [{"error": "Failed to get Media Pool"}]
-
-        root_folder = media_pool.GetRootFolder()
-        if not root_folder:
-            return [{"error": "Failed to get root folder"}]
-
-        clips = root_folder.GetClipList()
-        if not clips:
-            return [{"info": "No clips found in the root folder"}]
-
-        result = []
-        for clip in clips:
-            name = safe_invoke(clip, "GetName") or "Unknown Clip"
-            result.append(
-                {
-                    "name": name,
-                    "duration": safe_clip_duration(clip),
-                    "fps": safe_invoke(clip, "GetClipProperty", "FPS"),
-                }
-            )
-
-        return result
+        # Delegates to src.api.media so the payload logic lives in one place
+        # (attribute lookup happens per call — the seam tests patch).
+        return _clip_result(media_api.list_media_pool_clips(resolve))
 
     @mcp.resource("resolve://media-pool-bins")
     def list_media_pool_bins() -> List[Dict[str, Any]]:
         """List all bins/folders in the media pool."""
-        try:
-            from src.api.media_operations import list_bins as list_bins_func
-        except ImportError:
-            return [{"error": "Could not import media operations"}]
-
-        return list_bins_func(resolve)
+        # src.api.media_operations moved into the src.api.media package; the
+        # old import path made this handler fail the moment it was called.
+        return media_api.list_bins(resolve)
 
     @mcp.resource("resolve://media-pool-bin/{bin_name}")
     def get_media_pool_bin_contents(bin_name: str) -> List[Dict[str, Any]]:
         """Get contents of a specific bin/folder in the media pool."""
-        try:
-            from src.api.media_operations import (
-                get_bin_contents as get_bin_contents_func,
-            )
-        except ImportError:
-            return [{"error": "Could not import media operations"}]
-
-        return get_bin_contents_func(resolve, bin_name)
+        return media_api.get_bin_contents(resolve, bin_name)
 
     @mcp.resource("resolve://timeline-clips")
     def list_timeline_clips() -> List[Dict[str, Any]]:
