@@ -1140,6 +1140,6 @@ output = {
     "skip": [{"name": n, "reason": r} for n, r in results["skip"]],
 }
 
-with open("tests/test_phase2_results.json", "w") as f:
+with open("tests/test_phase2_results.json", "w", encoding="utf-8") as f:
     json.dump(output, f, indent=2)
 print(f"\nResults saved to tests/test_phase2_results.json")

@@ -47,6 +47,7 @@ def find_powershell() -> Optional[str]:
             result = subprocess.run(
                 [path, "-Command", "echo test"],
                 capture_output=True,
+                stdin=subprocess.DEVNULL,  # never inherit the JSON-RPC stream (#272)
                 timeout=2,
             )
             if result.returncode == 0:
@@ -70,6 +71,9 @@ def _run_powershell(
             [ps_exe, "-NoProfile", "-Command", script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",  # never UnicodeDecodeError on non-ASCII titles
+            stdin=subprocess.DEVNULL,  # never inherit the JSON-RPC stream (#272)
             timeout=timeout,
         )
         if result.returncode == 0 and result.stdout.strip():

@@ -315,7 +315,7 @@ class DemoRunner:
         }
         
         report_file = Path("demo_report.json")
-        with open(report_file, 'w') as f:
+        with open(report_file, 'w', encoding="utf-8") as f:
             json.dump(report_data, f, indent=2)
         
         logger.info(f"\n💾 报告已保存到: {report_file}")

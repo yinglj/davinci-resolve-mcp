@@ -1,7 +1,18 @@
 import json
+import os
+import sys
+
 import pytest
 
 pytest.importorskip("aiohttp")
+
+# davinci_resolve_agent is a script directory, not a package: its modules do
+# `from logger import logger`, so the directory itself has to be importable.
+# examples/demo_tools_usage.py does the same thing.
+_AGENT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.abspath(__file__)))), "davinci_resolve_agent")
+if _AGENT_DIR not in sys.path:
+    sys.path.insert(0, _AGENT_DIR)
 
 from davinci_resolve_agent.client_simulator import ClientSimulator
 

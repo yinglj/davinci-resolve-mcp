@@ -31,7 +31,7 @@ _saved_user_state: Optional[Dict[str, Any]] = None
 def is_wsl() -> bool:
     """Check if running in Windows Subsystem for Linux."""
     try:
-        with open("/proc/version", "r") as f:
+        with open("/proc/version", "r", encoding="utf-8") as f:
             return "microsoft" in f.read().lower()
     except Exception:
         return False
@@ -157,6 +157,9 @@ if ($resolve) {{
             ["powershell.exe", "-Command", ps_script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,  # never inherit the JSON-RPC stream (#272)
             timeout=15,  # Increased timeout for retries
         )
 
@@ -233,6 +236,9 @@ if ($title -like '*DaVinci Resolve*') {
             ["powershell.exe", "-Command", ps_script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,  # never inherit the JSON-RPC stream (#272)
             timeout=5,
         )
         output = result.stdout.strip()

@@ -75,6 +75,9 @@ Write-Output "CURSOR:$($pos.X),$($pos.Y)"
             ["powershell.exe", "-Command", ps_script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,  # never inherit the JSON-RPC stream (#272)
             timeout=5,
         )
         output = result.stdout.strip()
@@ -149,6 +152,9 @@ Write-Output "RESTORED"
             ["powershell.exe", "-Command", ps_script],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
+            stdin=subprocess.DEVNULL,  # never inherit the JSON-RPC stream (#272)
             timeout=5,
         )
 

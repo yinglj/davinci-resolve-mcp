@@ -171,6 +171,6 @@ print(f"Fail: {len(results['fail'])}")
 print(f"Skip: {len(results['skip'])}")
 
 out_path = os.path.join(os.path.dirname(__file__), "test_phase5_results.json")
-with open(out_path, "w") as f:
+with open(out_path, "w", encoding="utf-8") as f:
     json.dump(results, f, indent=2)
 print(f"\nResults saved to {out_path}")

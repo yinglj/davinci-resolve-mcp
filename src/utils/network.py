@@ -3,11 +3,16 @@
 Network utilities for DaVinci Resolve MCP Server
 """
 
-import netifaces
+try:
+    import netifaces
+except ImportError:  # optional: not installable everywhere (needs a C build)
+    netifaces = None
 
 
 def get_all_ip_addresses():
     """Retrieve all non-loopback IP addresses."""
+    if netifaces is None:
+        return []
     try:
         # Get all network interfaces
         interfaces = netifaces.interfaces()

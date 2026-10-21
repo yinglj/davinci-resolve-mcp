@@ -21,24 +21,23 @@ if str(project_dir) not in sys.path:
     sys.path.insert(0, str(project_dir))
 
 # Import the connection utils first to set environment variables
-# Note: we use absolute imports relative to project_dir to avoid confusion
-try:
-    from src.utils.resolve_connection import (
-        check_environment_variables,
-        set_default_environment_variables,
-    )
-    from src.utils.network import get_all_ip_addresses
-    from src.utils.logger import logger
-except ModuleNotFoundError as e:
-    if e.name not in {"src", "src.utils", "src.utils.resolve_connection", "src.utils.network", "src.utils.logger"}:
-        raise
-    # Fallback for if we're inside the package
+# Note: we use absolute imports relative to project_dir to avoid confusion.
+# `python -m src` runs this file as part of the package, so the relative path
+# is the one that resolves there; as a plain script the absolute path does.
+if __package__:
     from .utils.resolve_connection import (
         check_environment_variables,
         set_default_environment_variables,
     )
     from .utils.network import get_all_ip_addresses
     from .utils.logger import logger
+else:
+    from src.utils.resolve_connection import (
+        check_environment_variables,
+        set_default_environment_variables,
+    )
+    from src.utils.network import get_all_ip_addresses
+    from src.utils.logger import logger
 
 # Remove manual basicConfig as CustomLogger handles it
 

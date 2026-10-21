@@ -52,3 +52,12 @@ stubPath = "typings"
 extraPaths = ["src"]
 reportMissingImports = false
 reportImportCycles = false
+
+[tool.pytest.ini_options]
+# Tests use @pytest.mark.asyncio in a few places; without auto mode
+# pytest-asyncio's strict mode refuses to run them ("async def functions are
+# not natively supported").
+asyncio_mode = "auto"
+markers = [
+    "real_resolve: needs a live DaVinci Resolve connection; skipped in the offline suite",
+]

@@ -84,6 +84,27 @@ def _fail_a_test_that_reaches_a_launcher():
         pytest.fail(offline_guard.launch_failure_message(pending), pytrace=False)
 
 
+@pytest.fixture
+def resolve_connection():
+    """A live Resolve handle, or None when this run has no live Resolve.
+
+    The offline suite never opens or connects to Resolve — that is the whole
+    point of the guard above. A test that wants to talk to the real thing asks
+    for this fixture, gets None, and skips itself. Without the fixture the
+    test would not even collect: "fixture 'resolve_connection' not found" is
+    an error, not a skip, and an error in one file is noise that hides real
+    failures in the rest of the run.
+    """
+    try:
+        from src.granular.common import get_resolve
+    except Exception:
+        return None
+    try:
+        return get_resolve()
+    except Exception:
+        return None
+
+
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     if LAUNCH_ATTEMPTS:
         terminalreporter.write_line("")

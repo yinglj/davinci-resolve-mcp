@@ -28,6 +28,15 @@ except ModuleNotFoundError:
         )
     raise
 
+# The module can be importable while the native fusionscript library behind it
+# did not load (no RESOLVE_SCRIPT_LIB), in which case `scriptapp` is missing
+# entirely rather than returning None.
+if not hasattr(dvr, "scriptapp") and __name__ != "__main__":
+    pytest.skip(
+        "DaVinci Resolve scripting library did not load (no RESOLVE_SCRIPT_LIB).",
+        allow_module_level=True,
+    )
+
 resolve = dvr.scriptapp("Resolve")
 if not resolve:
     if __name__ != "__main__":
@@ -287,6 +296,8 @@ print("=" * 60)
 
 # Save results
 with open(
-    "/Users/samuelgursky/davinci-resolve-mcp/tests/test_phase4_results.json", "w"
+    "/Users/samuelgursky/davinci-resolve-mcp/tests/test_phase4_results.json",
+    "w",
+    encoding="utf-8",
 ) as f:
     json.dump(results, f, indent=2, default=str)

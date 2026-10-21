@@ -12,6 +12,8 @@ This module tests Fusion composition functionality in real DaVinci Resolve:
 import sys
 import asyncio
 import logging
+
+import pytest
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from datetime import datetime
@@ -358,6 +360,7 @@ class MockFusionComp:
         return {"type": tool_type, "name": name}
 
 
+@pytest.mark.anyio
 async def test_fusion_comprehensive():
     """Run comprehensive Fusion composition tests"""
     logger.info("\n" + "#" * 80)
