@@ -25,7 +25,12 @@ def _allows_null(schema):
 def _null_default_args_rejecting_null(mcp):
     bad = []
     for tool in asyncio.run(mcp.list_tools()):
-        for name, prop in tool.inputSchema.get("properties", {}).items():
+        # fastmcp 4.x renamed Tool.inputSchema to Tool.parameters; both hold
+        # the same JSON Schema object.
+        schema = getattr(tool, "parameters", None)
+        if schema is None:
+            schema = getattr(tool, "inputSchema", {})
+        for name, prop in schema.get("properties", {}).items():
             if "default" in prop and prop["default"] is None and not _allows_null(prop):
                 bad.append(f"{tool.name}.{name}")
     return sorted(bad)

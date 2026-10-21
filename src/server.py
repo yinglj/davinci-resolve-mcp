@@ -255,8 +255,11 @@ logger = logging.getLogger("resolve-mcp")
 
 from fastmcp import FastMCP
 from fastmcp.server.context import Context
+# fastmcp >= 4 kept its Image helper in fastmcp.utilities.types. (mcp.types
+# has ImageContent, but that is a different class: str data + mimeType, not
+# the bytes + format this module builds.)
 try:
-    from mcp.types import ImageContent as Image
+    from fastmcp.utilities.types import Image
 except Exception:
     Image = None
 from mcp import types as mcp_types
@@ -15201,6 +15204,22 @@ def _playhead_thumbnail_settled(tl, attempts: int = 12, delay: float = 0.3):
     return None, None
 
 
+def _image_content(data: bytes, out_format: str):
+    """MCP image content, or a clear error when the SDK has no Image type.
+
+    `Image` is bound to None when the MCP SDK is too old to expose
+    ImageContent, so every use has to be able to answer for that instead of
+    raising AttributeError on None.
+    """
+    if Image is None:
+        return _err(
+            "This build of the MCP SDK has no image content type, so a frame "
+            "cannot be returned as an image.",
+            code="IMAGE_UNSUPPORTED", category="api_error",
+        )
+    return Image(data=data, format=out_format)
+
+
 def _playhead_frame_preview(tl, p: Dict[str, Any]):
     """Current frame via GetCurrentClipThumbnailImage, as MCP image content."""
     max_width = p.get("max_width", p.get("maxWidth"))
@@ -15234,7 +15253,7 @@ def _playhead_frame_preview(tl, p: Dict[str, Any]):
                 return _err(str(exc), code="THUMBNAIL_DECODE_FAILED", category="api_error")
             if max_width:
                 width, height, raw = _box_downscale_rgb(width, height, raw, int(max_width))
-            return Image(data=_rgb_to_png_bytes(width, height, raw), format="png")
+            return _image_content(_rgb_to_png_bytes(width, height, raw), "png")
         finally:
             _restore_playhead(tl, original_tc, what="the thumbnail capture")
 
@@ -15579,7 +15598,7 @@ def _playhead_frame_render(proj, tl, p: Dict[str, Any],
                 "GetRenderSettings, and on Resolve 19 those keys are accepted "
                 "and then ignored."
             )
-        return Image(data=data, format=out_format)
+        return _image_content(data, out_format)
     finally:
         if job:
             try:
@@ -15824,7 +15843,7 @@ def _playhead_frame_full(proj, tl, p: Dict[str, Any]):
             else:
                 with open(src_path, "rb") as handle:
                     data = handle.read()
-            return Image(data=data, format=out_format)
+            return _image_content(data, out_format)
         finally:
             # GrabStill puts a still in the user's gallery; a capture is a read,
             # so take it back out. Same for the files ExportStills wrote — the
@@ -33850,6 +33869,43 @@ def _resource_install_guidance() -> Dict[str, Any]:
 # Server Startup
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _iter_tool_objects(fastmcp):
+    """Return the server's tool objects, whichever fastmcp shape is installed.
+
+    fastmcp 3.x exposed them as ``server._tool_manager._tools`` (a dict).
+    fastmcp 4.x dropped ``_tool_manager`` entirely and only exposes them through
+    the async ``server._list_tools()``. Both are handled here so the threaded
+    dispatch keeps working across the upgrade instead of silently wrapping
+    nothing (which is what fastmcp 4.x used to cause: the guard returned 0 and
+    every sync tool body ran inline on the event loop).
+    """
+    manager = getattr(fastmcp, "_tool_manager", None)
+    tools = getattr(manager, "_tools", None)
+    if isinstance(tools, dict) and tools:
+        return list(tools.values())
+
+    lister = getattr(fastmcp, "_list_tools", None)
+    if lister is None:
+        return []
+    try:
+        import asyncio
+        result = lister()
+        if asyncio.iscoroutine(result):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                result = asyncio.run(result)
+            else:
+                # Called from inside a running loop — the caller is startup
+                # code, so this should not happen; leave the tools unwrapped
+                # rather than deadlocking.
+                return []
+        return list(result or [])
+    except Exception as exc:
+        logger.warning(f"could not enumerate tools for threaded dispatch: {exc}")
+        return []
+
+
 def _install_threaded_tool_dispatch(fastmcp) -> int:
     """Run synchronous tool bodies in a worker thread instead of inline on the
     event loop.
@@ -33869,12 +33925,12 @@ def _install_threaded_tool_dispatch(fastmcp) -> int:
     changes, leave the tools as-is, falling back to the current inline behavior.
     """
     import functools
+    import inspect
     import anyio
     from anyio.lowlevel import checkpoint_if_cancelled
 
-    manager = getattr(fastmcp, "_tool_manager", None)
-    tools = getattr(manager, "_tools", None)
-    if not isinstance(tools, dict) or not tools:
+    tools = _iter_tool_objects(fastmcp)
+    if not tools:
         return 0
 
     def _offloaded(fn):
@@ -33898,12 +33954,25 @@ def _install_threaded_tool_dispatch(fastmcp) -> int:
         return run_off_thread
 
     wrapped = 0
-    for tool in tools.values():
-        if getattr(tool, "is_async", False):
+    for tool in tools:
+        fn = getattr(tool, "fn", None)
+        if fn is None:
+            continue
+        # mcp 1.x / fastmcp 3.x marked it with Tool.is_async; fastmcp 4.x dropped
+        # that field, so fall back to inspecting the callable itself.
+        is_async = getattr(tool, "is_async", None)
+        if is_async is None:
+            is_async = inspect.iscoroutinefunction(fn)
+        if is_async:
             continue
         try:
-            tool.fn = _offloaded(tool.fn)
-            tool.is_async = True
+            tool.fn = _offloaded(fn)
+            # fastmcp >= 4.0 has no Tool.is_async field; the wrapped callable is
+            # a coroutine function, which is how it now decides to await.
+            try:
+                tool.is_async = True
+            except Exception:
+                pass
         except Exception as exc:  # unexpected SDK shape — keep the original tool
             logger.warning(f"threaded tool dispatch skipped for {getattr(tool, 'name', '?')}: {exc}")
             continue

@@ -82,14 +82,15 @@ class RealAppTests(unittest.TestCase):
         T.clear_transport_state()
 
     def _app_for(self, host):
-        from mcp.server.fastmcp import FastMCP
-        mcp = FastMCP("allowlist-test")  # no host, exactly like src/server.py
+        # MCP SDK 2.x renamed FastMCP to MCPServer (mcp.server.mcpserver).
+        from mcp.server.mcpserver import MCPServer
+        mcp = MCPServer("allowlist-test")  # no host, exactly like src/server.py
         os.environ["DAVINCI_MCP_HOST"] = host
         built = {}
         real = mcp.streamable_http_app
 
-        def capture():
-            built["app"] = real()
+        def capture(*args, **kwargs):
+            built["app"] = real(*args, **kwargs)
             return built["app"]
 
         with mock.patch("uvicorn.run"), \
@@ -106,7 +107,7 @@ class RealAppTests(unittest.TestCase):
     def test_lan_bind_serves_initialize_at_its_own_address(self):
         from starlette.testclient import TestClient
         mcp, app = self._app_for("192.168.1.50")
-        self.assertIn("192.168.1.50:*", mcp.settings.transport_security.allowed_hosts)
+        self.assertIn("192.168.1.50:*", T._active_transport_security.allowed_hosts)
         with TestClient(app) as c:
             self.assertEqual(self._post(c, "192.168.1.50:8000").status_code, 200)
             # The bearer check still runs first, and loopback still works.
@@ -118,7 +119,7 @@ class RealAppTests(unittest.TestCase):
     def test_loopback_bind_is_unchanged(self):
         from starlette.testclient import TestClient
         mcp, app = self._app_for("127.0.0.1")
-        self.assertEqual(mcp.settings.transport_security.allowed_hosts,
+        self.assertEqual(T._active_transport_security.allowed_hosts,
                          ["127.0.0.1:*", "localhost:*", "[::1]:*"])
         with TestClient(app) as c:
             self.assertEqual(self._post(c, "127.0.0.1:8000").status_code, 200)

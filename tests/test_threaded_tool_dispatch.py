@@ -57,10 +57,17 @@ class ThreadedToolDispatchTest(unittest.TestCase):
         # the SDK answered the request a second time, and its "Request already
         # responded to" assert took the whole session down. Driven through the
         # real SDK over the in-memory transport, not the fakes above.
-        from mcp import types
-        from mcp.server.fastmcp import FastMCP
-        from mcp.shared.exceptions import McpError
-        from mcp.shared.memory import create_connected_server_and_client_session
+        #
+        # MCP SDK 2.x dropped `mcp.server.fastmcp` (renamed to MCPServer) and
+        # `mcp.shared.memory.create_connected_server_and_client_session`, so
+        # this drives fastmcp's own Client over the in-memory transport. The
+        # cancellation comes from the client-side timeout, which is the same
+        # cancel path a real client takes — and unlike a hand-built
+        # CancelledNotification it does not need the request id, which SDK 2.x
+        # keeps inside its dispatcher.
+        from fastmcp import FastMCP
+        from fastmcp.client import Client
+        from fastmcp.client.transports import FastMCPTransport
 
         app = FastMCP("cancel-probe")
         release = threading.Event()
@@ -78,24 +85,18 @@ class ThreadedToolDispatchTest(unittest.TestCase):
         outcome = {}
 
         async def scenario():
-            async with create_connected_server_and_client_session(
-                app._mcp_server, raise_exceptions=False
-            ) as client:
+            async with Client(FastMCPTransport(app)) as client:
                 async with anyio.create_task_group() as tg:
                     async def call_slow():
                         try:
-                            await client.call_tool("slow", {})
+                            await client.call_tool("slow", {}, timeout=0.5)
                             outcome["slow"] = "returned"
-                        except McpError as exc:
-                            outcome["slow"] = exc.error.message
+                        except Exception as exc:
+                            outcome["slow"] = str(exc)
 
                     tg.start_soon(call_slow)
                     await anyio.sleep(0.3)
-                    # id 0 was initialize, so the slow call is request 1.
-                    await client.send_notification(types.ClientNotification(
-                        types.CancelledNotification(params=types.CancelledNotificationParams(
-                            requestId=1, reason="client timeout"))))
-                    await anyio.sleep(0.2)
+                    await anyio.sleep(0.4)  # the timeout fires here
                     release.set()  # the body finishes AFTER the cancellation
                 with anyio.fail_after(5):
                     result = await client.call_tool("quick", {})
@@ -105,7 +106,7 @@ class ThreadedToolDispatchTest(unittest.TestCase):
             anyio.run(scenario)
         finally:
             release.set()
-        self.assertEqual(outcome.get("slow"), "Request cancelled")
+        self.assertIn("timed out", str(outcome.get("slow")))
         self.assertEqual(outcome.get("quick"), "quick done")  # session still serving
 
     def test_missing_tool_manager_is_a_noop(self):

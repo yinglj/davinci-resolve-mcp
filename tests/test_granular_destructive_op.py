@@ -463,7 +463,7 @@ class McpSchema(unittest.TestCase):
                     continue
                 hooked += 1
                 original = set(inspect.signature(fn.__wrapped__).parameters)
-                advertised = set(self.tools[name].inputSchema["properties"])
+                advertised = set(self.tools[name].parameters["properties"])
                 with self.subTest(tool=name):
                     self.assertEqual(advertised, original | {dh.GRANULAR_OVERRIDE_PARAM})
                     self.assertTrue(self.tools[name].annotations.destructiveHint)
@@ -479,7 +479,7 @@ class McpSchema(unittest.TestCase):
     def test_readers_and_plain_writes_do_not_carry_the_override(self):
         for name in ("ti_get_info", "timeline_get_track_name", "add_marker" if "add_marker" in self.tools else "ti_get_markers"):
             with self.subTest(tool=name):
-                self.assertNotIn(dh.GRANULAR_OVERRIDE_PARAM, self.tools[name].inputSchema["properties"])
+                self.assertNotIn(dh.GRANULAR_OVERRIDE_PARAM, self.tools[name].parameters["properties"])
 
     def test_the_override_reaches_the_hook_through_fastmcp(self):
         """End to end: a client passing allow_risky_operation through MCP."""

@@ -15,7 +15,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from mcp.server.fastmcp import Image
+# fastmcp >= 4 keeps its Image helper here; mcp.types.ImageContent is a
+# different class (str data + mimeType), not the bytes + format shape used here.
+from fastmcp.utilities.types import Image
 
 import src.server as s
 from src.utils import page_lock
@@ -672,7 +674,9 @@ class CaptureRenderPageRestoreTest(_RenderCapture, unittest.TestCase):
             out, _, _ = self._capture({}, resolve=resolve)
         with mock.patch.object(s, "_playhead_frame_capture", return_value=out):
             sent = asyncio.run(s.mcp.call_tool("timeline_frame", {"action": "capture"}))
-        blocks = sent[0] if isinstance(sent, tuple) else sent
+        # fastmcp 3 returned the block list directly; 4.x returns a ToolResult
+        # (and some paths a (content, structured) tuple).
+        blocks = sent.content if hasattr(sent, "content") else (sent[0] if isinstance(sent, tuple) else sent)
         self.assertEqual([b.type for b in blocks], ["image", "text"])
         self.assertIn("open_page", json.loads(blocks[1].text)["warnings"][0])
 

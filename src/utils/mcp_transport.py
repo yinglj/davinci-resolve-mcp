@@ -45,6 +45,11 @@ LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 WILDCARD_HOSTS = {"0.0.0.0", "::", ""}
 ALLOWED_HOSTS_ENV = "DAVINCI_MCP_ALLOWED_HOSTS"
 
+#: The transport security the last networked bind was built with. MCP SDK 2.x
+#: no longer keeps a copy on `mcp.settings`, but the allowlist a bind ended up
+#: with still has to be observable, not just enforced.
+_active_transport_security = None
+
 
 def _host_pattern(name: str) -> str:
     """`Host`-header pattern for one name: any port, IPv6 literals bracketed."""
@@ -198,18 +203,18 @@ def run_networked(mcp, transport):
     """Serve `mcp` over an authenticated HTTP transport ('sse'|'streamable-http')."""
     import uvicorn
 
-    host = os.environ.get("DAVINCI_MCP_HOST") or mcp.settings.host or "127.0.0.1"
-    port = int(os.environ.get("DAVINCI_MCP_PORT") or mcp.settings.port or 8000)
-    mcp.settings.host = host
-    mcp.settings.port = port
+    settings = getattr(mcp, "settings", None)
+    default_host = getattr(settings, "host", None) or "127.0.0.1"
+    default_port = getattr(settings, "port", None) or 8000
+    host = os.environ.get("DAVINCI_MCP_HOST") or default_host
+    port = int(os.environ.get("DAVINCI_MCP_PORT") or default_port)
     token, generated = resolve_token()
 
     # Must happen BEFORE the app is built: sse_app()/streamable_http_app() read
-    # settings.transport_security once, when they construct the middleware.
+    # the transport security settings once, when they construct the middleware.
     extra = extra_allowed_hosts()
     security = transport_security_for(host, extra)
     if security is not None:
-        mcp.settings.transport_security = security
         if security.enable_dns_rebinding_protection:
             logger.info("MCP transport Host allowlist: %s",
                         ", ".join(security.allowed_hosts))
@@ -222,7 +227,38 @@ def run_networked(mcp, transport):
                 "it on.", host, ALLOWED_HOSTS_ENV, ALLOWED_HOSTS_ENV,
             )
 
-    app = mcp.sse_app() if transport == "sse" else mcp.streamable_http_app()
+    # MCP SDK 2.x moved `host` and `transport_security` off `settings` and onto
+    # the app builders; 1.x kept them on `settings`. Set whichever the installed
+    # SDK actually has, so both work.
+    app_kwargs = {}
+    if settings is not None and hasattr(settings, "host"):
+        settings.host = host
+        settings.port = port
+        if security is not None:
+            settings.transport_security = security
+    else:
+        app_kwargs["host"] = host
+        if security is not None:
+            app_kwargs["transport_security"] = security
+
+    # The security the app was actually built with. SDK 2.x no longer keeps a
+    # copy on `settings`, and for a loopback bind the SDK builds the allowlist
+    # itself (`allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"]`) when it
+    # is handed None — so record the same allowlist here. The allowlist a bind
+    # ended up with has to be observable, not just enforced.
+    global _active_transport_security
+    if security is not None:
+        _active_transport_security = security
+    else:
+        from mcp.server.transport_security import TransportSecuritySettings
+        _active_transport_security = TransportSecuritySettings(
+            enable_dns_rebinding_protection=True,
+            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*"],
+            allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*"],
+        )
+
+    app = (mcp.sse_app(**app_kwargs) if transport == "sse"
+           else mcp.streamable_http_app(**app_kwargs))
     app.add_middleware(_auth_middleware_cls(token))
 
     if host not in LOOPBACK_HOSTS:
