@@ -282,15 +282,19 @@ def register_cache_tools(mcp, resolve, logger):
             clips_to_process = get_all_media_pool_clips(media_pool)
 
         try:
-            media_pool.SetCurrentFolder(media_pool.GetRootFolder())
+            if not media_pool.SetCurrentFolder(media_pool.GetRootFolder()):
+                return "Error: Failed to select the media pool root folder"
             for clip in clips_to_process:
-                clip.AddFlag("Green")
+                if not clip.AddFlag("Green"):
+                    return f"Error: Failed to flag clip '{clip.GetName()}'"
 
             current_page = resolve.GetCurrentPage()
             if current_page != "media":
-                resolve.OpenPage("media")
+                if not resolve.OpenPage("media"):
+                    return "Error: Could not switch to the media page"
 
-            media_pool.SetClipSelection([clip for clip in clips_to_process])
+            if not media_pool.SetClipSelection([clip for clip in clips_to_process]):
+                return "Error: Failed to select the clips in the media pool"
             result = current_project.GenerateOptimizedMedia()
 
             for clip in clips_to_process:
@@ -357,15 +361,19 @@ def register_cache_tools(mcp, resolve, logger):
             clips_to_process = get_all_media_pool_clips(media_pool)
 
         try:
-            media_pool.SetCurrentFolder(media_pool.GetRootFolder())
+            if not media_pool.SetCurrentFolder(media_pool.GetRootFolder()):
+                return "Error: Failed to select the media pool root folder"
             for clip in clips_to_process:
-                clip.AddFlag("Green")
+                if not clip.AddFlag("Green"):
+                    return f"Error: Failed to flag clip '{clip.GetName()}'"
 
             current_page = resolve.GetCurrentPage()
             if current_page != "media":
-                resolve.OpenPage("media")
+                if not resolve.OpenPage("media"):
+                    return "Error: Could not switch to the media page"
 
-            media_pool.SetClipSelection([clip for clip in clips_to_process])
+            if not media_pool.SetClipSelection([clip for clip in clips_to_process]):
+                return "Error: Failed to select the clips in the media pool"
             result = current_project.DeleteOptimizedMedia()
 
             for clip in clips_to_process:

@@ -7,6 +7,8 @@ Timeline creation, listing, and management
 import logging
 from typing import List, Dict, Any
 
+from src.utils.resolve_writes import set_current_timeline as _switch_current_timeline
+
 logger = logging.getLogger("davinci-resolve-mcp.timeline.basic")
 
 
@@ -148,7 +150,8 @@ def create_empty_timeline(
 
     for setting_name, setting_value in settings_to_modify.items():
         logger.info(f"Setting project setting {setting_name} to {setting_value}")
-        current_project.SetSetting(setting_name, setting_value)
+        if not current_project.SetSetting(setting_name, setting_value):
+            logger.warning(f"SetSetting returned False for {setting_name}")
 
     timeline = media_pool.CreateEmptyTimeline(name)
 
@@ -157,7 +160,10 @@ def create_empty_timeline(
             current_project.SetSetting(setting_name, setting_value)
         return f"Failed to create timeline '{name}'"
 
-    current_project.SetCurrentTimeline(timeline)
+    switched, detail = _switch_current_timeline(current_project, timeline)
+    if not switched:
+        logger.error(f"Failed to switch to the new timeline '{name}': {detail}")
+        return f"Failed to switch to the new timeline '{name}'"
 
     if start_timecode is not None:
         try:
@@ -205,7 +211,10 @@ def set_current_timeline(resolve, name: str) -> str:
     for i in range(1, timeline_count + 1):
         timeline = current_project.GetTimelineByIndex(i)
         if timeline and timeline.GetName() == name:
-            current_project.SetCurrentTimeline(timeline)
+            switched, detail = _switch_current_timeline(current_project, timeline)
+            if not switched:
+                logger.error(f"Failed to switch to timeline '{name}': {detail}")
+                return f"Error: Failed to switch to timeline '{name}'"
             current_timeline = current_project.GetCurrentTimeline()
             if current_timeline and current_timeline.GetName() == name:
                 return f"Successfully switched to timeline '{name}'"
@@ -250,7 +259,10 @@ def delete_timeline(resolve, name: str) -> str:
                 break
 
         if another_timeline:
-            current_project.SetCurrentTimeline(another_timeline)
+            switched, detail = _switch_current_timeline(current_project, another_timeline)
+            if not switched:
+                logger.error(f"Failed to switch away from '{name}': {detail}")
+                return f"Failed to switch away from '{name}' before deleting it"
         else:
             return "Error: Cannot delete the only timeline in the project. Create a new timeline first."
 

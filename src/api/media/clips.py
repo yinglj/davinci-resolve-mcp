@@ -7,6 +7,8 @@ Clip management: timeline clips, adding, deleting, moving, subclips
 import logging
 from typing import List, Dict, Any
 
+from src.utils.resolve_writes import set_current_timeline
+
 from .pool import get_all_media_pool_clips
 
 logger = logging.getLogger("davinci-resolve-mcp.media.clips")
@@ -123,7 +125,9 @@ def append_to_timeline(
         for i in range(1, timeline_count + 1):
             t = current_project.GetTimelineByIndex(i)
             if t and t.GetName() == timeline_name:
-                current_project.SetCurrentTimeline(t)
+                switched, detail = set_current_timeline(current_project, t)
+                if not switched:
+                    return f"Error: Failed to switch to timeline '{timeline_name}': {detail}"
                 found = True
                 break
         if not found:
@@ -238,7 +242,9 @@ def add_clip_to_timeline(resolve, clip_name: str, timeline_name: str = None) -> 
             t = current_project.GetTimelineByIndex(i)
             if t and t.GetName() == timeline_name:
                 timeline = t
-                current_project.SetCurrentTimeline(timeline)
+                switched, detail = set_current_timeline(current_project, timeline)
+                if not switched:
+                    return f"Error: Failed to switch to timeline '{timeline_name}': {detail}"
                 break
 
         if not timeline:

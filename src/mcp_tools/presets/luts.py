@@ -7,6 +7,8 @@ LUT export and management
 import os
 from typing import Dict, Any
 
+from src.utils.page_lock import restore_page
+
 
 def register_lut_tools(mcp, resolve, logger):
     """Register LUT MCP tools."""
@@ -32,7 +34,8 @@ def register_lut_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             current_timeline = current_project.GetCurrentTimeline()
@@ -48,7 +51,8 @@ def register_lut_tools(mcp, resolve, logger):
                         break
                 if not target_clip:
                     return f"Error: Clip '{clip_name}' not found in the timeline"
-                current_timeline.SetCurrentSelectedItem(target_clip)
+                if not current_timeline.SetCurrentSelectedItem(target_clip):
+                    return f"Error: Failed to select clip '{clip_name}' in the timeline"
 
             if not export_path:
                 import tempfile
@@ -90,7 +94,7 @@ def register_lut_tools(mcp, resolve, logger):
             )
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             if result:
                 return f"Successfully exported LUT to '{export_path}'"
@@ -99,7 +103,7 @@ def register_lut_tools(mcp, resolve, logger):
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error exporting LUT: {str(e)}"
 
     @mcp.tool()
@@ -118,7 +122,8 @@ def register_lut_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             gallery = current_project.GetGallery()
@@ -176,7 +181,7 @@ def register_lut_tools(mcp, resolve, logger):
                     failed_stills.append(f"{still_name} (export failed)")
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             if failed_stills:
                 return f"Exported {exported_count} LUTs. Failed: {', '.join(failed_stills)}"
@@ -185,7 +190,7 @@ def register_lut_tools(mcp, resolve, logger):
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error exporting PowerGrade LUTs: {str(e)}"
 
     logger.info("Registered LUT tools")

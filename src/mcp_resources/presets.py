@@ -7,6 +7,8 @@ from typing import Any
 
 from fastmcp.resources import ResourceContent, ResourceResult
 
+from src.utils.page_lock import restore_page
+
 
 def register_preset_resources(mcp, resolve, logger):
     """Register preset-related (LUTs, Color Presets) resources."""
@@ -65,7 +67,8 @@ def register_preset_resources(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return to_resource_result([{"error": "could not switch to the color page"}])
 
         try:
             gallery = current_project.GetGallery()
@@ -94,12 +97,12 @@ def register_preset_resources(mcp, resolve, logger):
                 result.append(album_info)
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             return to_resource_result(result)
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return to_resource_result(
                 [{"error": f"Error retrieving color presets: {str(e)}"}]
             )

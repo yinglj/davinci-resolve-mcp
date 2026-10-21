@@ -203,20 +203,22 @@ def register_timeline_item_color_tools(mcp, resolve, logger):
     def _color_set_cdl(timeline_item, cdl, node_index):
         """Set CDL (Color Decision List) values."""
         try:
+            # Resolve API calls must be positional: a keyword argument dies in
+            # the free-edit bridge.
             if node_index is not None:
                 result = timeline_item.SetCDL(
-                    nodeIndex=node_index,
-                    slope=cdl.get("Slope"),
-                    offset=cdl.get("Offset"),
-                    power=cdl.get("Power"),
-                    saturation=cdl.get("Saturation"),
+                    node_index,
+                    cdl.get("Slope"),
+                    cdl.get("Offset"),
+                    cdl.get("Power"),
+                    cdl.get("Saturation"),
                 )
             else:
                 result = timeline_item.SetCDL(
-                    slope=cdl.get("Slope"),
-                    offset=cdl.get("Offset"),
-                    power=cdl.get("Power"),
-                    saturation=cdl.get("Saturation"),
+                    cdl.get("Slope"),
+                    cdl.get("Offset"),
+                    cdl.get("Power"),
+                    cdl.get("Saturation"),
                 )
             return {"success": result}
         except Exception as e:

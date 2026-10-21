@@ -7,6 +7,8 @@ Node management in the color page
 import logging
 from typing import Dict, Any, Optional, Tuple
 
+from src.utils.resolve_probe import has_method
+
 logger = logging.getLogger("davinci-resolve-mcp.color.nodes")
 
 
@@ -40,7 +42,8 @@ def ensure_clip_selected(resolve, timeline) -> Tuple[bool, Optional[Any], str]:
             if first_clip:
                 clip_name = first_clip.GetName()
                 logger.info(f"Attempting to select clip: {clip_name}")
-                timeline.SetCurrentVideoItem(first_clip)
+                if not timeline.SetCurrentVideoItem(first_clip):
+                    logger.warning(f"SetCurrentVideoItem returned False: {clip_name}")
 
                 selected_clip = timeline.GetCurrentVideoItem()
                 if selected_clip and selected_clip.GetName() == clip_name:
@@ -199,7 +202,8 @@ def add_node(resolve, node_type: str = "serial", label: str = None) -> str:
             logger.info("Attempting alternative methods to access grade functionality")
             try:
                 logger.info("Trying to select the clip in timeline again")
-                current_timeline.SetCurrentVideoItem(current_clip)
+                if not current_timeline.SetCurrentVideoItem(current_clip):
+                    logger.warning("SetCurrentVideoItem returned False")
                 logger.info(f"Selected clip {current_clip.GetName()} in timeline")
                 current_grade = current_clip.GetCurrentGrade()
                 if current_grade:
@@ -213,7 +217,7 @@ def add_node(resolve, node_type: str = "serial", label: str = None) -> str:
             )
             try:
                 color_page = project_manager.GetCurrentPage()
-                if color_page and hasattr(color_page, "GetNodeGraph"):
+                if color_page and has_method(color_page, "GetNodeGraph"):
                     node_graph = color_page.GetNodeGraph()
                     if node_graph:
                         logger.info("Successfully got node graph through ColorPage")
@@ -261,8 +265,11 @@ def add_node(resolve, node_type: str = "serial", label: str = None) -> str:
         if label and new_node_index > 0:
             try:
                 logger.info(f"Setting node label to '{label}'")
-                current_grade.SetNodeLabel(new_node_index, label)
-                node_label_info = f" with label '{label}'"
+                if current_grade.SetNodeLabel(new_node_index, label):
+                    node_label_info = f" with label '{label}'"
+                else:
+                    logger.warning("SetNodeLabel returned False")
+                    node_label_info = f" (couldn't set label to '{label}')"
             except Exception as e:
                 logger.warning(f"Failed to set node label: {str(e)}")
                 node_label_info = f" (couldn't set label to '{label}')"

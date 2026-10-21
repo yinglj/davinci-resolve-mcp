@@ -4,6 +4,8 @@ Timeline Export/Import Operations for DaVinci Resolve MCP Server.
 Implements timeline import/export, timecode, and subtitle generation.
 """
 
+from src.utils.resolve_probe import api_constant
+
 
 def import_timeline_from_file(
     resolve,
@@ -240,12 +242,14 @@ def create_subtitles_from_audio(
         settings = {}
         if language and language.lower() in LANGUAGE_MAP:
             lang_const = getattr(resolve, LANGUAGE_MAP[language.lower()], None)
-            if lang_const and hasattr(resolve, "SUBTITLE_LANGUAGE"):
-                settings[resolve.SUBTITLE_LANGUAGE] = lang_const
+            sub_language_key = api_constant(resolve, "SUBTITLE_LANGUAGE")
+            if lang_const and sub_language_key:
+                settings[sub_language_key] = lang_const
 
         if chars_per_line and 1 <= chars_per_line <= 60:
-            if hasattr(resolve, "SUBTITLE_CHARS_PER_LINE"):
-                settings[resolve.SUBTITLE_CHARS_PER_LINE] = chars_per_line
+            sub_chars_key = api_constant(resolve, "SUBTITLE_CHARS_PER_LINE")
+            if sub_chars_key:
+                settings[sub_chars_key] = chars_per_line
 
         if settings:
             result = current_timeline.CreateSubtitlesFromAudio(settings)

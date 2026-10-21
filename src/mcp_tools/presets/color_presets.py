@@ -6,6 +6,8 @@ Color preset management in gallery
 
 from typing import List, Dict, Any
 
+from src.utils.page_lock import restore_page
+
 
 def register_color_preset_tools(mcp, resolve, logger):
     """Register color preset MCP tools."""
@@ -30,7 +32,8 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             current_timeline = current_project.GetCurrentTimeline()
@@ -46,7 +49,8 @@ def register_color_preset_tools(mcp, resolve, logger):
                         break
                 if not target_clip:
                     return f"Error: Clip '{clip_name}' not found in the timeline"
-                current_timeline.SetCurrentSelectedItem(target_clip)
+                if not current_timeline.SetCurrentSelectedItem(target_clip):
+                    return f"Error: Failed to select clip '{clip_name}' in the timeline"
 
             gallery = current_project.GetGallery()
             if not gallery:
@@ -84,16 +88,17 @@ def register_color_preset_tools(mcp, resolve, logger):
             stills = album.GetStills()
             if stills:
                 latest_still = stills[-1]
-                latest_still.SetLabel(final_preset_name)
+                if not latest_still.SetLabel(final_preset_name):
+                    logger.warning("SetLabel returned False for the saved still")
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             return f"Successfully saved color preset '{final_preset_name}'"
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error saving color preset: {str(e)}"
 
     @mcp.tool()
@@ -120,7 +125,8 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             current_timeline = current_project.GetCurrentTimeline()
@@ -136,7 +142,8 @@ def register_color_preset_tools(mcp, resolve, logger):
                         break
                 if not target_clip:
                     return f"Error: Clip '{clip_name}' not found in the timeline"
-                current_timeline.SetCurrentSelectedItem(target_clip)
+                if not current_timeline.SetCurrentSelectedItem(target_clip):
+                    return f"Error: Failed to select clip '{clip_name}' in the timeline"
 
             gallery = current_project.GetGallery()
             if not gallery:
@@ -175,7 +182,7 @@ def register_color_preset_tools(mcp, resolve, logger):
             result = target_still.ApplyToClip()
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             if result:
                 return "Successfully applied color preset"
@@ -184,7 +191,7 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error applying color preset: {str(e)}"
 
     @mcp.tool()
@@ -210,7 +217,8 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             gallery = current_project.GetGallery()
@@ -250,7 +258,7 @@ def register_color_preset_tools(mcp, resolve, logger):
             result = album.DeleteStill(target_still)
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             if result:
                 return "Successfully deleted color preset"
@@ -259,7 +267,7 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error deleting color preset: {str(e)}"
 
     @mcp.tool()
@@ -278,7 +286,8 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             gallery = current_project.GetGallery()
@@ -290,13 +299,13 @@ def register_color_preset_tools(mcp, resolve, logger):
                 for a in albums:
                     if a.GetName() == album_name:
                         if current_page != "color":
-                            resolve.OpenPage(current_page)
+                            restore_page(resolve, current_page, what="the page the caller was on")
                         return f"Album '{album_name}' already exists"
 
             album = gallery.CreateAlbum(album_name)
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             if album:
                 return f"Successfully created album '{album_name}'"
@@ -305,7 +314,7 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error creating album: {str(e)}"
 
     @mcp.tool()
@@ -324,7 +333,8 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         current_page = resolve.GetCurrentPage()
         if current_page != "color":
-            resolve.OpenPage("color")
+            if not resolve.OpenPage("color"):
+                return "Error: Could not switch to the color page"
 
         try:
             gallery = current_project.GetGallery()
@@ -341,13 +351,13 @@ def register_color_preset_tools(mcp, resolve, logger):
 
             if not album:
                 if current_page != "color":
-                    resolve.OpenPage(current_page)
+                    restore_page(resolve, current_page, what="the page the caller was on")
                 return f"Error: Album '{album_name}' not found"
 
             result = gallery.DeleteAlbum(album)
 
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
 
             if result:
                 return f"Successfully deleted album '{album_name}'"
@@ -356,7 +366,7 @@ def register_color_preset_tools(mcp, resolve, logger):
 
         except Exception as e:
             if current_page != "color":
-                resolve.OpenPage(current_page)
+                restore_page(resolve, current_page, what="the page the caller was on")
             return f"Error deleting album: {str(e)}"
 
     logger.info("Registered color preset tools")

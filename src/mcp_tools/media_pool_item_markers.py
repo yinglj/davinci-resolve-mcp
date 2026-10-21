@@ -231,9 +231,9 @@ def register_media_pool_item_markers_tools(mcp, resolve, logger):
                     for frame, marker in markers.items():
                         if marker.get("color") == color:
                             try:
-                                target_clip.DeleteMarkerAtFrame(frame)
-                                deleted_count += 1
-                            except:
+                                if target_clip.DeleteMarkerAtFrame(frame):
+                                    deleted_count += 1
+                            except Exception:
                                 pass
                 return {"success": True, "deleted_count": deleted_count}
             except Exception as e:

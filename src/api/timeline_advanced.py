@@ -6,6 +6,8 @@ Implements timeline duplication, compound clips, generators.
 
 from typing import List
 
+from src.utils.resolve_writes import set_current_timeline
+
 
 def duplicate_timeline(resolve, timeline_name: str = None, new_name: str = None) -> str:
     """Duplicate a timeline.
@@ -36,7 +38,9 @@ def duplicate_timeline(resolve, timeline_name: str = None, new_name: str = None)
                     break
             if not target_timeline:
                 return f"Error: Timeline '{timeline_name}' not found"
-            current_project.SetCurrentTimeline(target_timeline)
+            switched, detail = set_current_timeline(current_project, target_timeline)
+            if not switched:
+                return f"Error: Failed to switch to timeline '{timeline_name}': {detail}"
         else:
             target_timeline = current_project.GetCurrentTimeline()
             if not target_timeline:

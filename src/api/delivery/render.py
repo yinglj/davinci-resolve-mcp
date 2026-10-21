@@ -12,6 +12,8 @@ NOTE: According to the DaVinci Resolve Scripting API documentation:
 import logging
 from typing import Dict, Any, List, Optional, Tuple
 
+from src.utils.resolve_writes import set_current_timeline
+
 logger = logging.getLogger("davinci-resolve-mcp.delivery.render")
 
 
@@ -21,7 +23,9 @@ def ensure_deliver_page(resolve) -> bool:
         current_page = resolve.GetCurrentPage()
         if current_page != "deliver":
             logger.info(f"Switching from {current_page} page to deliver page")
-            resolve.OpenPage("deliver")
+            if not resolve.OpenPage("deliver"):
+                logger.warning("could not switch to the Deliver page")
+                return False
         return True
     except Exception as e:
         logger.error(f"Error switching to deliver page: {str(e)}")
@@ -149,7 +153,10 @@ def add_to_render_queue(
         if not timeline:
             logger.error(f"Timeline '{timeline_name}' not found")
             return {"error": f"Timeline '{timeline_name}' not found"}
-        current_project.SetCurrentTimeline(timeline)
+        switched, detail = set_current_timeline(current_project, timeline)
+        if not switched:
+            logger.error(f"Failed to switch to timeline '{timeline_name}': {detail}")
+            return {"error": f"Failed to switch to timeline '{timeline_name}'"}
     else:
         timeline = current_project.GetCurrentTimeline()
         if not timeline:

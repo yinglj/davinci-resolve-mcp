@@ -166,7 +166,8 @@ def copy_grade(
         if not target_grade:
             return f"Error: Failed to get grade from target clip '{target_clip_name}'"
 
-        current_timeline.SetCurrentVideoItem(target_clip)
+        if not current_timeline.SetCurrentVideoItem(target_clip):
+            logger.warning("SetCurrentVideoItem returned False for the target clip")
 
         result = False
         if mode.lower() == "full":
@@ -192,19 +193,37 @@ def copy_grade(
 
             target_node_count = target_grade.GetNodeCount()
             for i in range(target_node_count, 0, -1):
-                target_grade.DeleteNode(i)
+                if not target_grade.DeleteNode(i):
+                    return (
+                        f"Error: Failed to clear node {i} of target clip "
+                        f"'{target_clip_name}' before copying"
+                    )
 
             for i in range(1, source_node_count + 1):
+                added = False
                 if source_grade.IsSerial(i):
-                    target_grade.AddSerialNode()
+                    added = target_grade.AddSerialNode()
                 elif source_grade.IsParallel(i):
-                    target_grade.AddParallelNode()
+                    added = target_grade.AddParallelNode()
                 elif source_grade.IsLayer(i):
-                    target_grade.AddLayerNode()
+                    added = target_grade.AddLayerNode()
+
+                if not added:
+                    return (
+                        f"Error: Failed to add node {i} of source clip "
+                        f"'{source_clip_name}' to target clip '{target_clip_name}'"
+                    )
 
                 new_node_index = target_grade.GetCurrentNode()
                 if new_node_index > 0:
-                    target_grade.CopyFromNodeToNode(source_grade, i, new_node_index)
+                    if not target_grade.CopyFromNodeToNode(
+                        source_grade, i, new_node_index
+                    ):
+                        return (
+                            f"Error: Failed to copy node {i} of source clip "
+                            f"'{source_clip_name}' to target clip "
+                            f"'{target_clip_name}'"
+                        )
 
             result = True
 

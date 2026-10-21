@@ -7,6 +7,8 @@ Color wheel parameter get/set operations
 import logging
 from typing import Dict, Any
 
+from src.utils.resolve_probe import has_method
+
 from .nodes import ensure_clip_selected
 
 logger = logging.getLogger("davinci-resolve-mcp.color.wheels")
@@ -88,7 +90,7 @@ def get_color_wheels(resolve, node_index: int = None) -> Dict[str, Any]:
                 ]:
                     function_name = f"{prefix}{channel}"
 
-                    if hasattr(current_grade, function_name):
+                    if has_method(current_grade, function_name):
                         getter_func = getattr(current_grade, function_name)
                         value = getter_func(target_node_index)
                         wheel_data[channel_name] = value
@@ -104,7 +106,7 @@ def get_color_wheels(resolve, node_index: int = None) -> Dict[str, Any]:
             additional_controls = {}
 
             try:
-                if hasattr(current_grade, "GetContrast"):
+                if has_method(current_grade, "GetContrast"):
                     additional_controls["contrast"] = current_grade.GetContrast(
                         target_node_index
                     )
@@ -112,7 +114,7 @@ def get_color_wheels(resolve, node_index: int = None) -> Dict[str, Any]:
                 pass
 
             try:
-                if hasattr(current_grade, "GetSaturation"):
+                if has_method(current_grade, "GetSaturation"):
                     additional_controls["saturation"] = current_grade.GetSaturation(
                         target_node_index
                     )
@@ -120,7 +122,7 @@ def get_color_wheels(resolve, node_index: int = None) -> Dict[str, Any]:
                 pass
 
             try:
-                if hasattr(current_grade, "GetColorTemp"):
+                if has_method(current_grade, "GetColorTemp"):
                     additional_controls["color_temp"] = current_grade.GetColorTemp(
                         target_node_index
                     )
@@ -128,7 +130,7 @@ def get_color_wheels(resolve, node_index: int = None) -> Dict[str, Any]:
                 pass
 
             try:
-                if hasattr(current_grade, "GetTint"):
+                if has_method(current_grade, "GetTint"):
                     additional_controls["tint"] = current_grade.GetTint(
                         target_node_index
                     )
@@ -224,7 +226,8 @@ def set_color_wheel_param(
             logger.info("Attempting alternative methods to access grade functionality")
             try:
                 logger.info("Trying to select the clip in timeline again")
-                current_timeline.SetCurrentVideoItem(current_clip)
+                if not current_timeline.SetCurrentVideoItem(current_clip):
+                    logger.warning("SetCurrentVideoItem returned False")
                 logger.info(f"Selected clip {current_clip.GetName()} in timeline")
                 current_grade = current_clip.GetCurrentGrade()
                 if current_grade:
@@ -269,7 +272,7 @@ def set_color_wheel_param(
         function_name = f"{function_prefix}{channel}"
         logger.info(f"Function to call: {function_name}")
 
-        if not hasattr(current_grade, function_name):
+        if not has_method(current_grade, function_name):
             logger.error(f"Function '{function_name}' not found in DaVinci Resolve API")
             return f"Error: Function '{function_name}' not found in DaVinci Resolve API"
 

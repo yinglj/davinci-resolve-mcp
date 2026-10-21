@@ -178,7 +178,8 @@ def register_keyframe_tools(mcp, resolve, logger):
                 current_value = timeline_item.GetPropertyAtKeyframeIndex(
                     property_name, keyframe_index
                 )
-                timeline_item.DeleteKeyframe(property_name, frame)
+                if not timeline_item.DeleteKeyframe(property_name, frame):
+                    return f"Failed to move keyframe for {property_name}"
                 value = new_value if new_value is not None else current_value
                 result = timeline_item.AddKeyframe(property_name, new_frame, value)
 
@@ -187,7 +188,8 @@ def register_keyframe_tools(mcp, resolve, logger):
                 else:
                     return f"Failed to move keyframe for {property_name}"
             else:
-                timeline_item.DeleteKeyframe(property_name, frame)
+                if not timeline_item.DeleteKeyframe(property_name, frame):
+                    return f"Failed to update keyframe value to {new_value}"
                 result = timeline_item.AddKeyframe(property_name, frame, new_value)
 
                 if result:
@@ -313,7 +315,8 @@ def register_keyframe_tools(mcp, resolve, logger):
 
             interpolation_map = {"Linear": 0, "Bezier": 1, "Ease-In": 2, "Ease-Out": 3}
 
-            timeline_item.DeleteKeyframe(property_name, frame)
+            if not timeline_item.DeleteKeyframe(property_name, frame):
+                return f"Failed to set interpolation to {interpolation_type}"
             result = timeline_item.AddKeyframe(
                 property_name, frame, value, interpolation_map[interpolation_type]
             )

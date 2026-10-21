@@ -111,6 +111,14 @@ ALLOWED: dict[tuple[str, str, str], str] = {
     ("graph.py", "graph_set_lut", "RefreshLUTList"): (
         TEARDOWN + "; the granular twin of the compound path, which logs it"
     ),
+    ("queue.py", "clear_render_queue", "StopRendering"): (
+        "the API returns None; the granular twin of the compound render path, "
+        "which the caller polls with IsRenderingInProgress"
+    ),
+    ("basic.py", "create_empty_timeline", "SetSetting"): (
+        TEARDOWN + "; restoring the project settings that were changed to "
+        "create the timeline, after the timeline exists or the create failed"
+    ),
 
     # --- probe harnesses ---------------------------------------------------
     ("probe_catalogue.py", "_probe_pool_add_subfolder", "SetCurrentFolder"): PROBE,

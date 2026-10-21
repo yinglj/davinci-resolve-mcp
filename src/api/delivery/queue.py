@@ -31,7 +31,8 @@ def start_render(resolve) -> Dict[str, Any]:
     page = resolve.GetCurrentPage()
     if page != "deliver":
         logger.info(f"Switching from {page} page to deliver page")
-        resolve.OpenPage("deliver")
+        if not resolve.OpenPage("deliver"):
+            logger.warning("could not switch to the Deliver page")
 
     try:
         logger.info("Checking for jobs in render queue")
@@ -105,7 +106,8 @@ def get_render_queue_status(resolve) -> Dict[str, Any]:
     page = resolve.GetCurrentPage()
     if page != "deliver":
         logger.info(f"Switching from {page} page to deliver page")
-        resolve.OpenPage("deliver")
+        if not resolve.OpenPage("deliver"):
+            logger.warning("could not switch to the Deliver page")
 
     try:
         queue_items = current_project.GetRenderJobList()
@@ -186,7 +188,8 @@ def clear_render_queue(resolve) -> Dict[str, Any]:
     page = resolve.GetCurrentPage()
     if page != "deliver":
         logger.info(f"Switching from {page} page to deliver page")
-        resolve.OpenPage("deliver")
+        if not resolve.OpenPage("deliver"):
+            logger.warning("could not switch to the Deliver page")
 
     try:
         queue_items = current_project.GetRenderJobList()
