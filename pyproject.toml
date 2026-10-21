@@ -5,7 +5,7 @@ description = "DaVinci Resolve MCP Server with Fusion Composition, AutoColor & A
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "fastmcp[tasks]>=4.1.1",
+    "fastmcp[tasks]>=4.1.3",
     "netifaces>=0.11.0",
     "torch>=2.11.0",
     "opencv_python>=4.13.0.92",
